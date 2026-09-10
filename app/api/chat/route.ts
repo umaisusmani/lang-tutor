@@ -7,9 +7,14 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
   const result = streamText({
-    model: groq('llama-3.3-70b-versatile'),
+    model: groq('openai/gpt-oss-120b'),
     system: CONVERSATION_SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
+    providerOptions: {
+      // A conversational reply doesn't need deep multi-step reasoning; keeping
+      // effort low cuts wasted reasoning tokens against Groq's per-minute cap.
+      groq: { reasoningEffort: 'low' },
+    },
   });
 
   return result.toUIMessageStreamResponse();

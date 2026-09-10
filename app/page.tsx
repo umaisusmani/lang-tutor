@@ -3,16 +3,48 @@
 import { useChat } from '@ai-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 
+import { CEFR_LEVELS, DEFAULT_CEFR_LEVEL, isCefrLevel, type CefrLevel } from '@/lib/prompts';
+
+const LEVEL_COOKIE = 'cefr_level';
+
+// Reads the cookie the API route also reads, so the dropdown reflects
+// whatever was set on a previous visit instead of always resetting to A2.
+function readLevelCookie(): CefrLevel {
+  if (typeof document === 'undefined') return DEFAULT_CEFR_LEVEL;
+  const match = document.cookie.match(/(?:^|; )cefr_level=([^;]+)/);
+  const value = match ? decodeURIComponent(match[1]) : undefined;
+  return isCefrLevel(value) ? value : DEFAULT_CEFR_LEVEL;
+}
+
+function writeLevelCookie(level: CefrLevel) {
+  // One year, available on every path, since /api/chat needs to read it too.
+  document.cookie = `${LEVEL_COOKIE}=${level}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
 export default function Chat() {
   const [input, setInput] = useState('');
+  const [level, setLevel] = useState<CefrLevel>(DEFAULT_CEFR_LEVEL);
   const { messages, sendMessage, status, error } = useChat();
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Cookie isn't available during server render, so sync from it after
+  // mount rather than trying to read it as initial state.
+  useEffect(() => {
+    setLevel(readLevelCookie());
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, status]);
 
   const busy = status === 'submitted' || status === 'streaming';
+
+  function handleLevelChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const next = e.target.value;
+    if (!isCefrLevel(next)) return;
+    setLevel(next);
+    writeLevelCookie(next);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,9 +57,25 @@ export default function Chat() {
   return (
     <div className="flex min-h-dvh flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <header className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <div className="mx-auto flex max-w-2xl items-baseline gap-2">
-          <h1 className="text-sm font-semibold">Lang Tutor</h1>
-          <span className="text-xs text-zinc-500">Deutsch üben</span>
+        <div className="mx-auto flex max-w-2xl items-baseline justify-between gap-2">
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-sm font-semibold">Lang Tutor</h1>
+            <span className="text-xs text-zinc-500">Deutsch üben</span>
+          </div>
+          <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+            Level
+            <select
+              value={level}
+              onChange={handleLevelChange}
+              className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              {CEFR_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </header>
 

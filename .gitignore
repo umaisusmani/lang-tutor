@@ -42,3 +42,6 @@ next-env.d.ts
 
 # keep the template (no secrets in it)
 !.env.example
+
+# working plan doc, not for the repo
+PLAN.md

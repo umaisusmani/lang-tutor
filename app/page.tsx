@@ -3,7 +3,24 @@
 import { useChat } from '@ai-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 
+import type { LangTutorUIMessage } from '@/lib/chat-types';
+import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import { CEFR_LEVELS, DEFAULT_CEFR_LEVEL, isCefrLevel, type CefrLevel } from '@/lib/prompts';
+
+// Human-readable labels for the side-panel display. Rough placeholder --
+// the real design pass (step 7) will handle this properly.
+const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
+  word_order: 'Word order',
+  case_declension: 'Case',
+  gender_article: 'Gender/article',
+  verb_conjugation: 'Verb conjugation',
+  auxiliary_verb: 'Auxiliary verb',
+  preposition: 'Preposition',
+  adjective_ending: 'Adjective ending',
+  plural_form: 'Plural form',
+  word_choice: 'Word choice',
+  other: 'Grammar',
+};
 
 const LEVEL_COOKIE = 'cefr_level';
 
@@ -24,7 +41,7 @@ function writeLevelCookie(level: CefrLevel) {
 export default function Chat() {
   const [input, setInput] = useState('');
   const [level, setLevel] = useState<CefrLevel>(DEFAULT_CEFR_LEVEL);
-  const { messages, sendMessage, status, error } = useChat();
+  const { messages, sendMessage, status, error } = useChat<LangTutorUIMessage>();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Cookie isn't available during server render, so sync from it after
@@ -103,6 +120,30 @@ export default function Chat() {
                   part.type === 'text' ? <span key={`${message.id}-${i}`}>{part.text}</span> : null,
                 )}
               </div>
+
+              {/* Rough correction side-area -- one data-correction part per
+                  assistant message, written by the route while the reply
+                  streams. Real layout comes in step 7's design pass. */}
+              {message.role === 'assistant' &&
+                message.parts
+                  .filter((p) => p.type === 'data-correction' && p.data.hasMistake)
+                  .map((p, i) => {
+                    if (p.type !== 'data-correction') return null;
+                    const c = p.data;
+                    return (
+                      <div
+                        key={`${message.id}-correction-${i}`}
+                        className="mt-1 max-w-[85%] rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                      >
+                        <span className="font-semibold">
+                          {c.mistakeType ? MISTAKE_TYPE_LABELS[c.mistakeType] : 'Grammar'}:
+                        </span>{' '}
+                        {c.correction}
+                        <br />
+                        <span className="opacity-80">{c.explanation}</span>
+                      </div>
+                    );
+                  })}
             </div>
           ))}
 

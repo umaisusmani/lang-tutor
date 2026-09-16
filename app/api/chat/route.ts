@@ -8,9 +8,11 @@ import {
 import { cookies } from 'next/headers';
 
 import type { LangTutorUIMessage } from '@/lib/chat-types';
-import { buildConversationSystemPrompt, DEFAULT_CEFR_LEVEL, isCefrLevel } from '@/lib/prompts';
+import { buildConversationSystemPrompt } from '@/lib/prompts';
+import { recordMistake } from '@/lib/services/mistake.service';
+import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
+import { logUsage } from '@/lib/services/usage.service';
 import { detectCorrection } from '@/lib/tutor';
-import { logUsage } from '@/lib/usage';
 
 const CHAT_MODEL = 'openai/gpt-oss-120b';
 
@@ -26,12 +28,9 @@ function lastUserMessageText(messages: LangTutorUIMessage[]): string {
 export async function POST(req: Request) {
   const { messages }: { messages: LangTutorUIMessage[] } = await req.json();
 
-  // Anonymous users get their level via a cookie (no DB until step 3).
-  // Validated against the known set rather than trusted blindly — a cookie
-  // is client-controlled, so a bad/tampered value should fall back safely
-  // rather than get interpolated into the prompt as-is.
+  const userId = await getCurrentUserId();
   const levelCookie = (await cookies()).get('cefr_level')?.value;
-  const level = isCefrLevel(levelCookie) ? levelCookie : DEFAULT_CEFR_LEVEL;
+  const level = await resolveCefrLevel(userId, levelCookie);
 
   const userText = lastUserMessageText(messages);
 
@@ -48,9 +47,10 @@ export async function POST(req: Request) {
       // way — first version had no await here and the correction simply
       // never reached the client.
       const correctionDone = userText.trim()
-        ? detectCorrection(userText, level)
-            .then((correction) => {
+        ? detectCorrection(userText, level, { userId })
+            .then(async (correction) => {
               writer.write({ type: 'data-correction', id: 'correction-1', data: correction });
+              await recordMistake(userId, userText, correction);
             })
             .catch((err) => {
               // A failed correction check shouldn't take down the whole
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
           // per-minute cap.
           groq: { reasoningEffort: 'low' },
         },
-        onFinish: ({ totalUsage }) => logUsage('chat', CHAT_MODEL, totalUsage),
+        onFinish: ({ totalUsage }) => logUsage('chat', CHAT_MODEL, totalUsage, { userId }),
       });
 
       writer.merge(result.toUIMessageStream());

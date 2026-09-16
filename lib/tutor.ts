@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import { buildCorrectionSystemPrompt, DEFAULT_CEFR_LEVEL, type CefrLevel } from '@/lib/prompts';
-import { logUsage } from '@/lib/usage';
+import { logUsage, type UsageContext } from '@/lib/services/usage.service';
 
 const CORRECTION_MODEL = 'openai/gpt-oss-120b';
 
@@ -27,6 +27,7 @@ export type Correction = z.infer<typeof CorrectionSchema>;
 export async function detectCorrection(
   userMessage: string,
   level: CefrLevel = DEFAULT_CEFR_LEVEL,
+  usageContext: UsageContext = {},
 ): Promise<Correction> {
   const { object, usage } = await generateObject({
     model: groq(CORRECTION_MODEL),
@@ -45,7 +46,7 @@ export async function detectCorrection(
     },
   });
 
-  logUsage('correction', CORRECTION_MODEL, usage);
+  await logUsage('correction', CORRECTION_MODEL, usage, usageContext);
 
   return object;
 }

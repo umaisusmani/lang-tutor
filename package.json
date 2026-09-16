@@ -12,6 +12,8 @@
   "dependencies": {
     "@ai-sdk/groq": "^3.0.64",
     "@ai-sdk/react": "^3.0.281",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.109.0",
     "ai": "^6.0.278",
     "next": "16.3.4",
     "react": "19.2.8",

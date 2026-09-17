@@ -17,8 +17,10 @@ const WORD_SPLIT_RE = /([\wäöüÄÖÜß]+)/g;
 
 /**
  * Renders `text` with every word that has a matching gloss entry wrapped in a
- * hoverable span (native `title` tooltip -- deliberately no custom tooltip
- * component yet, this is the rough pass; step 7 gets a real one).
+ * hoverable span. Uses a CSS group-hover tooltip rather than the native
+ * `title` attribute -- `title`'s tooltip is browser-styled (delayed, can't be
+ * themed, looks different per OS), whereas this one matches the app and shows
+ * instantly.
  *
  * Matching is exact-string-first, falling back to case-insensitive, since the
  * gloss prompt asks the model to copy each word exactly as it appears in the
@@ -37,6 +39,21 @@ function stripPunctuation(word: string): string {
   return word.replace(/^[^\wäöüÄÖÜß]+|[^\wäöüÄÖÜß]+$/g, '');
 }
 
+function GlossedWord({ word, translation }: { word: string; translation: string }) {
+  return (
+    <span className="group relative inline-block">
+      <span className="cursor-help rounded border border-dashed border-transparent hover:border-zinc-400 dark:hover:border-zinc-500">
+        {word}
+      </span>
+      <span
+        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 rounded-md bg-zinc-900 px-2 py-1 text-xs whitespace-nowrap text-zinc-50 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100 dark:bg-zinc-100 dark:text-zinc-900"
+      >
+        {translation}
+      </span>
+    </span>
+  );
+}
+
 function GlossedText({ text, gloss }: { text: string; gloss: WordGloss | undefined }) {
   if (!gloss || gloss.length === 0) return <>{text}</>;
 
@@ -50,15 +67,7 @@ function GlossedText({ text, gloss }: { text: string; gloss: WordGloss | undefin
       {chunks.map((chunk, i) => {
         const translation = byExact.get(chunk) ?? byLower.get(chunk.toLowerCase());
         if (!translation) return <span key={i}>{chunk}</span>;
-        return (
-          <span
-            key={i}
-            title={translation}
-            className="cursor-help underline decoration-dotted decoration-zinc-400 underline-offset-2"
-          >
-            {chunk}
-          </span>
-        );
+        return <GlossedWord key={i} word={chunk} translation={translation} />;
       })}
     </>
   );
@@ -220,48 +229,58 @@ export default function Chat({
                 key={message.id}
                 className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
               >
-                <div
-                  className={
-                    message.role === 'user'
-                      ? 'max-w-[85%] rounded-2xl rounded-br-sm bg-zinc-900 px-4 py-2 text-sm whitespace-pre-wrap text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900'
-                      : 'max-w-[85%] rounded-2xl rounded-bl-sm border border-zinc-200 bg-white px-4 py-2 text-sm whitespace-pre-wrap dark:border-zinc-800 dark:bg-zinc-900'
-                  }
-                >
-                  {message.parts.map((part, i) =>
-                    part.type === 'text' ? (
-                      <GlossedText key={`${message.id}-${i}`} text={part.text} gloss={replyGloss} />
-                    ) : null,
-                  )}
+                {/* Everything for one message -- bubble, gloss toggle,
+                    correction panel -- stacks in this single column so it
+                    aligns and wraps as one unit. Without this wrapper, each
+                    piece was a sibling in the outer flex-ROW above, competing
+                    for horizontal space: the correction panel happened to be
+                    wide enough to look right by accident, but the small
+                    gloss-toggle icon just floated beside the bubble instead
+                    of under it. */}
+                <div className="flex max-w-[85%] flex-col gap-1">
+                  <div
+                    className={
+                      message.role === 'user'
+                        ? 'rounded-2xl rounded-br-sm bg-zinc-900 px-4 py-2 text-sm whitespace-pre-wrap text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900'
+                        : 'rounded-2xl rounded-bl-sm border border-zinc-200 bg-white px-4 py-2 text-sm whitespace-pre-wrap dark:border-zinc-800 dark:bg-zinc-900'
+                    }
+                  >
+                    {message.parts.map((part, i) =>
+                      part.type === 'text' ? (
+                        <GlossedText key={`${message.id}-${i}`} text={part.text} gloss={replyGloss} />
+                      ) : null,
+                    )}
+                  </div>
+
+                  {message.role === 'assistant' && <GlossToggle gloss={replyGloss} />}
+
+                  {/* Rough correction area -- one data-correction part per
+                      assistant message, written by the route while the reply
+                      streams. Real layout comes in step 7's design pass. */}
+                  {message.role === 'assistant' &&
+                    message.parts
+                      .filter((p) => p.type === 'data-correction' && p.data.hasMistake)
+                      .map((p, i) => {
+                        if (p.type !== 'data-correction') return null;
+                        const c = p.data;
+                        return (
+                          <div
+                            key={`${message.id}-correction-${i}`}
+                            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                          >
+                            <span className="font-semibold">
+                              {c.mistakeType ? MISTAKE_TYPE_LABELS[c.mistakeType] : 'Grammar'}:
+                            </span>{' '}
+                            {c.correction && (
+                              <GlossedText text={c.correction} gloss={c.correctionGloss ?? undefined} />
+                            )}
+                            <br />
+                            <span className="opacity-80">{c.explanation}</span>
+                            <GlossToggle gloss={c.correctionGloss ?? undefined} />
+                          </div>
+                        );
+                      })}
                 </div>
-
-                {message.role === 'assistant' && <GlossToggle gloss={replyGloss} />}
-
-                {/* Rough correction side-area -- one data-correction part per
-                    assistant message, written by the route while the reply
-                    streams. Real layout comes in step 7's design pass. */}
-                {message.role === 'assistant' &&
-                  message.parts
-                    .filter((p) => p.type === 'data-correction' && p.data.hasMistake)
-                    .map((p, i) => {
-                      if (p.type !== 'data-correction') return null;
-                      const c = p.data;
-                      return (
-                        <div
-                          key={`${message.id}-correction-${i}`}
-                          className="mt-1 max-w-[85%] rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
-                        >
-                          <span className="font-semibold">
-                            {c.mistakeType ? MISTAKE_TYPE_LABELS[c.mistakeType] : 'Grammar'}:
-                          </span>{' '}
-                          {c.correction && (
-                            <GlossedText text={c.correction} gloss={c.correctionGloss ?? undefined} />
-                          )}
-                          <br />
-                          <span className="opacity-80">{c.explanation}</span>
-                          <GlossToggle gloss={c.correctionGloss ?? undefined} />
-                        </div>
-                      );
-                    })}
               </div>
             );
           })}

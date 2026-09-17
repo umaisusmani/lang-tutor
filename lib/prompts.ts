@@ -12,8 +12,13 @@ export function isCefrLevel(value: string | undefined): value is CefrLevel {
   return !!value && (CEFR_LEVELS as readonly string[]).includes(value);
 }
 
+// A1 used to get an inline "(gloss)" appended after uncommon words directly
+// in the reply text. Removed once the structured word-gloss feature shipped
+// (lib/gloss.ts) -- every reply now gets a full word-by-word gloss fetched
+// unconditionally and revealed via hover/icon in the UI, so an inline gloss
+// in the German text itself would just duplicate that, cluttering the reply.
 const LEVEL_GUIDANCE: Record<CefrLevel, string> = {
-  A1: 'The learner is a complete beginner (CEFR A1). Use only the most common words and the simplest sentence structures — short clauses, mostly present tense. Add a short English gloss in parentheses after anything beyond basic vocabulary.',
+  A1: 'The learner is a complete beginner (CEFR A1). Use only the most common words and the simplest sentence structures — short clauses, mostly present tense.',
   A2: "The learner is an elementary learner (CEFR A2). Use everyday vocabulary and simple sentences. You can introduce the Perfekt (past) tense, but keep clauses short.",
   B1: 'The learner is an intermediate learner (CEFR B1). Use natural everyday German, including some subordinate clauses (weil, dass, wenn). Only gloss genuinely uncommon words.',
   B2: 'The learner is an upper-intermediate learner (CEFR B2). Use natural, idiomatic German with varied tenses and subordinate clauses. Do not simplify unnecessarily.',
@@ -83,6 +88,39 @@ priority, and these disambiguation rules:
 Also:
 - "correction" is the full corrected sentence, not just the fixed word or fragment.
 - "explanation" is one or two plain-language sentences in English, understandable to someone who doesn't know grammar terminology.
+- "correctionGloss" is a word-by-word English translation of EVERY word in
+  "correction", in order, including small function words (articles,
+  auxiliaries, pronouns) -- not just the content words. Each entry is
+  {word, translation} where "word" is copied exactly as it appears in
+  "correction" (same capitalization), WITHOUT any leading or trailing
+  punctuation -- no sentence-final periods, commas, or question marks. The
+  one exception is punctuation that is part of the word's own spelling, like
+  an apostrophe in a contraction.
 
-If there is no mistake worth flagging at this level, hasMistake must be false and mistakeType/correction/explanation must all be null.`;
+If there is no mistake worth flagging at this level, hasMistake must be false and mistakeType/correction/explanation/correctionGloss must all be null.`;
+}
+
+/** System prompt for the per-reply word-gloss pass (lib/gloss.ts). Glosses
+ * whatever German text it's given -- the tutor's reply here, but the schema
+ * and prompt are shared with the correction pass's own gloss field, so the
+ * two features behave identically to the learner. */
+export function buildGlossSystemPrompt(): string {
+  return `You are translating a German sentence or short passage word by word for a language learner.
+
+Break the text into individual words, in the order they appear, and give a
+short English translation for each one -- including small function words
+(articles, auxiliaries, pronouns, conjunctions), not just content words.
+
+Rules:
+- "word" must be copied exactly as it appears in the source text (same
+  capitalization), WITHOUT any leading or trailing punctuation -- no sentence-
+  final periods, commas, question marks, or quotation marks. The one exception
+  is punctuation that is part of the word's own spelling, like an apostrophe
+  in a contraction.
+- Translate each word as it functions in THIS sentence, not just its most
+  common dictionary meaning -- e.g. a separable-prefix verb split across the
+  sentence should have its prefix glossed as part of the verb's meaning, not
+  translated as a standalone preposition.
+- One entry per word. Do not merge multi-word phrases into a single entry,
+  and do not skip any word in the source text.`;
 }

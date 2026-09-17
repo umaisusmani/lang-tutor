@@ -14,7 +14,7 @@ import type { MistakeType } from '@/lib/mistake-types';
 import type { CefrLevel } from '@/lib/prompts';
 
 export type VocabSource = 'new_word' | 'mistake';
-export type UsageEndpoint = 'chat' | 'correction';
+export type UsageEndpoint = 'chat' | 'correction' | 'gloss';
 export type MessageRole = 'user' | 'assistant';
 
 export interface Profile {

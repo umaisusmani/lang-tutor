@@ -2,6 +2,7 @@ import { groq } from '@ai-sdk/groq';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
+import { WordGlossSchema } from '@/lib/gloss';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import { buildCorrectionSystemPrompt, DEFAULT_CEFR_LEVEL, type CefrLevel } from '@/lib/prompts';
 import { logUsage, type UsageContext } from '@/lib/services/usage.service';
@@ -13,6 +14,10 @@ const CorrectionSchema = z.object({
   mistakeType: z.enum(MISTAKE_TYPES).nullable(),
   correction: z.string().nullable(),
   explanation: z.string().nullable(),
+  // Word-by-word gloss of `correction`, not `userMessage` -- rides on this
+  // same call for free (no extra request), unlike the reply gloss in
+  // lib/gloss.ts, which needs its own call since it glosses different text.
+  correctionGloss: WordGlossSchema.nullable(),
 });
 
 export type Correction = z.infer<typeof CorrectionSchema>;

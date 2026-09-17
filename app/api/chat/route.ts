@@ -8,6 +8,7 @@ import {
 import { cookies } from 'next/headers';
 
 import type { LangTutorUIMessage } from '@/lib/chat-types';
+import { glossText } from '@/lib/gloss';
 import { buildConversationSystemPrompt } from '@/lib/prompts';
 import { recordMistake } from '@/lib/services/mistake.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
@@ -74,11 +75,31 @@ export async function POST(req: Request) {
 
       writer.merge(result.toUIMessageStream());
 
+      // Reply gloss: unlike correction detection, this genuinely CANNOT start
+      // until the reply text exists, so it chains off result.text rather than
+      // running from the top of execute(). It's still not sequential from the
+      // client's point of view -- the reply has already fully streamed to the
+      // browser by the time this starts -- it's just sequential relative to
+      // the reply's own completion, which is unavoidable.
+      const glossDone = Promise.resolve(result.text)
+        .then((replyText) => glossText(replyText, { userId }))
+        .then((gloss) => {
+          writer.write({ type: 'data-gloss', id: 'gloss-1', data: gloss });
+        })
+        .catch((err) => {
+          // Same rationale as the correction catch below: a failed gloss
+          // must not take down a reply the user already received.
+          console.error('[gloss] failed:', err);
+        });
+
       // `result.text` resolves once generation is complete, giving us a
       // promise to wait on for "the reply is done" without disturbing the
-      // merge above. Waiting on both concurrently (not sequentially) is the
-      // whole point -- this isn't `await correctionDone; await result.text`.
-      await Promise.all([correctionDone, result.text]);
+      // merge above. Waiting on all three concurrently (not sequentially) is
+      // the whole point -- this isn't `await correctionDone; await result.text`.
+      // Omitting any one of these three from this Promise.all reproduces the
+      // exact bug documented above: whichever one resolves last gets its
+      // writer.write() silently dropped once the stream closes.
+      await Promise.all([correctionDone, result.text, glossDone]);
     },
   });
 

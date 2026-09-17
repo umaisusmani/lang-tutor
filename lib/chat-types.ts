@@ -1,13 +1,20 @@
 import type { UIMessage } from 'ai';
 
+import type { WordGloss } from '@/lib/gloss';
 import type { Correction } from '@/lib/tutor';
 
 /**
- * Our chat message type, extending the AI SDK's UIMessage with a typed
- * "correction" data part. Shared between the route (which writes it) and
- * the page (which reads it) so both sides agree on the shape.
+ * Our chat message type, extending the AI SDK's UIMessage with typed data
+ * parts. Shared between the route (which writes them) and the page (which
+ * reads them) so both sides agree on the shape.
+ *
+ * "gloss" is the reply's own word-by-word translation, written once the reply
+ * text is fully generated. It's separate from "correction" (which glosses the
+ * *corrected* sentence, inline in its own object) because it translates
+ * different text, fetched by a different call, that finishes at a different
+ * time.
  */
 export type LangTutorUIMessage = UIMessage<
   never, // no message metadata yet
-  { correction: Correction } // data parts
+  { correction: Correction; gloss: WordGloss } // data parts
 >;

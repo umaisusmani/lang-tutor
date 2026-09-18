@@ -132,6 +132,47 @@ schema rather than introducing a parallel "cards" content model.
 5. Level-gated glossing
 6. Scenario personas + tutor-initiated topics
 
+## Phase 3 — Voice ("video call", turn-based pipeline)
+
+Decision: build voice the way Duolingo's "video call" feature actually
+works, not the way it's presented. It *looks* like a live call (avatar,
+listening/speaking states, a "calling..." transition), but under the hood
+it's turn-based — record until the learner pauses, transcribe, run the
+existing text pipeline, speak the reply back. No persistent duplex socket,
+no OpenAI Realtime API, no per-minute meter. This keeps voice on the same
+near-zero-billing footing as the rest of the stack (see `PLAN.md`'s
+guiding principle) instead of introducing the first genuinely metered,
+usage-scaling cost in the project.
+
+Rejected for now: true realtime duplex (OpenAI Realtime API) — ~$0.016-
+0.05/min with no free tier, and duplex turn-taking/interrupt handling is
+meaningfully more engineering than this project needs to validate the
+"does anyone want voice at all" question first.
+
+- **Pipeline:** browser records while the learner talks, client-side
+  silence/VAD detection ends the turn → audio sent to STT → transcript fed
+  into the *existing* chat pipeline unchanged (`buildConversationSystemPrompt`,
+  `detectCorrection`, etc. all reused as-is — voice is just a different
+  input/output surface on the same text pipeline, not a parallel one) →
+  reply text sent to TTS → audio played back, with the UI driving the
+  avatar's listening/thinking/speaking states off each pipeline stage.
+- **STT/TTS provider:** check Groq's catalog first (it already serves
+  Whisper for STT) to keep this on the existing free-tier account before
+  reaching for a paid TTS provider — same reasoning as the LLM choice.
+  Needs a concrete check of what TTS Groq currently offers and its quality,
+  not assumed.
+- **Correction handling in voice mode:** the side-panel correction UI
+  doesn't make sense mid-call — decide whether corrections are silently
+  logged to `mistake_history` for later (surfaced after the call ends, or
+  as phase-2 drill cards) or spoken as a brief recast (Phase 2 item 1)
+  within the reply itself. Leaning toward the latter, since it's already
+  planned and voice is exactly where a spoken recast is most natural.
+- **Latency budget:** STT + LLM + TTS chained sequentially will be
+  noticeably slower turn-around than true duplex. Worth measuring actual
+  round-trip time early (a throwaway script, before any UI work) to decide
+  if it's tolerable or needs streaming TTS (start speaking before the full
+  reply text is generated) to feel acceptable.
+
 ## Open questions to settle before building
 
 - SM-2 grading UI: simplest is a binary again/got-it, Anki-standard is a

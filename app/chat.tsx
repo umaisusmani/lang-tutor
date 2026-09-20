@@ -224,6 +224,29 @@ export default function Chat({
             // (see lib/gloss.ts) but only ever revealed by hover/icon here.
             const replyGloss = message.parts.find((p) => p.type === 'data-gloss')?.data;
 
+            // Written instead of a normal reply when an anonymous visitor
+            // has hit their message cap -- the route never called the LLM,
+            // so there's no text part on this message at all, just this one.
+            const rateLimited = message.parts.find((p) => p.type === 'data-rateLimited')?.data;
+            if (rateLimited) {
+              return (
+                <div key={message.id} className="flex justify-start">
+                  <div className="max-w-[85%] rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                    <p className="font-semibold">Nachrichtenlimit erreicht</p>
+                    <p className="mt-1">
+                      Du hast dein Limit von {rateLimited.cap} Nachrichten als Gast erreicht.
+                    </p>
+                    <Link
+                      href="/login"
+                      className="mt-2 inline-block font-medium underline underline-offset-4"
+                    >
+                      Melde dich an, um ohne Limit weiterzuchatten
+                    </Link>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={message.id}

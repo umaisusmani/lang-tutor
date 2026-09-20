@@ -12,6 +12,7 @@ import { glossText } from '@/lib/gloss';
 import { buildConversationSystemPrompt } from '@/lib/prompts';
 import { recordMistake } from '@/lib/services/mistake.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
+import { ANON_MESSAGE_CAP, checkAndIncrementUsage, getSessionId } from '@/lib/services/session.service';
 import { logUsage } from '@/lib/services/usage.service';
 import { detectCorrection } from '@/lib/tutor';
 
@@ -30,6 +31,29 @@ export async function POST(req: Request) {
   const { messages }: { messages: LangTutorUIMessage[] } = await req.json();
 
   const userId = await getCurrentUserId();
+
+  // Rate limit check happens before anything else -- specifically before any
+  // Groq call -- so a capped-out anonymous visitor costs us zero tokens, not
+  // just zero *visible* reply. Signed-in users skip this entirely; the cap
+  // only exists to protect against unauthenticated traffic.
+  if (!userId) {
+    const sessionId = await getSessionId();
+    const { allowed } = await checkAndIncrementUsage(sessionId);
+
+    if (!allowed) {
+      const stream = createUIMessageStream<LangTutorUIMessage>({
+        execute: async ({ writer }) => {
+          writer.write({
+            type: 'data-rateLimited',
+            id: 'rate-limit-1',
+            data: { cap: ANON_MESSAGE_CAP },
+          });
+        },
+      });
+      return createUIMessageStreamResponse({ stream });
+    }
+  }
+
   const levelCookie = (await cookies()).get('cefr_level')?.value;
   const level = await resolveCefrLevel(userId, levelCookie);
 

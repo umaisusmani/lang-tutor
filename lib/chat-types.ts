@@ -13,8 +13,13 @@ import type { Correction } from '@/lib/tutor';
  * *corrected* sentence, inline in its own object) because it translates
  * different text, fetched by a different call, that finishes at a different
  * time.
+ *
+ * "rateLimited" is written instead of everything else when an anonymous
+ * visitor has hit their message cap (lib/services/session.service.ts) -- the
+ * route never calls the LLM at all in that case, so this is the only part on
+ * that message.
  */
 export type LangTutorUIMessage = UIMessage<
   never, // no message metadata yet
-  { correction: Correction; gloss: WordGloss } // data parts
+  { correction: Correction; gloss: WordGloss; rateLimited: { cap: number } } // data parts
 >;

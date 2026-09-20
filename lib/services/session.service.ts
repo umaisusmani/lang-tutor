@@ -30,6 +30,29 @@ export async function getSessionId(): Promise<string> {
 }
 
 /**
+ * How many messages this visitor has left, without touching anything.
+ *
+ * Read-only on purpose, and deliberately NOT built on getSessionId(): that one
+ * writes a cookie, which a Server Component isn't allowed to do. This only
+ * reads an existing cookie, so app/page.tsx can call it during render. No
+ * cookie yet means nobody has sent a message from this browser, so the full
+ * cap is still available.
+ */
+export async function getRemainingMessages(): Promise<number> {
+  const sessionId = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!sessionId) return ANON_MESSAGE_CAP;
+
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from('session_usage')
+    .select('message_count')
+    .eq('session_id', sessionId)
+    .single();
+
+  return Math.max(0, ANON_MESSAGE_CAP - (data?.message_count ?? 0));
+}
+
+/**
  * Checks the session's message count against the cap and, if under it,
  * increments it. Only ever called for anonymous requests -- signed-in users
  * skip this entirely (see app/api/chat/route.ts).

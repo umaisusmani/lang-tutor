@@ -21,5 +21,13 @@ import type { Correction } from '@/lib/tutor';
  */
 export type LangTutorUIMessage = UIMessage<
   never, // no message metadata yet
-  { correction: Correction; gloss: WordGloss; rateLimited: { cap: number } } // data parts
+  {
+    correction: Correction;
+    gloss: WordGloss;
+    rateLimited: { cap: number };
+    // Which conversation the turn was stored in. Written on every persisted
+    // turn so a brand-new chat's second message appends to the conversation
+    // the first one created, rather than forking a new one each turn.
+    conversation: { id: string };
+  }
 >;

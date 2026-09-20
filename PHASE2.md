@@ -1,4 +1,4 @@
-# Lang Tutor — Phase 2 Plan (SRS + Recasting + Personas)
+# starprache — Phase 2 Plan (SRS + Recasting + Personas)
 
 > Builds on `PLAN.md` (v1). Not started — v1's build order (steps 3-7) ships
 > first. This doc exists so the phase 2 ideas don't get lost, and so v1's

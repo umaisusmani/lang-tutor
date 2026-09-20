@@ -45,3 +45,7 @@ next-env.d.ts
 
 # working plan doc, not for the repo
 PLAN.md
+
+# design handoff export (reference for implementing, not shipped code)
+*.zip
+design_handoff_*/

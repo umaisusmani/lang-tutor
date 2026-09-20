@@ -1,4 +1,4 @@
-# Lang Tutor
+# starprache
 
 German conversation practice with an AI tutor. Chat in German at your CEFR level, get your grammar mistakes classified and explained, and keep track of what you get wrong.
 

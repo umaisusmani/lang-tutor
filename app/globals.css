@@ -1,26 +1,160 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens from the Übung handoff.
+ *
+ * Dark mode resolves two ways on purpose: the OS preference applies unless the
+ * user has explicitly picked light, and an explicit data-theme always wins.
+ * That's what lets the header's toggle override the system setting instead of
+ * fighting it.
+ *
+ * --on-bright and --on-accent do NOT flip between themes. Yellow, orange and
+ * the accent fill are (near enough) constant across both, so text sitting on
+ * them has to stay constant too -- using --ink there would invert it in dark
+ * mode and put dark text on a dark bubble.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --paper: oklch(0.968 0.014 95);
+  --panel: oklch(1 0 0);
+  --ink: oklch(0.24 0.03 280);
+  --ink-2: oklch(0.52 0.03 280);
+  --ink-3: oklch(0.56 0.025 280);
+  --line: oklch(0.24 0.03 280);
+  --hair: oklch(0.86 0.015 95);
+  --accent: oklch(0.30 0.022 280);
+  --accent-ink: oklch(0.38 0.03 280);
+  --yellow: oklch(0.89 0.15 100);
+  --orange: oklch(0.82 0.14 55);
+  --soft: oklch(0.93 0.018 95);
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --on-bright: oklch(0.24 0.03 280);
+  --on-accent: oklch(0.99 0 0);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --paper: oklch(0.22 0.025 285);
+    --panel: oklch(0.27 0.028 285);
+    --ink: oklch(0.96 0.01 95);
+    --ink-2: oklch(0.74 0.02 285);
+    --ink-3: oklch(0.68 0.02 285);
+    /* --line lightens in dark mode: the outline character comes from contrast
+       with the background, not from pure black. */
+    --line: oklch(0.46 0.03 285);
+    --hair: oklch(0.34 0.025 285);
+    --accent: oklch(0.40 0.025 285);
+    --accent-ink: oklch(0.82 0.02 285);
+    --soft: oklch(0.31 0.03 285);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: oklch(0.22 0.025 285);
+  --panel: oklch(0.27 0.028 285);
+  --ink: oklch(0.96 0.01 95);
+  --ink-2: oklch(0.74 0.02 285);
+  --ink-3: oklch(0.68 0.02 285);
+  --line: oklch(0.46 0.03 285);
+  --hair: oklch(0.34 0.025 285);
+  --accent: oklch(0.40 0.025 285);
+  --accent-ink: oklch(0.82 0.02 285);
+  --soft: oklch(0.31 0.03 285);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-hair: var(--hair);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-yellow: var(--yellow);
+  --color-orange: var(--orange);
+  --color-soft: var(--soft);
+  --color-on-bright: var(--on-bright);
+  --color-on-accent: var(--on-accent);
+
+  --font-sans: var(--font-archivo);
+  --font-mono: var(--font-dm-mono);
+}
+
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
+ * Entrance for attachments that arrive ONCE, after the reply has finished
+ * streaming -- the correction panel and the pending-label row.
+ *
+ * Deliberately not applied to reply text: the handoff calls that out, and it's
+ * right. Streaming text mounts token by token, so a per-mount entrance
+ * animation compounds into a constant shimmer.
+ */
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The 0fr -> 1fr grid-row trick: the only way to transition to a content-
+   driven height without measuring it in JS. The child needs overflow:hidden
+   and min-height:0 for it to actually clip. */
+.gloss-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 220ms ease,
+    opacity 160ms ease;
+}
+
+.gloss-panel[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.gloss-panel > * {
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-archivo), system-ui, sans-serif;
+}
+
+a {
+  color: var(--accent-ink);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+a:hover {
+  color: var(--ink);
 }

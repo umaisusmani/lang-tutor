@@ -10,8 +10,10 @@
  * service layer is where they get translated into anything friendlier.
  */
 
+import type { WordGloss } from '@/lib/gloss';
 import type { MistakeType } from '@/lib/mistake-types';
 import type { CefrLevel } from '@/lib/prompts';
+import type { Correction } from '@/lib/tutor';
 
 export type VocabSource = 'new_word' | 'mistake';
 export type UsageEndpoint = 'chat' | 'correction' | 'gloss';
@@ -65,6 +67,8 @@ export interface SessionUsage {
 export interface Conversation {
   id: string;
   user_id: string;
+  /** Derived from the first user message, so a list has something to show. */
+  title: string | null;
   created_at: string;
 }
 
@@ -74,4 +78,9 @@ export interface Message {
   role: MessageRole;
   content: string;
   created_at: string;
+  /** Set on USER messages -- it describes what the learner wrote, even though
+   * the UI renders it under the reply that followed. */
+  correction: Correction | null;
+  /** Set on ASSISTANT messages -- a word-by-word reading of its own text. */
+  gloss: WordGloss | null;
 }

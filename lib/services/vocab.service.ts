@@ -147,14 +147,25 @@ export async function getVocabCandidates(
  * Upsert on the existing UNIQUE(user_id, lemma) constraint -- saving a word
  * that's already saved is a no-op, not an error, so the UI doesn't need to
  * distinguish "first save" from "already there" before calling this.
+ *
+ * Returns whether the write went through. supabase-js RETURNS request
+ * failures (RLS rejection, a dropped connection, a constraint violation)
+ * instead of throwing them, so the old version -- which only had a try/catch
+ * -- reported success for a save that never happened, and the UI ticked a word
+ * that would be gone on reload. A conflict that `ignoreDuplicates` skips is
+ * not an error here, so an already-saved word still returns true.
+ *
+ * First save wins: `ignoreDuplicates` means an existing row is never updated,
+ * so a word saved from a reply as 'new_word' keeps that source even if it's
+ * later saved from a correction.
  */
 export async function saveVocabEntry(
   userId: string,
   entry: { term: string; lemma: string; translation: string; source: VocabSource },
-): Promise<void> {
+): Promise<boolean> {
   try {
     const supabase = await createClient();
-    await supabase.from('vocab_entries').upsert(
+    const { error } = await supabase.from('vocab_entries').upsert(
       {
         user_id: userId,
         term: entry.term,
@@ -164,20 +175,43 @@ export async function saveVocabEntry(
       },
       { onConflict: 'user_id,lemma', ignoreDuplicates: true },
     );
+
+    if (error) {
+      console.error('[vocab.service] saveVocabEntry failed:', error.message);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error('[vocab.service] saveVocabEntry failed:', err);
+    return false;
   }
 }
 
-export async function deleteVocabEntry(userId: string, entryId: string): Promise<void> {
+/**
+ * Returns whether the delete succeeded. Deleting a row that's already gone
+ * counts as success -- the learner wanted it gone and it is -- so this only
+ * reports false for a real failure, not for "0 rows matched".
+ */
+export async function deleteVocabEntry(userId: string, entryId: string): Promise<boolean> {
   try {
     const supabase = await createClient();
     // user_id here is redundant with RLS (a cross-user delete is already
     // rejected by the policy) but cheap defense-in-depth, same reasoning as
     // mistake.service.ts.
-    await supabase.from('vocab_entries').delete().eq('id', entryId).eq('user_id', userId);
+    const { error } = await supabase
+      .from('vocab_entries')
+      .delete()
+      .eq('id', entryId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('[vocab.service] deleteVocabEntry failed:', error.message);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error('[vocab.service] deleteVocabEntry failed:', err);
+    return false;
   }
 }
 

@@ -1,7 +1,7 @@
 import { groq } from '@ai-sdk/groq';
 import { convertToModelMessages, streamText, type UIMessageStreamWriter } from 'ai';
 
-import type { LangTutorUIMessage } from '@/lib/chat-types';
+import type { LangTutorUIMessage, NoticeSource } from '@/lib/chat-types';
 import { glossText } from '@/lib/gloss';
 import { buildConversationSystemPrompt, type CefrLevel } from '@/lib/prompts';
 import {
@@ -26,6 +26,27 @@ import type { Conversation } from '@/lib/types/db';
  */
 
 const CHAT_MODEL = 'openai/gpt-oss-120b';
+
+/**
+ * Tells the learner a background step failed, without touching the reply.
+ *
+ * Transient (see the `notice` part in chat-types.ts). Wrapped in its own
+ * try/catch because this is called from inside the `.catch` handlers below:
+ * if the stream is already broken, letting this throw would turn "the gloss
+ * failed" into "the whole response rejected", which is exactly what those
+ * handlers exist to prevent.
+ */
+function notify(
+  writer: UIMessageStreamWriter<LangTutorUIMessage>,
+  source: NoticeSource,
+  message: string,
+) {
+  try {
+    writer.write({ type: 'data-notice', data: { source, message }, transient: true });
+  } catch (err) {
+    console.error('[notice] write failed:', err);
+  }
+}
 
 export type ChatTurn = {
   userId: string | null;
@@ -103,6 +124,15 @@ export async function runChatTurn(
     });
   }
 
+  // A signed-in learner's turn that didn't make it into the database. Either
+  // there's no conversation to put it in (creating one failed, or the id the
+  // client sent belongs to a chat that's since been deleted) or the message
+  // insert itself failed. The reply still streams normally either way, so
+  // without this the chat looks fine and the turn is silently gone on reload.
+  if (userId && userText.trim() && (!conversation || !userMessageId)) {
+    notify(writer, 'history', "Couldn't save this message to your chat history.");
+  }
+
   // Correction detection analyses the user's own message, so it needs
   // nothing from the reply — kick it off now, concurrently with the
   // reply stream below, rather than waiting for the reply to finish
@@ -141,8 +171,10 @@ export async function runChatTurn(
         })
         .catch((err) => {
           // A failed correction check shouldn't take down the whole
-          // response -- the conversation reply still matters more.
+          // response -- the conversation reply still matters more. But say
+          // so: a missing correction card otherwise reads as "no mistake".
           console.error('[correction] failed:', err);
+          notify(writer, 'correction', "Couldn't check your German this time.");
         })
     : Promise.resolve();
 
@@ -174,9 +206,15 @@ export async function runChatTurn(
   // closes. Resolves to the new row's id so the gloss can be attached to it
   // below.
   const assistantSave = conversation
-    ? Promise.resolve(result.text).then((replyText) =>
-        saveMessage(conversation.id, 'assistant', replyText),
-      )
+    ? Promise.resolve(result.text).then(async (replyText) => {
+        const id = await saveMessage(conversation.id, 'assistant', replyText);
+        // Written from inside this chain so it's awaited by the Promise.all
+        // below -- a write made after the stream closes is silently dropped.
+        if (!id && replyText.trim()) {
+          notify(writer, 'history', "Couldn't save the tutor's reply to your chat history.");
+        }
+        return id;
+      })
     : Promise.resolve(null);
 
   const glossDone = Promise.resolve(result.text)
@@ -207,6 +245,7 @@ export async function runChatTurn(
       // Same rationale as the correction catch above: a failed gloss
       // must not take down a reply the user already received.
       console.error('[gloss] failed:', err);
+      notify(writer, 'gloss', "Couldn't translate the reply this time.");
     });
 
   // `result.text` resolves once generation is complete, giving us a

@@ -1,10 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { signOut } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
+import { useConfirm } from '@/app/components/confirm-modal';
+import { notifyError } from '@/app/components/toaster';
+import { deleteConversationAction } from '@/app/conversations/actions';
 import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
 
@@ -35,6 +39,9 @@ export function SiteHeader({
 }) {
   const [chatsOpen, setChatsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const router = useRouter();
 
   useEffect(() => {
     if (!chatsOpen && !accountOpen) return;
@@ -52,6 +59,43 @@ export function SiteHeader({
     const next = e.target.value;
     if (!isCefrLevel(next)) return;
     onLevelChange(next);
+  }
+
+  async function handleDeleteChat(chat: Conversation) {
+    const ok = await confirm({
+      title: 'Delete this chat?',
+      description: (
+        <>
+          &ldquo;{chat.title ?? 'Untitled'}&rdquo; and all of its messages will be permanently
+          deleted. Words you saved from it stay in your vocab list.
+        </>
+      ),
+      confirmLabel: 'Delete chat',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
+    setDeletingId(chat.id);
+    // A rejected promise (network drop) is a failed delete just like
+    // `ok: false`, so both fall through to the same notice below.
+    let deleted = false;
+    try {
+      ({ ok: deleted } = await deleteConversationAction(chat.id));
+    } catch {
+      // deleted stays false
+    } finally {
+      setDeletingId(null);
+    }
+
+    if (!deleted) {
+      notifyError("Couldn't delete that chat. Please try again.", `delete-${chat.id}`);
+      return;
+    }
+    // Only leave once the delete has really happened, and only if the chat
+    // being deleted is the one on screen -- deleting a different one from
+    // the menu shouldn't yank you out of what you're reading. The action's
+    // revalidation has already refreshed this list by the time it returns.
+    if (chat.id === conversationId) router.push('/?c=new');
   }
 
   const progressPct =
@@ -83,16 +127,9 @@ export function SiteHeader({
 
           {userEmail && (
             <div className="flex items-center gap-2.5">
-              <Link
-                href="/"
-                className={`font-mono text-xs underline underline-offset-[3px] transition-colors ${
-                  activePage === 'chat'
-                    ? 'text-ink bg-yellow text-on-bright rounded-full px-2 py-1 no-underline'
-                    : 'text-ink-2 hover:text-ink'
-                }`}
-              >
-                chat
-              </Link>
+              {/* The "chat" nav link was removed: "+ new chat" in the chats
+                  menu below already opens a chat, and every conversation in
+                  it links back to `/`, so this only duplicated them. */}
               <Link
                 href="/vocab"
                 className={`font-mono text-xs underline underline-offset-[3px] transition-colors ${
@@ -144,21 +181,41 @@ export function SiteHeader({
                     {conversations.length > 0 && <div className="bg-hair my-1.5 h-px" />}
 
                     <div className="flex max-h-[280px] flex-col overflow-y-auto">
-                      {conversations.map((c) => (
-                        <Link
-                          key={c.id}
-                          href={`/?c=${c.id}`}
-                          onClick={() => setChatsOpen(true)}
-                          className={`truncate rounded-lg px-2.5 py-2 text-[13px] no-underline ${
-                            c.id === conversationId
-                              ? 'bg-yellow text-on-bright font-semibold'
-                              : 'text-ink-2 hover:bg-soft hover:text-ink'
-                          }`}
-                          aria-current={c.id === conversationId ? 'page' : undefined}
-                        >
-                          {c.title ?? 'Untitled'}
-                        </Link>
-                      ))}
+                      {conversations.map((c) => {
+                        const current = c.id === conversationId;
+                        return (
+                          <div
+                            key={c.id}
+                            className={`group flex items-center rounded-lg ${
+                              current ? 'bg-yellow text-on-bright' : 'hover:bg-soft'
+                            } ${deletingId === c.id ? 'pointer-events-none opacity-50' : ''}`}
+                          >
+                            <Link
+                              href={`/?c=${c.id}`}
+                              onClick={() => setChatsOpen(true)}
+                              className={`min-w-0 flex-1 truncate px-2.5 py-2 text-[13px] no-underline ${
+                                current ? 'font-semibold' : 'text-ink-2 group-hover:text-ink'
+                              }`}
+                              aria-current={current ? 'page' : undefined}
+                            >
+                              {c.title ?? 'Untitled'}
+                            </Link>
+                            {/* Hover-revealed on wide screens to keep the list
+                                calm, but always visible on touch, where there
+                                is no hover to reveal it. Focus reveals it too,
+                                so keyboard users can reach it. */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteChat(c)}
+                              aria-label={`Delete chat: ${c.title ?? 'Untitled'}`}
+                              title="Delete chat"
+                              className="mr-1 flex h-6 w-6 flex-none cursor-pointer items-center justify-center rounded-md text-[15px] leading-none opacity-70 transition-opacity hover:bg-black/10 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </>

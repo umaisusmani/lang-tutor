@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import { deleteVocabAction } from '@/app/vocab/actions';
+import { RemoveWordButton } from '@/app/vocab/remove-word-button';
 import { VocabPageHeader } from '@/app/vocab/VocabPageHeader';
 import { listConversations } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
@@ -60,14 +60,7 @@ export default async function VocabPage() {
                   <span className="text-ink-3 ml-auto font-mono text-[10px]">
                     {new Date(entry.created_at).toLocaleDateString()}
                   </span>
-                  <form action={deleteVocabAction.bind(null, entry.id)}>
-                    <button
-                      type="submit"
-                      className="text-ink-3 hover:text-ink cursor-pointer font-mono text-[11px] underline underline-offset-[3px]"
-                    >
-                      remove
-                    </button>
-                  </form>
+                  <RemoveWordButton entryId={entry.id} lemma={entry.lemma} />
                 </div>
               ))}
             </div>

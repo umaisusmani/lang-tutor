@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Archivo, DM_Mono } from "next/font/google";
 import "./globals.css";
+import { ConfirmProvider } from "@/app/components/confirm-modal";
+import { AppToaster } from "@/app/components/toaster";
 
 // The type split is semantic, not decorative: Archivo carries UI and German,
 // DM Mono marks English glosses, labels and metadata -- "this is scaffolding
@@ -29,7 +31,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${archivo.variable} ${dmMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ConfirmProvider>{children}</ConfirmProvider>
+        <AppToaster />
+      </body>
     </html>
   );
 }

@@ -23,20 +23,24 @@ export async function saveVocabAction(
     translation: string;
   },
   source: VocabSource = 'new_word',
-) {
+): Promise<{ ok: boolean }> {
   const userId = await getCurrentUserId();
-  if (!userId) return;
+  if (!userId) return { ok: false };
 
-  await saveVocabEntry(userId, { ...candidate, source });
+  const ok = await saveVocabEntry(userId, { ...candidate, source });
   // Revalidates the /vocab list page's data; the chat UI updates its own
   // saved state locally rather than waiting on a round-trip (see chat.tsx).
-  revalidatePath('/vocab');
+  if (ok) revalidatePath('/vocab');
+  // `ok` is returned so the client can undo its optimistic tick and say so --
+  // a save that silently failed used to leave a word showing as saved.
+  return { ok };
 }
 
-export async function deleteVocabAction(entryId: string) {
+export async function deleteVocabAction(entryId: string): Promise<{ ok: boolean }> {
   const userId = await getCurrentUserId();
-  if (!userId) return;
+  if (!userId) return { ok: false };
 
-  await deleteVocabEntry(userId, entryId);
-  revalidatePath('/vocab');
+  const ok = await deleteVocabEntry(userId, entryId);
+  if (ok) revalidatePath('/vocab');
+  return { ok };
 }

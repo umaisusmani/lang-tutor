@@ -145,3 +145,43 @@ export async function annotateMessage(
     console.error('[conversation.service] annotateMessage failed:', err);
   }
 }
+
+/**
+ * Deletes one conversation, and with it every message in it -- `messages`
+ * references `conversations` with ON DELETE CASCADE, so there's no second
+ * query and no way to strand orphaned rows.
+ *
+ * Returns whether a row was really removed rather than just "didn't throw":
+ * a delete that RLS filters out (someone else's id, or one that's already
+ * gone) is not an error to Postgres, it simply matches zero rows. Reading
+ * the deleted ids back with `.select('id')` is what lets the caller tell
+ * "deleted" from "nothing happened", so the UI never navigates away from a
+ * conversation that is still there.
+ *
+ * Saved vocabulary is untouched on purpose: `vocab_entries` has no link to a
+ * conversation, and a word the learner chose to keep shouldn't vanish because
+ * the chat it came from did. Same for `mistake_history`.
+ *
+ * `user_id` is redundant with the RLS policy but cheap defense-in-depth --
+ * the same reasoning as deleteVocabEntry in vocab.service.ts.
+ */
+export async function deleteConversation(userId: string, id: string): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('conversations')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id');
+
+    if (error) {
+      console.error('[conversation.service] deleteConversation failed:', error.message);
+      return false;
+    }
+    return (data?.length ?? 0) > 0;
+  } catch (err) {
+    console.error('[conversation.service] deleteConversation failed:', err);
+    return false;
+  }
+}

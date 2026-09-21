@@ -6,9 +6,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { saveLevel } from '@/app/auth/actions';
 import { SiteHeader } from '@/app/components/site-header';
+import { notifyError } from '@/app/components/toaster';
 // DEPRECATED: import { VocabChips } from '@/app/components/vocab-chips';
 import { saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
+import type { Starter } from '@/lib/constants';
 import type { WordGloss } from '@/lib/gloss';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import type { CefrLevel } from '@/lib/prompts';
@@ -26,12 +28,6 @@ const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
   word_choice: 'word choice',
   other: 'grammar',
 };
-
-const STARTERS = [
-  ['Wie war dein Wochenende?', 'How was your weekend?'],
-  ['Ich lerne seit drei Monaten Deutsch.', "I've been learning German for three months."],
-  ['Kannst du mir bei der Grammatik helfen?', 'Can you help me with grammar?'],
-] as const;
 
 const LEVEL_COOKIE = 'cefr_level';
 const THEME_KEY = 'starprache_theme';
@@ -226,7 +222,12 @@ function GlossPanel({
       <div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(155px,1fr))] gap-x-6">
           {gloss.map((g, i) => (
-            <div key={i} className="border-hair flex items-baseline gap-2.5 border-b py-1 text-sm">
+            // items-center, not items-baseline: a translation that wraps onto
+            // several lines makes its cell taller than the rest, and baseline
+            // alignment pins everything to the first line, so the save button
+            // and word drift to the top of the row. Centering keeps all three
+            // cells on the row's vertical midline however tall one gets.
+            <div key={i} className="border-hair flex items-center gap-2.5 border-b py-1 text-sm">
               {/* Glosses predating the `lemma` field have nothing to key a
                   saved word on, so those rows stay read-only rather than
                   saving an inflected form as though it were a headword. */}
@@ -255,6 +256,7 @@ export default function Chat({
   messageCap,
   initialMessages,
   initialSavedLemmas,
+  starters,
   initialConversationId,
   conversations,
 }: {
@@ -265,6 +267,7 @@ export default function Chat({
   messageCap: number;
   initialMessages: LangTutorUIMessage[];
   initialSavedLemmas: string[];
+  starters: Starter[];
   initialConversationId: string | null;
   conversations: Conversation[];
 }) {
@@ -279,6 +282,17 @@ export default function Chat({
   const conversationId = useRef(initialConversationId);
   const { messages, sendMessage, status, error } = useChat<LangTutorUIMessage>({
     messages: initialMessages,
+    // The whole request failed (model down, rate-limited upstream, a 500 from
+    // startChatTurn). The inline message under the thread stays -- a reply
+    // that never arrived should leave a mark in the conversation -- and this
+    // adds the transient heads-up for a learner not looking at the bottom.
+    onError: () => notifyError("Couldn't reach the tutor. Please try again.", 'chat'),
+    // Background steps (correction, gloss, history) report failures as
+    // transient `notice` parts. They arrive here once and never enter
+    // message.parts, so there's nothing to dedupe against on re-render.
+    onData: (part) => {
+      if (part.type === 'data-notice') notifyError(part.data.message, part.data.source);
+    },
   });
 
   useEffect(() => {
@@ -364,24 +378,46 @@ export default function Chat({
   }
 
   /**
-   * Optimistic, and deliberately not rolled back on failure: saveVocabEntry
-   * is an idempotent upsert, so the cost of a lost save is that the word
-   * isn't in the list next page load -- against which un-ticking a word under
-   * the learner's cursor is the worse lie. Same call the chips used to make.
+   * Optimistic: the word ticks the instant it's clicked, then is undone if the
+   * save turns out not to have happened.
+   *
+   * This used to skip the rollback on purpose -- a lost save was invisible
+   * either way, and un-ticking a word under the cursor for no stated reason
+   * seemed the worse lie. Now that a failure is reported (the action returns
+   * `ok`, and the toast says why the tick vanished) the trade flips: leaving a
+   * ✓ on a word that will be gone on reload is the lie, and it's the one that
+   * costs the learner a word they thought they'd kept.
    *
    * The guard matters more than it looks: Server Actions dispatch one at a
    * time per client, so clicking + down a long gloss queues them. Skipping
    * lemmas already in the Set keeps a double-click off that queue entirely.
    */
-  function saveWord(entry: WordGloss[number], source: VocabSource) {
+  async function saveWord(entry: WordGloss[number], source: VocabSource) {
     const key = entry.lemma.toLowerCase();
     if (!userEmail || !entry.lemma || savedLemmas.has(key)) return;
 
     setLocallySaved((prev) => new Set(prev).add(key));
-    void saveVocabAction(
-      { term: entry.word, lemma: entry.lemma, translation: entry.translation },
-      source,
-    );
+
+    // A rejected promise (network drop, timeout) is a failed save just like
+    // `ok: false`, so both funnel into the same undo.
+    let ok = false;
+    try {
+      ({ ok } = await saveVocabAction(
+        { term: entry.word, lemma: entry.lemma, translation: entry.translation },
+        source,
+      ));
+    } catch {
+      // ok stays false
+    }
+
+    if (!ok) {
+      setLocallySaved((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+      notifyError(`Couldn't save "${entry.lemma}". Please try again.`, `save-${key}`);
+    }
   }
 
   function send(text: string) {
@@ -429,7 +465,7 @@ export default function Chat({
               <span className="text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase">
                 or start with
               </span>
-              {STARTERS.map(([de, en]) => (
+              {starters.map(([de, en]) => (
                 <button
                   key={de}
                   type="button"

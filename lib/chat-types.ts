@@ -4,6 +4,11 @@ import type { WordGloss } from '@/lib/gloss';
 // DEPRECATED: import type { VocabCandidate } from '@/lib/services/vocab.service';
 import type { Correction } from '@/lib/tutor';
 
+/** Which background step a `notice` part is reporting on. Doubles as the
+ * client's toast id, so a repeat of the same failure replaces its toast
+ * instead of stacking a second one. */
+export type NoticeSource = 'correction' | 'gloss' | 'history';
+
 /**
  * Our chat message type, extending the AI SDK's UIMessage with typed data
  * parts. Shared between the route (which writes them) and the page (which
@@ -40,6 +45,17 @@ export type LangTutorUIMessage = UIMessage<
     // merges every one it sees into a single Set. It's a plain array because
     // a Set doesn't survive serialization.
     savedLemmas: string[];
+
+    // A background step failed after the reply had already been sent -- the
+    // correction check, the word gloss, or saving the turn to history. The
+    // reply is unaffected, which is why this is a notice and not an error, but
+    // without it the learner can't tell "no mistake found" from "the check
+    // didn't run", or "saved" from "quietly lost".
+    //
+    // Always written with `transient: true`: it's an event, not content. It
+    // reaches useChat's onData once and is never added to message.parts, so it
+    // can't re-fire on a re-render or reappear when the thread is reloaded.
+    notice: { source: NoticeSource; message: string };
 
     // DEPRECATED -- replaced by savedLemmas above, since saving moved from
     // chips under the reply into the gloss panel (app/chat.tsx). Kept

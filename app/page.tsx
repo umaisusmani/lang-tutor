@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 
 import Chat from '@/app/chat';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
+import { STARTERS, STARTERS_SHOWN, type Starter } from '@/lib/constants';
 import {
   getConversation,
   getLatestConversation,
@@ -52,6 +53,32 @@ function toUIMessages(stored: Message[]): LangTutorUIMessage[] {
   }
 
   return stored.map((m) => byId.get(m.id)!);
+}
+
+/**
+ * `count` distinct starters drawn at random from the pool.
+ *
+ * Runs here, on the server, and the result is handed to <Chat> as a prop --
+ * not picked inside the client component. Chat is server-rendered first and
+ * then hydrated, so a Math.random() in its render would produce one set of
+ * starters in the HTML and a different set on hydration: a mismatch React
+ * warns about and patches over with a visible flicker. Picking once, upstream,
+ * gives both passes the same three. This page is already dynamic (it reads
+ * cookies), so it re-picks on every visit, including each "+ new chat".
+ *
+ * A partial Fisher-Yates shuffle: only the first `count` slots get settled,
+ * and each is swapped with a random later one, so every item is equally
+ * likely and none repeats -- which sorting by Math.random() would not
+ * guarantee.
+ */
+function pickStarters(count: number): Starter[] {
+  const pool = [...STARTERS];
+  const n = Math.min(count, pool.length);
+  for (let i = 0; i < n; i++) {
+    const j = i + Math.floor(Math.random() * (pool.length - i));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, n);
 }
 
 /**
@@ -142,6 +169,7 @@ export default async function Page({
       messageCap={ANON_MESSAGE_CAP}
       initialMessages={initialMessages}
       initialSavedLemmas={initialSavedLemmas}
+      starters={pickStarters(STARTERS_SHOWN)}
       initialConversationId={conversation?.id ?? null}
       conversations={conversations}
     />

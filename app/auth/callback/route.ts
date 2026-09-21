@@ -19,6 +19,13 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
+    // Was silently discarded before -- a failed exchange redirected to a
+    // generic error page with zero information about why. This is the one
+    // place that would show a PKCE code-verifier mismatch (e.g. the cookie
+    // from initiating the flow not being readable at this domain/request).
+    console.error('[auth/callback] exchangeCodeForSession failed:', error.message);
+  } else {
+    console.error('[auth/callback] no code param on callback request');
   }
 
   return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);

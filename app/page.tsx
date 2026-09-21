@@ -10,7 +10,7 @@ import {
 } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
 import { ANON_MESSAGE_CAP, getRemainingMessages } from '@/lib/services/session.service';
-import { getVocabCandidates } from '@/lib/services/vocab.service';
+import { getSavedLemmas } from '@/lib/services/vocab.service';
 import type { Conversation, Message } from '@/lib/types/db';
 
 /**
@@ -20,8 +20,14 @@ import type { Conversation, Message } from '@/lib/types/db';
  * correction describes what the learner wrote, but the UI draws it under the
  * reply that followed, so each assistant message picks up the correction
  * belonging to the message before it.
+ *
+ * Synchronous and database-free, which it wasn't before: it used to run a
+ * getVocabCandidates() query per assistant message to build the save chips,
+ * so restoring a 40-message thread meant 20 sequential round-trips inside
+ * this loop. The saved-lemma lookup those chips needed now happens once for
+ * the whole thread, in Page below.
  */
-async function toUIMessages(stored: Message[], userId: string | null): Promise<LangTutorUIMessage[]> {
+function toUIMessages(stored: Message[]): LangTutorUIMessage[] {
   const byId = new Map<string, LangTutorUIMessage>();
 
   for (const [i, m] of stored.entries()) {
@@ -30,11 +36,6 @@ async function toUIMessages(stored: Message[], userId: string | null): Promise<L
     if (m.role === 'assistant') {
       if (m.gloss) {
         parts.push({ type: 'data-gloss', id: `${m.id}-gloss`, data: m.gloss });
-
-        if (userId) {
-          const candidates = await getVocabCandidates(userId, m.gloss);
-          parts.push({ type: 'data-vocabCandidates', id: `${m.id}-vocab`, data: candidates });
-        }
       }
 
       const previous = stored[i - 1];
@@ -51,6 +52,27 @@ async function toUIMessages(stored: Message[], userId: string | null): Promise<L
   }
 
   return stored.map((m) => byId.get(m.id)!);
+}
+
+/**
+ * Every lemma the restored thread can offer a save button for: the reply
+ * glosses and the corrections' glosses both, since the panel renders the same
+ * way under either. Gathered from the built parts rather than the raw rows so
+ * there's one definition of "what's saveable" and it's the one the UI uses.
+ *
+ * Glosses stored before `lemma` joined the schema have none (it's jsonb --
+ * nothing enforces the type at read time), hence the filter.
+ */
+function glossedLemmas(messages: LangTutorUIMessage[]): string[] {
+  return messages.flatMap((m) =>
+    m.parts.flatMap((p) => {
+      if (p.type === 'data-gloss') return p.data.map((g) => g.lemma).filter(Boolean);
+      if (p.type === 'data-correction') {
+        return (p.data.correctionGloss ?? []).map((g) => g.lemma).filter(Boolean);
+      }
+      return [];
+    }),
+  );
 }
 
 export default async function Page({
@@ -71,6 +93,7 @@ export default async function Page({
   let conversations: Conversation[] = [];
   let conversation: Conversation | null = null;
   let initialMessages: LangTutorUIMessage[] = [];
+  let initialSavedLemmas: string[] = [];
 
   if (user) {
     const requested = (await searchParams).c;
@@ -84,7 +107,11 @@ export default async function Page({
         ? await getConversation(requested)
         : await getLatestConversation(user.id);
 
-      if (conversation) initialMessages = await toUIMessages(await getMessages(conversation.id), user.id);
+      if (conversation) {
+        initialMessages = toUIMessages(await getMessages(conversation.id));
+        // One query for the whole thread, however long it is.
+        initialSavedLemmas = await getSavedLemmas(user.id, glossedLemmas(initialMessages));
+      }
     }
   }
 
@@ -114,6 +141,7 @@ export default async function Page({
       initialRemaining={remaining}
       messageCap={ANON_MESSAGE_CAP}
       initialMessages={initialMessages}
+      initialSavedLemmas={initialSavedLemmas}
       initialConversationId={conversation?.id ?? null}
       conversations={conversations}
     />

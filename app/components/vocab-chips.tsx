@@ -6,6 +6,20 @@ import { saveVocabAction } from '@/app/vocab/actions';
 import type { VocabCandidate } from '@/lib/services/vocab.service';
 
 /**
+ * DEPRECATED -- no longer rendered. app/chat.tsx no longer imports this, so
+ * it is dead code the bundler drops; it stays in the tree (and type-checked)
+ * so reviving the chips is an import away rather than a rewrite.
+ *
+ * Saving moved into the gloss panel: a + on every word, which also covers
+ * words in a *correction* -- something a row of chips under the reply could
+ * never reach, since the chips were built from the reply's gloss alone.
+ *
+ * Reviving this needs data-vocabCandidates put back too (lib/chat-types.ts,
+ * lib/services/chat.service.ts, app/page.tsx) -- see the commented-out blocks
+ * marked DEPRECATED in each.
+ */
+
+/**
  * One save-candidate chip. Saved state is tracked locally rather than
  * re-fetching candidates after a click: the server already told us whether
  * each word was saved at gloss-time, and a save can only ever move it from

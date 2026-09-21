@@ -1,4 +1,19 @@
 /**
+ * DEPRECATED -- nothing calls isStopword() any more. Kept, not deleted, so
+ * the list can be revived without rebuilding it.
+ *
+ * Saving moved from a filtered row of chips under each reply to a + button on
+ * every row of the gloss panel (see GlossPanel in app/chat.tsx). Once the
+ * learner opens the panel and picks a word themselves, there is no list to
+ * keep short and nothing to filter: offering "ist" costs one unread row, not
+ * a chip crowding out the words worth saving. The filter only ever existed to
+ * protect a display that no longer exists.
+ *
+ * Revive this if a surface that *suggests* words (rather than offering all of
+ * them) comes back -- a daily review queue, say.
+ *
+ * ---
+ *
  * Function words excluded from vocab-candidate suggestions.
  *
  * A learner sees "ich" and "ist" in every other sentence from day one --

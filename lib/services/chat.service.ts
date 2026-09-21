@@ -12,7 +12,7 @@ import {
 } from '@/lib/services/conversation.service';
 import { recordMistake } from '@/lib/services/mistake.service';
 import { logUsage } from '@/lib/services/usage.service';
-import { getVocabCandidates } from '@/lib/services/vocab.service';
+import { getSavedLemmas } from '@/lib/services/vocab.service';
 import { detectCorrection } from '@/lib/tutor';
 import type { Conversation } from '@/lib/types/db';
 
@@ -117,6 +117,22 @@ export async function runChatTurn(
     ? detectCorrection(userText, level, { userId })
         .then(async (correction) => {
           writer.write({ type: 'data-correction', id: 'correction-1', data: correction });
+
+          // The corrected sentence's own gloss is saveable word-by-word too,
+          // so it needs the same already-saved marks the reply's gloss gets.
+          // Written from inside THIS chain rather than joined with the gloss
+          // chain below: the two run concurrently and either may finish
+          // first, and a write that waits on the slower one is a write that
+          // can miss the stream close. Distinct ids keep them from
+          // clobbering each other on the client.
+          if (userId && correction.correctionGloss?.length) {
+            const saved = await getSavedLemmas(
+              userId,
+              correction.correctionGloss.map((g) => g.lemma),
+            );
+            writer.write({ type: 'data-savedLemmas', id: 'saved-correction', data: saved });
+          }
+
           await recordMistake(userId, userText, correction);
           // Attached to the USER's message row, since that's what it
           // describes -- app/page.tsx pairs it back up with the following
@@ -172,13 +188,19 @@ export async function runChatTurn(
       const assistantId = await assistantSave;
       if (assistantId) await annotateMessage(assistantId, { gloss });
 
-      // Vocab candidates are derived from the same gloss words, so they
-      // can only exist once gloss does -- signed-in users only, since
-      // there's no vocab_entries row to check "already saved" against
-      // (or anywhere to save one) for an anonymous visitor.
+      // Every glossed word is saveable, so all the client needs is which
+      // ones are already saved -- signed-in users only, since there's no
+      // vocab_entries row to check against (or anywhere to save one) for an
+      // anonymous visitor.
+      //
+      // DEPRECATED -- was getVocabCandidates() writing 'data-vocabCandidates'
+      // for the chips under each reply; see app/components/vocab-chips.tsx.
       if (userId) {
-        const candidates = await getVocabCandidates(userId, gloss);
-        writer.write({ type: 'data-vocabCandidates', id: 'vocab-1', data: candidates });
+        const saved = await getSavedLemmas(
+          userId,
+          gloss.map((g) => g.lemma),
+        );
+        writer.write({ type: 'data-savedLemmas', id: 'saved-reply', data: saved });
       }
     })
     .catch((err) => {

@@ -2,16 +2,17 @@
 
 import { useChat } from '@ai-sdk/react';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { saveLevel } from '@/app/auth/actions';
 import { SiteHeader } from '@/app/components/site-header';
-import { VocabChips } from '@/app/components/vocab-chips';
+// DEPRECATED: import { VocabChips } from '@/app/components/vocab-chips';
+import { saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { WordGloss } from '@/lib/gloss';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import type { CefrLevel } from '@/lib/prompts';
-import type { Conversation } from '@/lib/types/db';
+import type { Conversation, VocabSource } from '@/lib/types/db';
 
 const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
   word_order: 'word order',
@@ -157,16 +158,85 @@ function GlossButton({ open, onToggle, className }: { open: boolean; onToggle: (
 }
 
 /**
+ * The per-word save control, one per gloss row.
+ *
+ * Saved is a dead end by design: there's no unsave here, only on /vocab. That
+ * makes `disabled` the honest state for an already-saved word rather than a
+ * toggle that silently does nothing, and it keeps the button out of the tab
+ * order once it has nothing left to do.
+ */
+function SaveWordButton({
+  word,
+  saved,
+  onSave,
+}: {
+  word: string;
+  saved: boolean;
+  onSave: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSave}
+      disabled={saved}
+      // The glyph alone is meaningless to a screen reader ("plus"), and the
+      // word it belongs to is a separate element, so the label carries both.
+      aria-label={saved ? `${word} saved` : `Save ${word}`}
+      title={saved ? 'Saved' : 'Save word'}
+      className={
+        saved
+          ? 'border-hair text-ink-3 flex h-4.5 w-4.5 flex-none cursor-default items-center justify-center self-center rounded-[5px] border-2 font-mono text-[10px] leading-none'
+          : 'border-line text-ink-2 hover:bg-yellow hover:text-on-bright flex h-4.5 w-4.5 flex-none cursor-pointer items-center justify-center self-center rounded-[5px] border-2 font-mono text-[11px] leading-none transition-colors duration-150 active:translate-x-px active:translate-y-px'
+      }
+    >
+      {saved ? '✓' : '+'}
+    </button>
+  );
+}
+
+/**
  * Always mounted, collapsed by CSS rather than unmounted -- that's what lets
  * the open/close actually transition. Unmounting would make it pop.
+ *
+ * That trick has a cost now the rows hold buttons rather than plain text: a
+ * collapsed panel is clipped to zero height but still in the document, so
+ * without `inert` a keyboard user would tab into save buttons they cannot
+ * see, and a screen reader would read out a panel nobody opened. `inert`
+ * removes the subtree from both the tab order and the accessibility tree
+ * while leaving it rendered, which is exactly the gap CSS-collapsing opens.
+ *
+ * `canSave` is false for anonymous visitors -- there's nowhere to save to --
+ * which leaves the panel exactly as it was before.
  */
-function GlossPanel({ gloss, open }: { gloss: WordGloss; open: boolean }) {
+function GlossPanel({
+  gloss,
+  open,
+  canSave,
+  isSaved,
+  onSave,
+}: {
+  gloss: WordGloss;
+  open: boolean;
+  canSave: boolean;
+  isSaved: (lemma: string) => boolean;
+  onSave: (entry: WordGloss[number]) => void;
+}) {
   return (
-    <div className="gloss-panel" data-open={open}>
+    <div className="gloss-panel" data-open={open} inert={!open}>
       <div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(155px,1fr))] gap-x-6">
           {gloss.map((g, i) => (
             <div key={i} className="border-hair flex items-baseline gap-2.5 border-b py-1 text-sm">
+              {/* Glosses predating the `lemma` field have nothing to key a
+                  saved word on, so those rows stay read-only rather than
+                  saving an inflected form as though it were a headword. */}
+              {canSave && g.lemma && (
+                <SaveWordButton
+                  word={g.word}
+                  saved={isSaved(g.lemma)}
+                  onSave={() => onSave(g)}
+                />
+              )}
               <span className="font-semibold">{g.word}</span>
               <span className="text-ink-2 ml-auto font-mono text-[11px]">{g.translation}</span>
             </div>
@@ -184,6 +254,7 @@ export default function Chat({
   initialRemaining,
   messageCap,
   initialMessages,
+  initialSavedLemmas,
   initialConversationId,
   conversations,
 }: {
@@ -193,6 +264,7 @@ export default function Chat({
   initialRemaining: number | null;
   messageCap: number;
   initialMessages: LangTutorUIMessage[];
+  initialSavedLemmas: string[];
   initialConversationId: string | null;
   conversations: Conversation[];
 }) {
@@ -201,6 +273,9 @@ export default function Chat({
   const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
   const [remaining, setRemaining] = useState(initialRemaining);
   const [openGloss, setOpenGloss] = useState<Record<string, boolean>>({});
+  // Words the learner ticked during this session -- the only part of "is this
+  // saved" that's genuinely local state. Everything else is derived below.
+  const [locallySaved, setLocallySaved] = useState<ReadonlySet<string>>(() => new Set<string>());
   const conversationId = useRef(initialConversationId);
   const { messages, sendMessage, status, error } = useChat<LangTutorUIMessage>({
     messages: initialMessages,
@@ -212,6 +287,33 @@ export default function Chat({
       .find((p) => p.type === 'data-conversation')?.data.id;
     if (id) conversationId.current = id;
   }, [messages]);
+
+  /**
+   * Which lemmas show a ✓, as one Set for the whole thread rather than
+   * per-message state: a lemma is global to the learner, not to the message
+   * it appeared in, so saving "Kind" in one reply has to tick it everywhere
+   * else it shows up -- twice in the same gloss, or again in a correction.
+   *
+   * Derived every render from its three sources (what the server knew at page
+   * load, what the stream has reported since, and what the learner has
+   * clicked) instead of folding the streamed parts into state in an effect.
+   * That ordering is the point: the union can't disagree with itself, and a
+   * saved-lemma part computed before a click can't land afterwards and
+   * un-tick the word under the learner's cursor.
+   *
+   * Lowercased throughout -- `lemma` comes from the model, so its casing is
+   * only as steady as the model's, and a ✓ that depends on that flickers.
+   */
+  const savedLemmas = useMemo(() => {
+    const set = new Set(initialSavedLemmas.map((l) => l.toLowerCase()));
+    for (const m of messages) {
+      for (const p of m.parts) {
+        if (p.type === 'data-savedLemmas') for (const l of p.data) set.add(l.toLowerCase());
+      }
+    }
+    for (const l of locallySaved) set.add(l);
+    return set;
+  }, [initialSavedLemmas, messages, locallySaved]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -233,6 +335,10 @@ export default function Chat({
 
   const busy = status === 'submitted' || status === 'streaming';
   const capped = remaining !== null && remaining <= 0;
+  // Anonymous visitors have no vocab_entries to save into, so their gloss
+  // panels stay exactly as they were: words and translations, no buttons.
+  const canSave = userEmail !== null;
+  const isSaved = (lemma: string) => savedLemmas.has(lemma.toLowerCase());
 
   function toggleTheme() {
     const next =
@@ -255,6 +361,27 @@ export default function Chat({
     setLevel(next);
     writeLevelCookie(next);
     if (userEmail) void saveLevel(next);
+  }
+
+  /**
+   * Optimistic, and deliberately not rolled back on failure: saveVocabEntry
+   * is an idempotent upsert, so the cost of a lost save is that the word
+   * isn't in the list next page load -- against which un-ticking a word under
+   * the learner's cursor is the worse lie. Same call the chips used to make.
+   *
+   * The guard matters more than it looks: Server Actions dispatch one at a
+   * time per client, so clicking + down a long gloss queues them. Skipping
+   * lemmas already in the Set keeps a double-click off that queue entirely.
+   */
+  function saveWord(entry: WordGloss[number], source: VocabSource) {
+    const key = entry.lemma.toLowerCase();
+    if (!userEmail || !entry.lemma || savedLemmas.has(key)) return;
+
+    setLocallySaved((prev) => new Set(prev).add(key));
+    void saveVocabAction(
+      { term: entry.word, lemma: entry.lemma, translation: entry.translation },
+      source,
+    );
   }
 
   function send(text: string) {
@@ -328,9 +455,11 @@ export default function Chat({
           <main className="flex flex-1 flex-col gap-[34px] pt-[22px] pb-7">
             {messages.map((message, msgIndex) => {
               const replyGloss = message.parts.find((p) => p.type === 'data-gloss')?.data;
-              const vocabCandidates = message.parts.find(
-                (p) => p.type === 'data-vocabCandidates',
-              )?.data;
+              // DEPRECATED -- the save chips this fed are gone; words are now
+              // saved from the gloss panel below. See vocab-chips.tsx.
+              // const vocabCandidates = message.parts.find(
+              //   (p) => p.type === 'data-vocabCandidates',
+              // )?.data;
               const rateLimited = message.parts.find((p) => p.type === 'data-rateLimited')?.data;
               const correctionPart = message.parts.find(
                 (p): p is Extract<typeof p, { type: 'data-correction' }> =>
@@ -411,7 +540,15 @@ export default function Chat({
                     )}
                   </div>
 
-                  {replyGloss && <GlossPanel gloss={replyGloss} open={replyOpen} />}
+                  {replyGloss && (
+                    <GlossPanel
+                      gloss={replyGloss}
+                      open={replyOpen}
+                      canSave={canSave}
+                      isSaved={isSaved}
+                      onSave={(entry) => saveWord(entry, 'new_word')}
+                    />
+                  )}
 
                   {streaming && !replyGloss && (
                     <div className="text-ink-3 flex animate-[fade-rise_240ms_ease-out] gap-3.5 font-mono text-[10px] tracking-[0.06em]">
@@ -447,7 +584,18 @@ export default function Chat({
 
                       {correction.correctionGloss && (
                         <div className="mt-3">
-                          <GlossPanel gloss={correction.correctionGloss} open={corrOpen} />
+                          {/* 'mistake', not 'new_word': a word met in a
+                              correction is one the learner got wrong, and
+                              /vocab can treat those differently. This is the
+                              half the old chips couldn't reach at all --
+                              they were built from the reply's gloss only. */}
+                          <GlossPanel
+                            gloss={correction.correctionGloss}
+                            open={corrOpen}
+                            canSave={canSave}
+                            isSaved={isSaved}
+                            onSave={(entry) => saveWord(entry, 'mistake')}
+                          />
                         </div>
                       )}
 
@@ -457,7 +605,7 @@ export default function Chat({
                     </div>
                   )}
 
-                  {vocabCandidates && <VocabChips candidates={vocabCandidates} />}
+                  {/* DEPRECATED: {vocabCandidates && <VocabChips candidates={vocabCandidates} />} */}
                 </div>
               );
             })}

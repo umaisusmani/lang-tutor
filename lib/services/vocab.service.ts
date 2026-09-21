@@ -2,7 +2,10 @@ import { isStopword } from '@/lib/stopwords';
 import { createClient } from '@/lib/supabase/server';
 import type { VocabEntry, VocabSource } from '@/lib/types/db';
 
-/** A word offered as a save candidate, tagged with whether it's already
+/** DEPRECATED alongside getVocabCandidates() below -- still referenced by
+ * the deprecated app/components/vocab-chips.tsx.
+ *
+ * A word offered as a save candidate, tagged with whether it's already
  * saved -- computed by checking lemmas against the user's own vocab_entries,
  * not by the model (which has no visibility into what's already saved). */
 export type VocabCandidate = {
@@ -20,7 +23,79 @@ export type VocabCandidate = {
  * as profile.service.ts and mistake.service.ts.
  */
 
+/** Lemmas per `IN (...)` query in getSavedLemmas -- see the note there. */
+const LEMMA_BATCH_SIZE = 100;
+
 /**
+ * Which of these lemmas the user has already saved, lowercased.
+ *
+ * This is what's left of getVocabCandidates() once saving moved into the
+ * gloss panel: every glossed word is offered now, so there is nothing to
+ * filter or dedupe server-side and the only question left is which ones
+ * should render as ✓ rather than +.
+ *
+ * Batched, because `.in()` is not free-form: a select goes out as an HTTP GET
+ * and every lemma in the list lands in the URL, so the request size grows with
+ * the list. A long thread restored at page load can carry several hundred
+ * unique lemmas -- measured, ~600 of them is ~8 KB of URL, the point where
+ * common proxy and CDN limits start rejecting requests. Chunks of
+ * LEMMA_BATCH_SIZE keep each URL around 1.5 KB whatever the thread's length,
+ * and run in parallel so a long thread costs a few concurrent round-trips
+ * rather than one that can't be sent.
+ *
+ * Lowercased on the way out because the client keys its Set that way --
+ * `lemma` comes from the model, so its casing is only as consistent as the
+ * model's, and a ✓ that depends on that is a ✓ that flickers.
+ *
+ * Returns an array rather than a Set: this crosses the server/client
+ * boundary as a streamed data part, and a Set isn't serializable.
+ */
+export async function getSavedLemmas(userId: string, lemmas: string[]): Promise<string[]> {
+  const unique = [...new Set(lemmas.filter(Boolean))];
+  if (unique.length === 0) return [];
+
+  const batches: string[][] = [];
+  for (let i = 0; i < unique.length; i += LEMMA_BATCH_SIZE) {
+    batches.push(unique.slice(i, i + LEMMA_BATCH_SIZE));
+  }
+
+  try {
+    const supabase = await createClient();
+    const results = await Promise.all(
+      batches.map(async (batch) => {
+        const { data, error } = await supabase
+          .from('vocab_entries')
+          .select('lemma')
+          .eq('user_id', userId)
+          .in('lemma', batch);
+
+        // supabase-js RETURNS request failures (a rejected URL, an RLS
+        // error, a network drop) instead of throwing them, so without this
+        // check they were invisible: `data` is null, the result is [], and
+        // the catch below never runs. Logged per batch so one bad chunk
+        // costs its own words their ✓ and nobody else's.
+        if (error) {
+          console.error('[vocab.service] getSavedLemmas batch failed:', error.message);
+          return [];
+        }
+        return (data ?? []).map((r) => r.lemma.toLowerCase());
+      }),
+    );
+
+    return results.flat();
+  } catch (err) {
+    // A failed lookup means words render as + when they're already saved --
+    // the save is an idempotent upsert, so the worst case is a wasted click,
+    // not a duplicate row. Not worth failing the page render over.
+    console.error('[vocab.service] getSavedLemmas failed:', err);
+    return [];
+  }
+}
+
+/**
+ * DEPRECATED -- nothing calls this; see getSavedLemmas() above, and the note
+ * on app/components/vocab-chips.tsx. Kept so the chips can be revived.
+ *
  * Turns raw gloss words into save candidates: drops stopwords, drops
  * duplicate lemmas within the same message (a word repeated in one reply
  * should only offer one chip), and marks which ones the user already saved.

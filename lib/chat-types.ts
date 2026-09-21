@@ -1,7 +1,7 @@
 import type { UIMessage } from 'ai';
 
 import type { WordGloss } from '@/lib/gloss';
-import type { VocabCandidate } from '@/lib/services/vocab.service';
+// DEPRECATED: import type { VocabCandidate } from '@/lib/services/vocab.service';
 import type { Correction } from '@/lib/tutor';
 
 /**
@@ -30,10 +30,26 @@ export type LangTutorUIMessage = UIMessage<
     // turn so a brand-new chat's second message appends to the conversation
     // the first one created, rather than forking a new one each turn.
     conversation: { id: string };
+    // Which lemmas in this turn's glosses the learner has already saved,
+    // lowercased -- so the gloss panel's save buttons render ✓ instead of +
+    // without the client asking. Signed-in users only: anonymous visitors
+    // have no vocab_entries to check against, and nowhere to save one anyway.
+    //
+    // Written by two independent chains (the reply gloss and the correction)
+    // under different part ids, so neither clobbers the other; the client
+    // merges every one it sees into a single Set. It's a plain array because
+    // a Set doesn't survive serialization.
+    savedLemmas: string[];
+
+    // DEPRECATED -- replaced by savedLemmas above, since saving moved from
+    // chips under the reply into the gloss panel (app/chat.tsx). Kept
+    // commented rather than deleted so the chips can be revived; see
+    // app/components/vocab-chips.tsx.
+    //
     // Save-candidate words from this reply, already filtered (stopwords
     // dropped, deduped) and marked saved/new against the user's own
     // vocab_entries. Signed-in users only -- anonymous visitors have no
     // vocab table row to check against, and nowhere to save one anyway.
-    vocabCandidates: VocabCandidate[];
+    // vocabCandidates: VocabCandidate[];
   }
 >;

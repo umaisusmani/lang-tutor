@@ -51,12 +51,19 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
  * redirects there. The session gets set later, when Google sends the user
  * back to app/auth/callback/route.ts with a code to exchange.
  *
- * `origin` comes from the request's own Origin header rather than an env var,
- * so this works unchanged on localhost and every Vercel preview/production
- * URL without per-environment config.
+ * Derived from Host, not the Origin header: Origin is only sent on some
+ * request types and isn't guaranteed to survive a proxy layer like Vercel's
+ * intact, which was silently falling back to the hardcoded localhost URL in
+ * production. Host is a mandatory header on every HTTP/1.1+ request -- it's
+ * the same value Next.js's own Server Action CSRF check treats as ground
+ * truth (see next.config.ts's allowedOrigins comment) -- so it doesn't have
+ * the same failure mode.
  */
 export async function signInWithGoogle() {
-  const origin = (await headers()).get('origin') ?? 'http://localhost:3000';
+  const h = await headers();
+  const host = h.get('host') ?? 'localhost:3000';
+  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
+  const origin = `${proto}://${host}`;
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithOAuth({

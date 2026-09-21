@@ -34,7 +34,12 @@ export async function getVocabCandidates(
 ): Promise<VocabCandidate[]> {
   const seen = new Set<string>();
   const candidates = words.filter(({ lemma }) => {
-    if (isStopword(lemma)) return false;
+    // Glosses are persisted as jsonb, so the `lemma: string` in the type is a
+    // promise nothing enforces at read time: messages stored before `lemma`
+    // was added to the gloss schema have none. Skip them (no chip is better
+    // than saving an inflected form as if it were a dictionary entry) rather
+    // than crashing the whole page render.
+    if (!lemma || isStopword(lemma)) return false;
     const key = lemma.toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);

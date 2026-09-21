@@ -4,11 +4,13 @@ import { useChat } from '@ai-sdk/react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
-import { saveLevel, signOut } from '@/app/auth/actions';
+import { saveLevel } from '@/app/auth/actions';
+import { SiteHeader } from '@/app/components/site-header';
+import { VocabChips } from '@/app/components/vocab-chips';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { WordGloss } from '@/lib/gloss';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
-import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
+import type { CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
 
 const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
@@ -178,6 +180,7 @@ function GlossPanel({ gloss, open }: { gloss: WordGloss; open: boolean }) {
 export default function Chat({
   initialLevel,
   userEmail,
+  userName,
   initialRemaining,
   messageCap,
   initialMessages,
@@ -186,6 +189,7 @@ export default function Chat({
 }: {
   initialLevel: CefrLevel;
   userEmail: string | null;
+  userName: string | null;
   initialRemaining: number | null;
   messageCap: number;
   initialMessages: LangTutorUIMessage[];
@@ -197,15 +201,11 @@ export default function Chat({
   const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
   const [remaining, setRemaining] = useState(initialRemaining);
   const [openGloss, setOpenGloss] = useState<Record<string, boolean>>({});
-  const [chatsOpen, setChatsOpen] = useState(false);
   const conversationId = useRef(initialConversationId);
   const { messages, sendMessage, status, error } = useChat<LangTutorUIMessage>({
     messages: initialMessages,
   });
 
-  // Held in a ref, not state: the id arrives mid-stream and is only ever read
-  // when sending the next message, so re-rendering on it would be pointless
-  // churn during streaming.
   useEffect(() => {
     const id = messages
       .flatMap((m) => m.parts)
@@ -214,10 +214,6 @@ export default function Chat({
   }, [messages]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Theme is read after mount, not during render: localStorage doesn't exist
-  // on the server, and reading it during render would mismatch the HTML the
-  // server sent. null means "no explicit choice", which leaves the OS
-  // preference in charge via the media query in globals.css.
   useEffect(() => {
     try {
       const stored = localStorage.getItem(THEME_KEY);
@@ -228,9 +224,7 @@ export default function Chat({
   }, []);
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme) root.setAttribute('data-theme', theme);
-    else root.removeAttribute('data-theme');
+    if (theme) document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
   useEffect(() => {
@@ -257,9 +251,7 @@ export default function Chat({
     }
   }
 
-  function handleLevelChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const next = e.target.value;
-    if (!isCefrLevel(next)) return;
+  function handleLevelChange(next: CefrLevel) {
     setLevel(next);
     writeLevelCookie(next);
     if (userEmail) void saveLevel(next);
@@ -270,148 +262,25 @@ export default function Chat({
     if (!trimmed || busy || capped) return;
     sendMessage({ text: trimmed }, { body: { conversationId: conversationId.current } });
     setInput('');
-    // Tracked client-side rather than round-tripping: the server is still the
-    // one enforcing the cap, this is only the header's display of it.
     setRemaining((r) => (r === null ? null : Math.max(0, r - 1)));
   }
-
-  const progressPct =
-    remaining === null ? 0 : Math.round(((messageCap - remaining) / messageCap) * 100);
 
   return (
     <div className="bg-paper text-ink flex min-h-dvh justify-center px-[18px] pb-6">
       <div className="flex min-h-dvh w-full max-w-[860px] flex-col">
-        <header className="bg-paper sticky top-0 z-5 flex flex-col gap-3 pt-5 pb-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="border-line bg-yellow text-on-bright flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border-2 text-base font-extrabold">
-              s
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[19px] leading-[1.1] font-extrabold tracking-[-0.02em]">
-                starprache
-              </span>
-              <span className="text-ink-3 font-mono text-[10px]">german conversation practice</span>
-            </div>
-
-            <div className="ml-auto flex items-center gap-3.5">
-              <label className="border-line text-ink hover:bg-yellow hover:text-on-bright relative flex items-center rounded-full border-2 text-[13px] font-bold transition-colors duration-150">
-                <span className="sr-only">Level</span>
-                <select
-                  value={level}
-                  onChange={handleLevelChange}
-                  className="cursor-pointer appearance-none bg-transparent py-1 pr-6 pl-3 text-inherit outline-none"
-                >
-                  {CEFR_LEVELS.map((l) => (
-                    <option key={l} value={l} className="text-ink bg-panel">
-                      {l}
-                    </option>
-                  ))}
-                </select>
-                <span aria-hidden className="pointer-events-none absolute right-2.5 text-[9px] opacity-60">
-                  ▾
-                </span>
-              </label>
-
-              {userEmail && (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setChatsOpen((v) => !v)}
-                    className="text-ink-2 hover:text-ink cursor-pointer font-mono text-xs underline underline-offset-[3px]"
-                  >
-                    chats{conversations.length > 0 && ` · ${conversations.length}`}
-                  </button>
-
-                  {chatsOpen && (
-                    <>
-                      {/* Full-screen catcher so clicking anywhere closes the
-                          menu -- cheaper and more reliable than a document
-                          listener that has to be added and torn down. */}
-                      <button
-                        type="button"
-                        aria-label="Close menu"
-                        onClick={() => setChatsOpen(false)}
-                        className="fixed inset-0 z-10 cursor-default"
-                      />
-                      <div className="border-line bg-panel absolute right-0 z-20 mt-2 flex w-[260px] animate-[fade-rise_160ms_ease-out] flex-col rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)]">
-                        <Link
-                          href="/?c=new"
-                          className="text-ink hover:bg-yellow hover:text-on-bright rounded-lg px-2.5 py-2 font-mono text-[11px] no-underline"
-                        >
-                          + new chat
-                        </Link>
-
-                        {conversations.length > 0 && (
-                          <div className="bg-hair my-1.5 h-px" />
-                        )}
-
-                        <div className="flex max-h-[280px] flex-col overflow-y-auto">
-                          {conversations.map((c) => (
-                            <Link
-                              key={c.id}
-                              href={`/?c=${c.id}`}
-                              className={`hover:bg-soft truncate rounded-lg px-2.5 py-2 text-[13px] no-underline ${
-                                c.id === conversationId.current ? 'text-ink font-semibold' : 'text-ink-2'
-                              }`}
-                            >
-                              {c.title ?? 'Untitled'}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {userEmail ? (
-                <form action={signOut}>
-                  <button
-                    type="submit"
-                    title={userEmail}
-                    className="text-ink-2 hover:text-ink cursor-pointer font-mono text-xs underline underline-offset-[3px]"
-                  >
-                    sign out
-                  </button>
-                </form>
-              ) : (
-                <Link
-                  href="/login"
-                  className="text-ink-2 hover:text-ink font-mono text-xs underline underline-offset-[3px]"
-                >
-                  sign in
-                </Link>
-              )}
-
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="text-ink-3 hover:text-ink cursor-pointer font-mono text-[11px]"
-              >
-                {theme === 'dark' ? 'light' : 'dark'}
-              </button>
-            </div>
-          </div>
-
-          {/* Anonymous visitors only -- signed-in users are uncapped, so there
-              is nothing to put in this row for them. */}
-          {remaining !== null && (
-            <div className="text-ink-3 flex items-center gap-2.5 font-mono text-[10px]">
-              <span>free trial</span>
-              <div className="bg-soft h-1.5 flex-1 overflow-hidden rounded-full">
-                <div
-                  className="bg-accent h-full rounded-full transition-[width] duration-500 ease-out"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-              <span>
-                {remaining} of {messageCap} messages left
-              </span>
-            </div>
-          )}
-
-          <div className="bg-line h-0.5 opacity-50" />
-        </header>
+        <SiteHeader
+          level={level}
+          onLevelChange={handleLevelChange}
+          userEmail={userEmail}
+          userName={userName}
+          conversations={conversations}
+          conversationId={conversationId.current}
+          remaining={remaining}
+          messageCap={messageCap}
+          theme={theme}
+          onThemeToggle={toggleTheme}
+          activePage="chat"
+        />
 
         {messages.length === 0 ? (
           <main className="flex flex-1 flex-col justify-center gap-[26px] py-10">
@@ -459,10 +328,10 @@ export default function Chat({
           <main className="flex flex-1 flex-col gap-[34px] pt-[22px] pb-7">
             {messages.map((message, msgIndex) => {
               const replyGloss = message.parts.find((p) => p.type === 'data-gloss')?.data;
+              const vocabCandidates = message.parts.find(
+                (p) => p.type === 'data-vocabCandidates',
+              )?.data;
               const rateLimited = message.parts.find((p) => p.type === 'data-rateLimited')?.data;
-              // Narrowed via an explicit type guard: a compound predicate
-              // (`p.type === … && p.data.hasMistake`) doesn't narrow the
-              // union, which leaves `.data` untyped.
               const correctionPart = message.parts.find(
                 (p): p is Extract<typeof p, { type: 'data-correction' }> =>
                   p.type === 'data-correction',
@@ -510,7 +379,6 @@ export default function Chat({
                 );
               }
 
-              // What the learner actually wrote, to diff the correction against.
               const priorUserText =
                 msgIndex > 0
                   ? messages[msgIndex - 1].parts
@@ -545,9 +413,6 @@ export default function Chat({
 
                   {replyGloss && <GlossPanel gloss={replyGloss} open={replyOpen} />}
 
-                  {/* Pending-attachment labels hold the reader's expectation
-                      while the correction and gloss calls are still in flight.
-                      They never reserve height they aren't using. */}
                   {streaming && !replyGloss && (
                     <div className="text-ink-3 flex animate-[fade-rise_240ms_ease-out] gap-3.5 font-mono text-[10px] tracking-[0.06em]">
                       <span>gloss …</span>
@@ -591,6 +456,8 @@ export default function Chat({
                       </p>
                     </div>
                   )}
+
+                  {vocabCandidates && <VocabChips candidates={vocabCandidates} />}
                 </div>
               );
             })}

@@ -91,11 +91,14 @@ Also:
 - "correctionGloss" is a word-by-word English translation of EVERY word in
   "correction", in order, including small function words (articles,
   auxiliaries, pronouns) -- not just the content words. Each entry is
-  {word, translation} where "word" is copied exactly as it appears in
+  {word, lemma, translation} where "word" is copied exactly as it appears in
   "correction" (same capitalization), WITHOUT any leading or trailing
   punctuation -- no sentence-final periods, commas, or question marks. The
   one exception is punctuation that is part of the word's own spelling, like
-  an apostrophe in a contraction.
+  an apostrophe in a contraction. "lemma" is that word's dictionary/citation
+  form -- infinitive for verbs, nominative singular for nouns (with article
+  case matching the noun's actual gender, e.g. "das Kind" not just "Kind"),
+  positive form for adjectives.
 
 If there is no mistake worth flagging at this level, hasMistake must be false and mistakeType/correction/explanation/correctionGloss must all be null.`;
 }
@@ -122,5 +125,11 @@ Rules:
   sentence should have its prefix glossed as part of the verb's meaning, not
   translated as a standalone preposition.
 - One entry per word. Do not merge multi-word phrases into a single entry,
-  and do not skip any word in the source text.`;
+  and do not skip any word in the source text.
+- Also give each word's "lemma" -- its dictionary/citation form: infinitive
+  for verbs (e.g. "gegangen" -> "gehen"), nominative singular WITH its
+  article for nouns (e.g. "Kinder" -> "das Kind", not just "Kind" -- the
+  article is the part learners most need attached to the noun), positive
+  form for adjectives (e.g. "besser" -> "gut"). For words that don't inflect
+  (articles, conjunctions, most prepositions), the lemma is the word itself.`;
 }

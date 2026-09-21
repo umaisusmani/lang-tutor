@@ -10,6 +10,7 @@ import {
 } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
 import { ANON_MESSAGE_CAP, getRemainingMessages } from '@/lib/services/session.service';
+import { getVocabCandidates } from '@/lib/services/vocab.service';
 import type { Conversation, Message } from '@/lib/types/db';
 
 /**
@@ -20,12 +21,21 @@ import type { Conversation, Message } from '@/lib/types/db';
  * reply that followed, so each assistant message picks up the correction
  * belonging to the message before it.
  */
-function toUIMessages(stored: Message[]): LangTutorUIMessage[] {
-  return stored.map((m, i) => {
+async function toUIMessages(stored: Message[], userId: string | null): Promise<LangTutorUIMessage[]> {
+  const byId = new Map<string, LangTutorUIMessage>();
+
+  for (const [i, m] of stored.entries()) {
     const parts: LangTutorUIMessage['parts'] = [{ type: 'text', text: m.content }];
 
     if (m.role === 'assistant') {
-      if (m.gloss) parts.push({ type: 'data-gloss', id: `${m.id}-gloss`, data: m.gloss });
+      if (m.gloss) {
+        parts.push({ type: 'data-gloss', id: `${m.id}-gloss`, data: m.gloss });
+
+        if (userId) {
+          const candidates = await getVocabCandidates(userId, m.gloss);
+          parts.push({ type: 'data-vocabCandidates', id: `${m.id}-vocab`, data: candidates });
+        }
+      }
 
       const previous = stored[i - 1];
       if (previous?.role === 'user' && previous.correction) {
@@ -37,8 +47,10 @@ function toUIMessages(stored: Message[]): LangTutorUIMessage[] {
       }
     }
 
-    return { id: m.id, role: m.role, parts };
-  });
+    byId.set(m.id, { id: m.id, role: m.role, parts });
+  }
+
+  return stored.map((m) => byId.get(m.id)!);
 }
 
 export default async function Page({
@@ -72,14 +84,33 @@ export default async function Page({
         ? await getConversation(requested)
         : await getLatestConversation(user.id);
 
-      if (conversation) initialMessages = toUIMessages(await getMessages(conversation.id));
+      if (conversation) initialMessages = await toUIMessages(await getMessages(conversation.id), user.id);
     }
   }
 
+  // Display only, never used for authorization: user_metadata is editable by
+  // the user themselves. Google sign-ins carry a real name; email/password
+  // accounts fall back to the part of the address before the @. First name
+  // only, to keep the header compact.
+  const fullName =
+    (user?.user_metadata?.full_name as string | undefined) ??
+    (user?.user_metadata?.name as string | undefined) ??
+    user?.email?.split('@')[0] ??
+    null;
+  const userName = fullName ? fullName.trim().split(/\s+/)[0] : null;
+
   return (
+    // Keyed by conversation so switching chats remounts the client component.
+    // Without it, navigating /?c=A -> /?c=B re-renders this page with new props
+    // (a 200 in the network tab) but the mounted <Chat> keeps its old state:
+    // useChat only treats `messages` as an initial seed, and only rebuilds
+    // itself when its `id` option changes. The key resets messages, the
+    // conversation-id ref and every other per-chat piece of UI state at once.
     <Chat
+      key={conversation?.id ?? 'new'}
       initialLevel={level}
       userEmail={user?.email ?? null}
+      userName={userName}
       initialRemaining={remaining}
       messageCap={ANON_MESSAGE_CAP}
       initialMessages={initialMessages}

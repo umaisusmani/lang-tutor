@@ -1,6 +1,7 @@
 import type { UIMessage } from 'ai';
 
 import type { WordGloss } from '@/lib/gloss';
+import type { VocabCandidate } from '@/lib/services/vocab.service';
 import type { Correction } from '@/lib/tutor';
 
 /**
@@ -29,5 +30,10 @@ export type LangTutorUIMessage = UIMessage<
     // turn so a brand-new chat's second message appends to the conversation
     // the first one created, rather than forking a new one each turn.
     conversation: { id: string };
+    // Save-candidate words from this reply, already filtered (stopwords
+    // dropped, deduped) and marked saved/new against the user's own
+    // vocab_entries. Signed-in users only -- anonymous visitors have no
+    // vocab table row to check against, and nowhere to save one anyway.
+    vocabCandidates: VocabCandidate[];
   }
 >;

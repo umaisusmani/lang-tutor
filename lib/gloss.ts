@@ -9,10 +9,19 @@ const GLOSS_MODEL = 'openai/gpt-oss-120b';
 
 /** Shared shape for a word-by-word gloss -- reused by both the reply gloss
  * (this file) and the correction's corrected-sentence gloss (lib/tutor.ts),
- * so the two features render identically on the client. */
+ * so the two features render identically on the client.
+ *
+ * `lemma` is the dictionary form (e.g. "Kinder" -> "Kind"), added so the vocab
+ * tracker (lib/services/vocab.service.ts) has something to key saved words on
+ * without a separate lemmatization pass. German's inflection and compounding
+ * make rule-based lemmatizers unreliable, and there's no mature one in the
+ * Node ecosystem anyway -- but the model already has to understand a word's
+ * base form to translate it correctly, so asking for the lemma alongside the
+ * translation costs nothing extra: same call, same token budget. */
 export const WordGlossSchema = z.array(
   z.object({
     word: z.string(),
+    lemma: z.string(),
     translation: z.string(),
   }),
 );

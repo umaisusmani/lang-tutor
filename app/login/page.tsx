@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useActionState, useState } from 'react';
 
 import { signIn, signInWithGoogle, signUp, type AuthState } from '@/app/auth/actions';
+import { Brand } from '@/app/components/brand';
 
 // useSearchParams() (used below, for surfacing a failed Google redirect)
 // requires a Suspense boundary in the App Router -- without one, this page
@@ -36,16 +37,8 @@ function LoginForm() {
     <div className="bg-paper text-ink flex min-h-dvh justify-center px-[18px] pb-6">
       <div className="flex min-h-dvh w-full max-w-[860px] flex-col">
         <header className="flex flex-wrap items-center gap-3 pt-5 pb-3">
-          <Link href="/" className="flex items-center gap-3 no-underline">
-            <div className="border-line bg-yellow text-on-bright flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border-2 text-base font-extrabold">
-              s
-            </div>
-            <div className="flex flex-col">
-              <span className="text-ink text-[19px] leading-[1.1] font-extrabold tracking-[-0.02em]">
-                starprache
-              </span>
-              <span className="text-ink-3 font-mono text-[10px]">german conversation practice</span>
-            </div>
+          <Link href="/" className="no-underline">
+            <Brand />
           </Link>
         </header>
 

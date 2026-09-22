@@ -211,6 +211,61 @@ function SaveWordButton({
 }
 
 /**
+ * Collapses gloss rows that share a lemma into one -- a separable verb's
+ * "rufe" and "an", or "ein" and "bisschen" in a fixed phrase, mean one thing
+ * and save as one vocab entry (see LEMMA_RULES in lib/prompts.ts), so two
+ * rows with the same translation and two independent-looking save buttons
+ * was actively misleading, not just redundant. Grouped on the lemma the same
+ * way saving and the ✓ already are, so this doesn't invent a new notion of
+ * "same word" -- it just stops rendering the existing one as two.
+ *
+ * Members that aren't adjacent in the sentence (a separable verb's detached
+ * prefix) are shown joined by an ellipsis ("rufe … an") so the row still
+ * reads as what was said, not as a made-up compound; adjacent members (a
+ * fixed phrase, a reflexive verb with its preposition) are shown as plain,
+ * space-joined text.
+ *
+ * The row's save button and onSave still act on a single WordGloss entry --
+ * the first occurrence -- since a click needs exactly one `word` to look up
+ * the source sentence with (see sentenceContaining) and one `lemma` to save;
+ * every member of a group carries the same lemma and lemmaTranslation, so
+ * which one is "representative" doesn't change what gets saved.
+ */
+function groupGlossByLemma(gloss: WordGloss) {
+  const order: string[] = [];
+  const groups = new Map<string, { words: string[]; indices: number[]; entry: WordGloss[number] }>();
+
+  gloss.forEach((g, i) => {
+    // No lemma (glosses saved before the field existed) -- keep its own row
+    // rather than merging on an empty key, which would wrongly collapse
+    // every un-lemmatized word in the message into one.
+    const key = g.lemma ? g.lemma.toLowerCase() : `__row_${i}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.words.push(g.word);
+      existing.indices.push(i);
+    } else {
+      groups.set(key, { words: [g.word], indices: [i], entry: g });
+      order.push(key);
+    }
+  });
+
+  return order.map((key) => {
+    const { words, indices, entry } = groups.get(key)!;
+    const contiguous = indices.every((idx, j) => j === 0 || idx === indices[j - 1] + 1);
+    return {
+      key,
+      displayWord: words.join(contiguous ? ' ' : ' … '),
+      // lemmaTranslation is the lemma's own meaning -- what every member of
+      // the group shares -- vs. translation, which is only this one word's
+      // meaning in the sentence. Falls back for glosses predating the field.
+      translation: entry.lemmaTranslation || entry.translation,
+      entry,
+    };
+  });
+}
+
+/**
  * Always mounted, collapsed by CSS rather than unmounted -- that's what lets
  * the open/close actually transition. Unmounting would make it pop.
  *
@@ -237,29 +292,31 @@ function GlossPanel({
   isSaved: (lemma: string) => boolean;
   onSave: (entry: WordGloss[number]) => void;
 }) {
+  const rows = groupGlossByLemma(gloss);
+
   return (
     <div className="gloss-panel" data-open={open} inert={!open}>
       <div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(155px,1fr))] gap-x-6">
-          {gloss.map((g, i) => (
+          {rows.map(({ key, displayWord, translation, entry }) => (
             // items-center, not items-baseline: a translation that wraps onto
             // several lines makes its cell taller than the rest, and baseline
             // alignment pins everything to the first line, so the save button
             // and word drift to the top of the row. Centering keeps all three
             // cells on the row's vertical midline however tall one gets.
-            <div key={i} className="border-hair flex items-center gap-2.5 border-b py-1 text-sm">
+            <div key={key} className="border-hair flex items-center gap-2.5 border-b py-1 text-sm">
               {/* Glosses predating the `lemma` field have nothing to key a
                   saved word on, so those rows stay read-only rather than
                   saving an inflected form as though it were a headword. */}
-              {canSave && g.lemma && (
+              {canSave && entry.lemma && (
                 <SaveWordButton
-                  lemma={g.lemma}
-                  saved={isSaved(g.lemma)}
-                  onSave={() => onSave(g)}
+                  lemma={entry.lemma}
+                  saved={isSaved(entry.lemma)}
+                  onSave={() => onSave(entry)}
                 />
               )}
-              <span className="font-semibold">{g.word}</span>
-              <span className="text-ink-2 ml-auto font-mono text-[11px]">{g.translation}</span>
+              <span className="font-semibold">{displayWord}</span>
+              <span className="text-ink-2 ml-auto font-mono text-[11px]">{translation}</span>
             </div>
           ))}
         </div>

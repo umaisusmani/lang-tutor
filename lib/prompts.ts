@@ -50,6 +50,62 @@ const STRICTNESS_BY_LEVEL: Record<CefrLevel, string> = {
   C1: 'Be strict but precise: only flag genuine mistakes, never stylistic preferences — an advanced learner has earned some stylistic latitude.',
 };
 
+/**
+ * Lemma rules shared by the reply gloss and the correction's gloss, so a word
+ * gets the same lemma wherever the learner meets it -- the lemma is the vocab
+ * key, so two prompts that disagreed would give one word two vocab entries.
+ *
+ * The lemma is written for the learner's vocab list, not for a linguist, which
+ * is where the non-textbook choices come from:
+ * - Words that only mean something together (separable verbs, reflexive
+ *   verbs, fixed phrases) share one lemma, so saving either half saves the
+ *   unit. Each word still gets its own gloss row; only the lemma is shared.
+ * - Pronouns keep the form the learner saw. A textbook lemmatizer reduces
+ *   "euch" to "ihr", but the case forms are exactly what a learner is trying
+ *   to learn when they click one.
+ * - `lemmaTranslation` is the lemma's dictionary meaning, which is what gets
+ *   saved. `translation` fits the sentence, so saving it paired "geben" with
+ *   "is" and "das Haus" with "home".
+ *
+ * evals/gloss-cases.ts tests these; run `npm run eval -- gloss` after changing
+ * them.
+ */
+const LEMMA_RULES = `"lemma" is what the learner saves to their vocabulary list, so it must be the
+form a learner would look up and learn:
+- Verbs: the infinitive ("gegangen" -> "gehen").
+- Nouns: nominative singular WITH the article matching the noun's gender
+  ("Kinder" -> "das Kind", not just "Kind" -- the article is the part
+  learners most need attached to the noun).
+- Adjectives: the positive form ("besser" -> "gut").
+- Personal pronouns: the form as written, lowercase unless it's the formal
+  "Sie"/"Ihnen" ("euch" -> "euch", "dich" -> "dich", "Wir" -> "wir"). Never
+  reduce them to another form: learning the forms is the point.
+- A preposition contracted with an article: the preposition ("beim" -> "bei",
+  "zum" -> "zu").
+- Articles, conjunctions, prepositions and other words that don't inflect:
+  the word itself, lowercase.
+
+When several words form ONE unit of meaning, every word in the unit gets the
+SAME lemma: the unit's full dictionary form.
+- Separable verbs: the stem and its detached prefix both get the full
+  infinitive ("Ich rufe dich morgen an": "rufe" -> "anrufen", "an" ->
+  "anrufen").
+- Reflexive verbs: the verb, its reflexive pronoun, and a preposition the verb
+  requires all get the "sich ..." form ("Ich freue mich auf das Wochenende":
+  "freue", "mich" and "auf" -> "sich freuen auf").
+- Fixed phrases whose words don't carry the meaning on their own, such as "ein
+  bisschen", "es gibt", "nach Hause", "zu Hause", "auf jeden Fall": each word
+  gets the whole phrase.
+Only do this when the unit really is in this sentence. Words that merely sit
+next to each other keep their own lemmas: "ein" in "ein Auto" is "ein", "Fall"
+in "in diesem Fall" is "der Fall", "auf" in "auf dem Tisch" is "auf".
+
+"lemmaTranslation" is the English meaning of the lemma itself -- what a
+learner would write on a flashcard, not the word's meaning in this sentence.
+For a unit it's the unit's meaning ("anrufen" -> "to call (on the phone)",
+"es gibt" -> "there is / there are", "ein bisschen" -> "a little"). Words
+that share a lemma share its lemmaTranslation.`;
+
 /** System prompt for the structured correction-detection pass (step 2).
  * Analyzes a single learner message in isolation — it does not see the
  * tutor's reply, since it runs concurrently with it, not after it. */
@@ -91,14 +147,14 @@ Also:
 - "correctionGloss" is a word-by-word English translation of EVERY word in
   "correction", in order, including small function words (articles,
   auxiliaries, pronouns) -- not just the content words. Each entry is
-  {word, lemma, translation} where "word" is copied exactly as it appears in
-  "correction" (same capitalization), WITHOUT any leading or trailing
-  punctuation -- no sentence-final periods, commas, or question marks. The
-  one exception is punctuation that is part of the word's own spelling, like
-  an apostrophe in a contraction. "lemma" is that word's dictionary/citation
-  form -- infinitive for verbs, nominative singular for nouns (with article
-  case matching the noun's actual gender, e.g. "das Kind" not just "Kind"),
-  positive form for adjectives.
+  {word, lemma, lemmaTranslation, translation} where "word" is copied exactly
+  as it appears in "correction" (same capitalization), WITHOUT any leading or
+  trailing punctuation -- no sentence-final periods, commas, or question
+  marks. The one exception is punctuation that is part of the word's own
+  spelling, like an apostrophe in a contraction. "translation" is the word's
+  meaning in this sentence. "lemma" and "lemmaTranslation" follow these rules:
+
+${LEMMA_RULES}
 
 If there is no mistake worth flagging at this level, hasMistake must be false and mistakeType/correction/explanation/correctionGloss must all be null.`;
 }
@@ -124,12 +180,10 @@ Rules:
   common dictionary meaning -- e.g. a separable-prefix verb split across the
   sentence should have its prefix glossed as part of the verb's meaning, not
   translated as a standalone preposition.
-- One entry per word. Do not merge multi-word phrases into a single entry,
-  and do not skip any word in the source text.
-- Also give each word's "lemma" -- its dictionary/citation form: infinitive
-  for verbs (e.g. "gegangen" -> "gehen"), nominative singular WITH its
-  article for nouns (e.g. "Kinder" -> "das Kind", not just "Kind" -- the
-  article is the part learners most need attached to the noun), positive
-  form for adjectives (e.g. "besser" -> "gut"). For words that don't inflect
-  (articles, conjunctions, most prepositions), the lemma is the word itself.`;
+- One entry per word, even when several words share a lemma (see below). Do
+  not merge multi-word phrases into a single entry, and do not skip any word
+  in the source text.
+- Also give each word's "lemma" and "lemmaTranslation":
+
+${LEMMA_RULES}`;
 }

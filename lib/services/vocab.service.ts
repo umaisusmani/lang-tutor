@@ -26,6 +26,9 @@ export type VocabCandidate = {
 /** Lemmas per `IN (...)` query in getSavedLemmas -- see the note there. */
 const LEMMA_BATCH_SIZE = 100;
 
+/** Longest example sentence stored with a saved word -- see saveVocabEntry(). */
+const EXAMPLE_SENTENCE_MAX = 500;
+
 /**
  * Which of these lemmas the user has already saved, lowercased.
  *
@@ -156,12 +159,22 @@ export async function getVocabCandidates(
  * not an error here, so an already-saved word still returns true.
  *
  * First save wins: `ignoreDuplicates` means an existing row is never updated,
- * so a word saved from a reply as 'new_word' keeps that source even if it's
- * later saved from a correction.
+ * so a word saved from a reply as 'new_word' keeps that source (and its first
+ * example sentence) even if it's later saved from a correction.
+ *
+ * The example sentence comes from the client, so it's capped: it's display
+ * text the learner already saw, but nothing else stops a caller from sending
+ * a megabyte of it.
  */
 export async function saveVocabEntry(
   userId: string,
-  entry: { term: string; lemma: string; translation: string; source: VocabSource },
+  entry: {
+    term: string;
+    lemma: string;
+    translation: string;
+    exampleSentence?: string;
+    source: VocabSource;
+  },
 ): Promise<boolean> {
   try {
     const supabase = await createClient();
@@ -171,6 +184,7 @@ export async function saveVocabEntry(
         term: entry.term,
         lemma: entry.lemma,
         translation: entry.translation,
+        example_sentence: entry.exampleSentence?.slice(0, EXAMPLE_SENTENCE_MAX) || null,
         source: entry.source,
       },
       { onConflict: 'user_id,lemma', ignoreDuplicates: true },

@@ -21,6 +21,8 @@ export async function saveVocabAction(
     term: string;
     lemma: string;
     translation: string;
+    /** The sentence the word was met in; optional so the deprecated chips still compile. */
+    exampleSentence?: string;
   },
   source: VocabSource = 'new_word',
 ): Promise<{ ok: boolean }> {

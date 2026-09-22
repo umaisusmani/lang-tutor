@@ -3,9 +3,10 @@ import Link from 'next/link';
 /**
  * Logo tile + wordmark lockup, shared by the chat, login and vocab headers.
  *
- * It's the link home (`/`) everywhere it appears: the header dropped its
- * separate "chat" nav link, so the logo is now the way back from /vocab and
- * /login. `/` resolves to the learner's latest conversation (or a fresh one).
+ * It links to a fresh chat (`/?c=new`, same target as "+ new chat") everywhere
+ * it appears: the header dropped its separate "chat" nav link, so the logo is
+ * the way back from /vocab and /login. Plain `/` would reopen the learner's
+ * latest conversation instead, which is what the chats menu is for.
  *
  * The wordmark's line box is pinned to the tile's height (34px), so the two
  * read as one unit rather than a small logo next to small text. That's also
@@ -14,7 +15,7 @@ import Link from 'next/link';
  */
 export function Brand() {
   return (
-    <Link href="/" className="flex items-center gap-2.5 no-underline">
+    <Link href="/?c=new" className="flex items-center gap-2.5 no-underline">
       <div className="border-line bg-yellow text-on-bright flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px] border-2 text-base font-extrabold">
         s
       </div>

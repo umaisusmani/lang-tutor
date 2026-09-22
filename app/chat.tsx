@@ -71,6 +71,24 @@ function changedWordIndices(original: string, corrected: string): Set<number> {
   return changed;
 }
 
+/**
+ * The sentence a saved word came from, stored as the vocab entry's example.
+ * A reply can run to several sentences, and a word is easier to remember in
+ * the one sentence it was used in than in a whole paragraph.
+ *
+ * Splits after . ! ? and takes the first sentence containing the word (compared
+ * the same way as changedWordIndices). Falls back to the whole text if nothing
+ * matches, so an example is never dropped just because the split was imperfect.
+ */
+function sentenceContaining(text: string, word: string): string {
+  const target = stripPunctuation(word).toLowerCase();
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const match = sentences.find((sentence) =>
+    sentence.split(/\s+/).some((token) => stripPunctuation(token).toLowerCase() === target),
+  );
+  return (match ?? text).trim();
+}
+
 function GlossedWord({
   word,
   translation,
@@ -162,11 +180,11 @@ function GlossButton({ open, onToggle, className }: { open: boolean; onToggle: (
  * order once it has nothing left to do.
  */
 function SaveWordButton({
-  word,
+  lemma,
   saved,
   onSave,
 }: {
-  word: string;
+  lemma: string;
   saved: boolean;
   onSave: () => void;
 }) {
@@ -177,8 +195,10 @@ function SaveWordButton({
       disabled={saved}
       // The glyph alone is meaningless to a screen reader ("plus"), and the
       // word it belongs to is a separate element, so the label carries both.
-      aria-label={saved ? `${word} saved` : `Save ${word}`}
-      title={saved ? 'Saved' : 'Save word'}
+      // It names the lemma, which is what actually gets saved: on the "an" of
+      // "rufe ... an" the button saves "anrufen", and the tooltip says so.
+      aria-label={saved ? `${lemma} saved` : `Save ${lemma}`}
+      title={saved ? `"${lemma}" saved` : `Save "${lemma}"`}
       className={
         saved
           ? 'border-hair text-ink-3 flex h-4.5 w-4.5 flex-none cursor-default items-center justify-center self-center rounded-[5px] border-2 font-mono text-[10px] leading-none'
@@ -233,7 +253,7 @@ function GlossPanel({
                   saving an inflected form as though it were a headword. */}
               {canSave && g.lemma && (
                 <SaveWordButton
-                  word={g.word}
+                  lemma={g.lemma}
                   saved={isSaved(g.lemma)}
                   onSave={() => onSave(g)}
                 />
@@ -392,7 +412,7 @@ export default function Chat({
    * time per client, so clicking + down a long gloss queues them. Skipping
    * lemmas already in the Set keeps a double-click off that queue entirely.
    */
-  async function saveWord(entry: WordGloss[number], source: VocabSource) {
+  async function saveWord(entry: WordGloss[number], source: VocabSource, sourceText: string) {
     const key = entry.lemma.toLowerCase();
     if (!userEmail || !entry.lemma || savedLemmas.has(key)) return;
 
@@ -403,7 +423,15 @@ export default function Chat({
     let ok = false;
     try {
       ({ ok } = await saveVocabAction(
-        { term: entry.word, lemma: entry.lemma, translation: entry.translation },
+        {
+          term: entry.word,
+          lemma: entry.lemma,
+          // The lemma's own meaning, not the word's meaning in this sentence
+          // (see WordGlossSchema). Glosses stored before lemmaTranslation
+          // existed don't have it, hence the fallback.
+          translation: entry.lemmaTranslation || entry.translation,
+          exampleSentence: sentenceContaining(sourceText, entry.word),
+        },
         source,
       ));
     } catch {
@@ -582,7 +610,7 @@ export default function Chat({
                       open={replyOpen}
                       canSave={canSave}
                       isSaved={isSaved}
-                      onSave={(entry) => saveWord(entry, 'new_word')}
+                      onSave={(entry) => saveWord(entry, 'new_word', text)}
                     />
                   )}
 
@@ -630,7 +658,7 @@ export default function Chat({
                             open={corrOpen}
                             canSave={canSave}
                             isSaved={isSaved}
-                            onSave={(entry) => saveWord(entry, 'mistake')}
+                            onSave={(entry) => saveWord(entry, 'mistake', correction.correction ?? '')}
                           />
                         </div>
                       )}

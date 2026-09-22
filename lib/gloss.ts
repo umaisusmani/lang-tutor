@@ -17,11 +17,22 @@ const GLOSS_MODEL = 'openai/gpt-oss-120b';
  * make rule-based lemmatizers unreliable, and there's no mature one in the
  * Node ecosystem anyway -- but the model already has to understand a word's
  * base form to translate it correctly, so asking for the lemma alongside the
- * translation costs nothing extra: same call, same token budget. */
+ * translation costs nothing extra: same call, same token budget.
+ *
+ * `translation` is the word's meaning in this sentence, for reading;
+ * `lemmaTranslation` is the lemma's dictionary meaning, for saving. They
+ * differ more than you'd think: "gibt" reads as "is" but its lemma "es gibt"
+ * means "there is". Words in one unit (a separable verb, a fixed phrase)
+ * share a lemma -- see LEMMA_RULES in lib/prompts.ts.
+ *
+ * Required here, but glosses stored before `lemmaTranslation` existed don't
+ * have it (they're jsonb, nothing re-validates them on read), so readers fall
+ * back to `translation`. */
 export const WordGlossSchema = z.array(
   z.object({
     word: z.string(),
     lemma: z.string(),
+    lemmaTranslation: z.string(),
     translation: z.string(),
   }),
 );

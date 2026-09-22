@@ -56,6 +56,13 @@ export default async function VocabPage() {
                         {entry.translation}
                       </span>
                     )}
+                    {/* Where the learner met the word. Words saved before
+                        examples were recorded have none. */}
+                    {entry.example_sentence && (
+                      <span className="text-ink-3 text-[13px] italic">
+                        {entry.example_sentence}
+                      </span>
+                    )}
                   </div>
                   <span className="text-ink-3 ml-auto font-mono text-[10px]">
                     {new Date(entry.created_at).toLocaleDateString()}

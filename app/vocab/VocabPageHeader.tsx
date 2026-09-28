@@ -7,7 +7,9 @@ import { SiteHeader } from '@/app/components/site-header';
 import type { CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
 
-const THEME_KEY = 'starprache_theme';
+const THEME_KEY = 'starfinch_theme';
+/** Pre-rename key, still read so a theme chosen before the rename survives it. */
+const LEGACY_THEME_KEY = 'starprache_theme';
 
 export function VocabPageHeader({
   initialLevel,
@@ -25,7 +27,7 @@ export function VocabPageHeader({
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(THEME_KEY);
+      const stored = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY);
       if (stored === 'light' || stored === 'dark') setTheme(stored);
     } catch {
       // Ignore storage errors and keep the browser/system preference.

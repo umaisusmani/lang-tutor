@@ -1,4 +1,4 @@
-# starprache
+# starfinch
 
 German conversation practice with an AI tutor. You chat in German at your CEFR level. Every reply comes with a word-by-word translation, every mistake you make gets a correction with a plain-English explanation, and any word you tap can be saved to your own vocabulary list.
 

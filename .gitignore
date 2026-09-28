@@ -43,8 +43,10 @@ next-env.d.ts
 # keep the template (no secrets in it)
 !.env.example
 
-# working plan doc, not for the repo
+# working plan docs, not for the repo
 PLAN.md
+PHASE2.md
+FLASHCARDS.md
 
 # design handoff export (reference for implementing, not shipped code)
 *.zip

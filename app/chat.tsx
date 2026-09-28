@@ -30,7 +30,9 @@ const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
 };
 
 const LEVEL_COOKIE = 'cefr_level';
-const THEME_KEY = 'starprache_theme';
+const THEME_KEY = 'starfinch_theme';
+/** Pre-rename key, still read so a theme chosen before the rename survives it. */
+const LEGACY_THEME_KEY = 'starprache_theme';
 
 function writeLevelCookie(level: CefrLevel) {
   document.cookie = `${LEVEL_COOKIE}=${level}; path=/; max-age=31536000; SameSite=Lax`;
@@ -409,7 +411,7 @@ export default function Chat({
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(THEME_KEY);
+      const stored = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY);
       if (stored === 'light' || stored === 'dark') setTheme(stored);
     } catch {
       // Private mode or blocked storage -- stay on the system preference.

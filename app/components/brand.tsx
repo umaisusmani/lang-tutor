@@ -20,7 +20,7 @@ export function Brand() {
         s
       </div>
       <span className="text-ink text-[30px] leading-[34px] font-extrabold tracking-[-0.03em] sm:text-[34px]">
-        starprache
+        starfinch
       </span>
     </Link>
   );

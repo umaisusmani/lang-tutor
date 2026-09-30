@@ -40,8 +40,8 @@ export const WordGlossSchema = z.array(
 export type WordGloss = z.infer<typeof WordGlossSchema>;
 
 /**
- * Breaks a German sentence (or short passage) into a word-by-word English
- * gloss. Pure function, same reasoning as detectCorrection() in lib/tutor.ts:
+ * Translates a German sentence (or short passage) as a whole, and breaks it
+ * into a word-by-word English gloss. Pure function, same reasoning as detectCorrection() in lib/tutor.ts:
  * no HTTP objects, so it's callable directly from both the chat route and any
  * future eval script.
  *
@@ -58,12 +58,36 @@ export type WordGloss = z.infer<typeof WordGlossSchema>;
 // inside CorrectionSchema's `correctionGloss` field, but glossText() calls
 // generateObject with this schema directly as the top level, so it has to be
 // wrapped in an object here and unwrapped after.
-const GlossResponseSchema = z.object({ words: WordGlossSchema });
+//
+// The wrapper also turned out useful: it's where the whole-text `translation`
+// rides along with the word list, in the same call. It comes first so the
+// model writes the sentence meaning before the per-word ones -- a word's
+// in-context translation is easier to get right once the whole is settled.
+const GlossResponseSchema = z.object({ translation: z.string(), words: WordGlossSchema });
+
+/** A reply's gloss: the full-sentence translation plus the per-word entries
+ * behind the hover menus. */
+export type ReplyGloss = z.infer<typeof GlossResponseSchema>;
+
+/**
+ * The one way to read a stored gloss. `messages.gloss` is jsonb, so nothing
+ * migrated the old array-shaped rows when the translation was added -- they're
+ * adapted here instead, with `translation: null` for "never fetched". That
+ * keeps every reader on one shape, and costs no migration or re-gloss.
+ */
+export function normalizeReplyGloss(
+  stored: unknown,
+): { words: WordGloss; translation: string | null } | null {
+  if (!stored) return null;
+  if (Array.isArray(stored)) return { words: stored as WordGloss, translation: null };
+  const { words, translation } = stored as { words?: WordGloss; translation?: string | null };
+  return { words: words ?? [], translation: translation ?? null };
+}
 
 export async function glossText(
   text: string,
   usageContext: UsageContext = {},
-): Promise<WordGloss> {
+): Promise<ReplyGloss> {
   const { object, usage } = await generateObject({
     model: groq(GLOSS_MODEL),
     schema: GlossResponseSchema,
@@ -77,5 +101,5 @@ export async function glossText(
 
   await logUsage('gloss', GLOSS_MODEL, usage, usageContext);
 
-  return object.words;
+  return object;
 }

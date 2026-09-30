@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import { RemoveWordButton } from '@/app/vocab/remove-word-button';
+import { VocabGrid } from '@/app/vocab/vocab-grid';
 import { VocabPageHeader } from '@/app/vocab/VocabPageHeader';
 import { listConversations } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
@@ -17,15 +17,14 @@ export default async function VocabPage() {
   const level = await resolveCefrLevel(user.id, levelCookie);
 
   return (
-    <div className="bg-paper text-ink flex min-h-dvh justify-center px-[18px] pb-6">
-      <div className="flex min-h-dvh w-full max-w-[860px] flex-col">
-        <VocabPageHeader
-          initialLevel={level}
-          userEmail={user.email ?? null}
-          userName={user.user_metadata?.full_name ?? user.email ?? null}
-          conversations={conversations}
-        />
-
+    <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
+      <VocabPageHeader
+        initialLevel={level}
+        userEmail={user.email ?? null}
+        userName={user.user_metadata?.full_name ?? user.email ?? null}
+        conversations={conversations}
+      />
+      <div className="flex w-full max-w-[860px] flex-1 flex-col">
         <main className="flex flex-1 flex-col gap-5 py-8">
           <div className="flex flex-col gap-1">
             <h1 className="text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">
@@ -41,36 +40,7 @@ export default async function VocabPage() {
               Nothing saved yet. Words you save from the chat will show up here.
             </p>
           ) : (
-            <div className="border-line bg-panel flex flex-col rounded-[14px] border-2">
-              {entries.map((entry, i) => (
-                <div
-                  key={entry.id}
-                  className={`flex items-center gap-3.5 px-4 py-3.5 ${
-                    i > 0 ? 'border-hair border-t' : ''
-                  }`}
-                >
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-[17px] font-semibold">{entry.lemma}</span>
-                    {entry.translation && (
-                      <span className="text-ink-2 font-mono text-[11px]">
-                        {entry.translation}
-                      </span>
-                    )}
-                    {/* Where the learner met the word. Words saved before
-                        examples were recorded have none. */}
-                    {entry.example_sentence && (
-                      <span className="text-ink-3 text-[13px] italic">
-                        {entry.example_sentence}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-ink-3 ml-auto font-mono text-[10px]">
-                    {new Date(entry.created_at).toLocaleDateString()}
-                  </span>
-                  <RemoveWordButton entryId={entry.id} lemma={entry.lemma} />
-                </div>
-              ))}
-            </div>
+            <VocabGrid entries={entries} />
           )}
         </main>
       </div>

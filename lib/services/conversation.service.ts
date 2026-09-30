@@ -1,4 +1,4 @@
-import type { WordGloss } from '@/lib/gloss';
+import type { ReplyGloss } from '@/lib/gloss';
 import { createClient } from '@/lib/supabase/server';
 import type { Correction } from '@/lib/tutor';
 import type { Conversation, Message, MessageRole } from '@/lib/types/db';
@@ -60,14 +60,17 @@ export async function getConversation(id: string): Promise<Conversation | null> 
   return (data as Conversation) ?? null;
 }
 
+/** `personaId` is null when the persona came from the in-code fallback (see
+ * resolvePersona) -- stored as-is, and read back as the default. */
 export async function createConversation(
   userId: string,
   title: string,
+  personaId: string | null,
 ): Promise<Conversation | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('conversations')
-    .insert({ user_id: userId, title: deriveTitle(title) })
+    .insert({ user_id: userId, title: deriveTitle(title), persona_id: personaId })
     .select()
     .single();
 
@@ -90,6 +93,18 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
 }
 
 /**
+ * One message by id, or null if it doesn't exist or isn't this user's -- the
+ * messages_select_own policy joins through the parent conversation, so a
+ * guessed id reads as missing. That's what lets /api/explain take a message
+ * id from the client without its own ownership check.
+ */
+export async function getMessage(id: string): Promise<Message | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from('messages').select('*').eq('id', id).maybeSingle();
+  return (data as Message) ?? null;
+}
+
+/**
  * Appends one turn, with whatever annotation belongs to it.
  *
  * Failures are logged and swallowed for the same reason mistake.service does
@@ -100,7 +115,7 @@ export async function saveMessage(
   conversationId: string,
   role: MessageRole,
   content: string,
-  annotation?: { correction?: Correction | null; gloss?: WordGloss | null },
+  annotation?: { correction?: Correction | null; gloss?: ReplyGloss | null },
 ): Promise<string | null> {
   if (!content.trim()) return null;
 
@@ -129,14 +144,16 @@ export async function saveMessage(
 /**
  * Attaches an annotation to a message that's already stored.
  *
- * Needed because the correction and gloss arrive AFTER their message row does:
+ * Needed because the correction, gloss and grammar explanation all arrive
+ * AFTER their message row does -- the explanation much later, only when the
+ * learner asks for one. The first two because:
  * the user's text is saved the moment it arrives (worth keeping even if
  * everything downstream fails), and the reply is saved as soon as it finishes
  * streaming -- both before their respective LLM analyses have resolved.
  */
 export async function annotateMessage(
   messageId: string,
-  annotation: { correction?: Correction; gloss?: WordGloss },
+  annotation: { correction?: Correction; gloss?: ReplyGloss; grammar_explanation?: string },
 ): Promise<void> {
   try {
     const supabase = await createClient();

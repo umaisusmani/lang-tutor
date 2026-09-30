@@ -11,8 +11,16 @@ const CORRECTION_MODEL = 'openai/gpt-oss-120b';
 
 const CorrectionSchema = z.object({
   hasMistake: z.boolean(),
+  // The learner used English for words they didn't know -- invited by the UI,
+  // so it's not a mistake: it doesn't set hasMistake and isn't recorded in
+  // mistake_history. It still produces a `correction` (the all-German
+  // version), shown under an "in German" label instead of a mistake type.
+  // Absent on corrections stored before it existed; read as false.
+  usedEnglish: z.boolean(),
   mistakeType: z.enum(MISTAKE_TYPES).nullable(),
   correction: z.string().nullable(),
+  // Whole-sentence English translation of `correction`, same call.
+  correctionTranslation: z.string().nullable(),
   explanation: z.string().nullable(),
   // Word-by-word gloss of `correction`, not `userMessage` -- rides on this
   // same call for free (no extra request), unlike the reply gloss in

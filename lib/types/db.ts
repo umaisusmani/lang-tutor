@@ -10,13 +10,13 @@
  * service layer is where they get translated into anything friendlier.
  */
 
-import type { WordGloss } from '@/lib/gloss';
+import type { ReplyGloss, WordGloss } from '@/lib/gloss';
 import type { MistakeType } from '@/lib/mistake-types';
 import type { CefrLevel } from '@/lib/prompts';
 import type { Correction } from '@/lib/tutor';
 
 export type VocabSource = 'new_word' | 'mistake';
-export type UsageEndpoint = 'chat' | 'correction' | 'gloss';
+export type UsageEndpoint = 'chat' | 'correction' | 'gloss' | 'explain';
 export type MessageRole = 'user' | 'assistant';
 
 export interface Profile {
@@ -69,6 +69,23 @@ export interface Conversation {
   user_id: string;
   /** Derived from the first user message, so a list has something to show. */
   title: string | null;
+  /** Who the chat was held with (0004). Null for a persona since removed --
+   * readers fall back to the default persona. */
+  persona_id: string | null;
+  created_at: string;
+}
+
+export interface Persona {
+  id: string;
+  slug: string;
+  name: string;
+  age: number | null;
+  city: string | null;
+  /** Facts about the character, in English -- lib/prompts.ts turns them into
+   * instructions. Not prompt text itself. */
+  bio: string;
+  avatar_url: string | null;
+  is_default: boolean;
   created_at: string;
 }
 
@@ -81,6 +98,11 @@ export interface Message {
   /** Set on USER messages -- it describes what the learner wrote, even though
    * the UI renders it under the reply that followed. */
   correction: Correction | null;
-  /** Set on ASSISTANT messages -- a word-by-word reading of its own text. */
-  gloss: WordGloss | null;
+  /** Set on ASSISTANT messages -- a reading of its own text. Stored as a bare
+   * word array before the sentence translation existed; read it through
+   * normalizeReplyGloss() in lib/gloss.ts, never directly. */
+  gloss: ReplyGloss | WordGloss | null;
+  /** The on-demand "explain grammar" text for this row's own text: the reply
+   * on an assistant row, the correction on a user row. */
+  grammar_explanation: string | null;
 }

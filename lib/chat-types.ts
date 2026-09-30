@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai';
 
-import type { WordGloss } from '@/lib/gloss';
+import type { ReplyGloss } from '@/lib/gloss';
 // DEPRECATED: import type { VocabCandidate } from '@/lib/services/vocab.service';
 import type { Correction } from '@/lib/tutor';
 
@@ -14,7 +14,7 @@ export type NoticeSource = 'correction' | 'gloss' | 'history';
  * parts. Shared between the route (which writes them) and the page (which
  * reads them) so both sides agree on the shape.
  *
- * "gloss" is the reply's own word-by-word translation, written once the reply
+ * "gloss" is the reply's own translation (whole sentence + word by word), written once the reply
  * text is fully generated. It's separate from "correction" (which glosses the
  * *corrected* sentence, inline in its own object) because it translates
  * different text, fetched by a different call, that finishes at a different
@@ -29,7 +29,19 @@ export type LangTutorUIMessage = UIMessage<
   never, // no message metadata yet
   {
     correction: Correction;
-    gloss: WordGloss;
+    // Reloaded rows can predate `translation` -- page.tsx normalizes them with
+    // translation: null, which the UI shows as "not available".
+    gloss: Omit<ReplyGloss, 'translation'> & { translation: string | null };
+    // Database ids of this turn's two rows: the learner's message (which
+    // holds the correction) and the reply. The client's own message ids are
+    // generated in the browser and match nothing in the database, so this is
+    // what lets "explain grammar" save its answer onto the right row. Null
+    // for anonymous visitors, and for a row that failed to save.
+    messageIds: { user: string | null; assistant: string | null };
+    // Grammar explanations already stored for this turn -- written only when
+    // a thread is reloaded (app/page.tsx). A live turn has none yet; they're
+    // fetched on demand and held in client state.
+    explanations: { reply: string | null; correction: string | null };
     rateLimited: { cap: number };
     // Which conversation the turn was stored in. Written on every persisted
     // turn so a brand-new chat's second message appends to the conversation

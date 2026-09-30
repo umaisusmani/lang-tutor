@@ -5,14 +5,20 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { saveLevel } from '@/app/auth/actions';
+import { GlossedText, stripPunctuation } from '@/app/components/glossed-text';
+import { PersonaAvatar } from '@/app/components/persona-avatar';
 import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
+import { TranslateButton, TranslationPanel } from '@/app/components/translation-panel';
 // DEPRECATED: import { VocabChips } from '@/app/components/vocab-chips';
 import { saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
+import { hasCorrectionCard } from '@/lib/correction-card';
+import type { ExplainKind } from '@/lib/explain';
 import type { WordGloss } from '@/lib/gloss';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
+import type { PersonaProfile } from '@/lib/personas';
 import type { CefrLevel } from '@/lib/prompts';
 import type { Conversation, VocabSource } from '@/lib/types/db';
 
@@ -36,12 +42,6 @@ const LEGACY_THEME_KEY = 'starprache_theme';
 
 function writeLevelCookie(level: CefrLevel) {
   document.cookie = `${LEVEL_COOKIE}=${level}; path=/; max-age=31536000; SameSite=Lax`;
-}
-
-/** Strips leading/trailing punctuation so a gloss entry still matches a word
- * that carries a comma or full stop in the sentence. */
-function stripPunctuation(word: string): string {
-  return word.replace(/^[^\wäöüÄÖÜß]+|[^\wäöüÄÖÜß]+$/g, '');
 }
 
 /**
@@ -91,242 +91,6 @@ function sentenceContaining(text: string, word: string): string {
   return (match ?? text).trim();
 }
 
-function GlossedWord({
-  word,
-  translation,
-  highlighted,
-}: {
-  word: string;
-  translation: string | undefined;
-  highlighted?: boolean;
-}) {
-  const body = highlighted ? (
-    <span className="bg-orange text-on-bright rounded-[4px] px-1 font-bold">{word}</span>
-  ) : (
-    word
-  );
-
-  if (!translation) return <span>{body}</span>;
-
-  return (
-    <span className="group relative cursor-help border-b-2 border-dashed border-transparent hover:border-accent-ink">
-      {body}
-      <span className="bg-ink text-paper pointer-events-none absolute bottom-[calc(100%+7px)] left-1/2 z-10 -translate-x-1/2 rounded-[7px] px-[9px] py-[3px] font-mono text-xs whitespace-nowrap opacity-0 transition-opacity duration-100 group-hover:opacity-100">
-        {translation}
-      </span>
-    </span>
-  );
-}
-
-/**
- * Renders German text with per-word hover glosses.
- *
- * Words are flex items with a gap rather than text separated by whitespace, so
- * each one is its own hover target with its own dashed underline. That means
- * literal newlines don't survive -- fine for replies of a few sentences, which
- * is all this ever renders.
- */
-function GlossedText({
-  text,
-  gloss,
-  highlight,
-  className,
-}: {
-  text: string;
-  gloss: WordGloss | undefined;
-  highlight?: Set<number>;
-  className?: string;
-}) {
-  const byExact = new Map((gloss ?? []).map((g) => [stripPunctuation(g.word), g.translation]));
-  const byLower = new Map(
-    (gloss ?? []).map((g) => [stripPunctuation(g.word).toLowerCase(), g.translation]),
-  );
-
-  const tokens = text.split(/\s+/).filter(Boolean);
-
-  return (
-    <div className={`flex flex-wrap gap-x-[0.3em] ${className ?? ''}`}>
-      {tokens.map((token, i) => {
-        const key = stripPunctuation(token);
-        return (
-          <GlossedWord
-            key={i}
-            word={token}
-            translation={byExact.get(key) ?? byLower.get(key.toLowerCase())}
-            highlighted={highlight?.has(i)}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-function GlossButton({ open, onToggle, className }: { open: boolean; onToggle: () => void; className?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`border-line text-ink-2 hover:bg-yellow hover:text-on-bright flex-none cursor-pointer rounded-lg border-2 px-2 py-0.5 font-mono text-[11px] transition-colors duration-150 active:translate-x-px active:translate-y-px ${className ?? ''}`}
-    >
-      {open ? 'hide' : 'gloss'}
-    </button>
-  );
-}
-
-/**
- * The per-word save control, one per gloss row.
- *
- * Saved is a dead end by design: there's no unsave here, only on /vocab. That
- * makes `disabled` the honest state for an already-saved word rather than a
- * toggle that silently does nothing, and it keeps the button out of the tab
- * order once it has nothing left to do.
- */
-function SaveWordButton({
-  lemma,
-  saved,
-  onSave,
-}: {
-  lemma: string;
-  saved: boolean;
-  onSave: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSave}
-      disabled={saved}
-      // The glyph alone is meaningless to a screen reader ("plus"), and the
-      // word it belongs to is a separate element, so the label carries both.
-      // It names the lemma, which is what actually gets saved: on the "an" of
-      // "rufe ... an" the button saves "anrufen", and the tooltip says so.
-      aria-label={saved ? `${lemma} saved` : `Save ${lemma}`}
-      title={saved ? `"${lemma}" saved` : `Save "${lemma}"`}
-      className={
-        saved
-          ? 'border-hair text-ink-3 flex h-4.5 w-4.5 flex-none cursor-default items-center justify-center self-center rounded-[5px] border-2 font-mono text-[10px] leading-none'
-          : 'border-line text-ink-2 hover:bg-yellow hover:text-on-bright flex h-4.5 w-4.5 flex-none cursor-pointer items-center justify-center self-center rounded-[5px] border-2 font-mono text-[11px] leading-none transition-colors duration-150 active:translate-x-px active:translate-y-px'
-      }
-    >
-      {saved ? '✓' : '+'}
-    </button>
-  );
-}
-
-/**
- * Collapses gloss rows that share a lemma into one -- a separable verb's
- * "rufe" and "an", or "ein" and "bisschen" in a fixed phrase, mean one thing
- * and save as one vocab entry (see LEMMA_RULES in lib/prompts.ts), so two
- * rows with the same translation and two independent-looking save buttons
- * was actively misleading, not just redundant. Grouped on the lemma the same
- * way saving and the ✓ already are, so this doesn't invent a new notion of
- * "same word" -- it just stops rendering the existing one as two.
- *
- * Members that aren't adjacent in the sentence (a separable verb's detached
- * prefix) are shown joined by an ellipsis ("rufe … an") so the row still
- * reads as what was said, not as a made-up compound; adjacent members (a
- * fixed phrase, a reflexive verb with its preposition) are shown as plain,
- * space-joined text.
- *
- * The row's save button and onSave still act on a single WordGloss entry --
- * the first occurrence -- since a click needs exactly one `word` to look up
- * the source sentence with (see sentenceContaining) and one `lemma` to save;
- * every member of a group carries the same lemma and lemmaTranslation, so
- * which one is "representative" doesn't change what gets saved.
- */
-function groupGlossByLemma(gloss: WordGloss) {
-  const order: string[] = [];
-  const groups = new Map<string, { words: string[]; indices: number[]; entry: WordGloss[number] }>();
-
-  gloss.forEach((g, i) => {
-    // No lemma (glosses saved before the field existed) -- keep its own row
-    // rather than merging on an empty key, which would wrongly collapse
-    // every un-lemmatized word in the message into one.
-    const key = g.lemma ? g.lemma.toLowerCase() : `__row_${i}`;
-    const existing = groups.get(key);
-    if (existing) {
-      existing.words.push(g.word);
-      existing.indices.push(i);
-    } else {
-      groups.set(key, { words: [g.word], indices: [i], entry: g });
-      order.push(key);
-    }
-  });
-
-  return order.map((key) => {
-    const { words, indices, entry } = groups.get(key)!;
-    const contiguous = indices.every((idx, j) => j === 0 || idx === indices[j - 1] + 1);
-    return {
-      key,
-      displayWord: words.join(contiguous ? ' ' : ' … '),
-      // lemmaTranslation is the lemma's own meaning -- what every member of
-      // the group shares -- vs. translation, which is only this one word's
-      // meaning in the sentence. Falls back for glosses predating the field.
-      translation: entry.lemmaTranslation || entry.translation,
-      entry,
-    };
-  });
-}
-
-/**
- * Always mounted, collapsed by CSS rather than unmounted -- that's what lets
- * the open/close actually transition. Unmounting would make it pop.
- *
- * That trick has a cost now the rows hold buttons rather than plain text: a
- * collapsed panel is clipped to zero height but still in the document, so
- * without `inert` a keyboard user would tab into save buttons they cannot
- * see, and a screen reader would read out a panel nobody opened. `inert`
- * removes the subtree from both the tab order and the accessibility tree
- * while leaving it rendered, which is exactly the gap CSS-collapsing opens.
- *
- * `canSave` is false for anonymous visitors -- there's nowhere to save to --
- * which leaves the panel exactly as it was before.
- */
-function GlossPanel({
-  gloss,
-  open,
-  canSave,
-  isSaved,
-  onSave,
-}: {
-  gloss: WordGloss;
-  open: boolean;
-  canSave: boolean;
-  isSaved: (lemma: string) => boolean;
-  onSave: (entry: WordGloss[number]) => void;
-}) {
-  const rows = groupGlossByLemma(gloss);
-
-  return (
-    <div className="gloss-panel" data-open={open} inert={!open}>
-      <div>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(155px,1fr))] gap-x-6">
-          {rows.map(({ key, displayWord, translation, entry }) => (
-            // items-center, not items-baseline: a translation that wraps onto
-            // several lines makes its cell taller than the rest, and baseline
-            // alignment pins everything to the first line, so the save button
-            // and word drift to the top of the row. Centering keeps all three
-            // cells on the row's vertical midline however tall one gets.
-            <div key={key} className="border-hair flex items-center gap-2.5 border-b py-1 text-sm">
-              {/* Glosses predating the `lemma` field have nothing to key a
-                  saved word on, so those rows stay read-only rather than
-                  saving an inflected form as though it were a headword. */}
-              {canSave && entry.lemma && (
-                <SaveWordButton
-                  lemma={entry.lemma}
-                  saved={isSaved(entry.lemma)}
-                  onSave={() => onSave(entry)}
-                />
-              )}
-              <span className="font-semibold">{displayWord}</span>
-              <span className="text-ink-2 ml-auto font-mono text-[11px]">{translation}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Chat({
   initialLevel,
   userEmail,
@@ -338,6 +102,7 @@ export default function Chat({
   starters,
   initialConversationId,
   conversations,
+  persona,
 }: {
   initialLevel: CefrLevel;
   userEmail: string | null;
@@ -349,12 +114,19 @@ export default function Chat({
   starters: Starter[];
   initialConversationId: string | null;
   conversations: Conversation[];
+  persona: PersonaProfile;
 }) {
   const [input, setInput] = useState('');
   const [level, setLevel] = useState<CefrLevel>(initialLevel);
   const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
   const [remaining, setRemaining] = useState(initialRemaining);
-  const [openGloss, setOpenGloss] = useState<Record<string, boolean>>({});
+  // Which translation panels are open, keyed `${message.id}-reply` / `-corr`.
+  const [openPanel, setOpenPanel] = useState<Record<string, boolean>>({});
+  // Grammar explanations fetched this session (same keys), and which are
+  // still streaming in. Ones stored before the page loaded arrive as
+  // `explanations` parts instead -- see explanationFor() below.
+  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  const [explaining, setExplaining] = useState<Record<string, boolean>>({});
   // Words the learner ticked during this session -- the only part of "is this
   // saved" that's genuinely local state. Everything else is derived below.
   const [locallySaved, setLocallySaved] = useState<ReadonlySet<string>>(() => new Set<string>());
@@ -507,31 +279,99 @@ export default function Chat({
     }
   }
 
+  /**
+   * Streams a grammar explanation into the panel. With a database id the
+   * server reads the text from that row and saves the answer onto it (or
+   * returns the one already saved); without one -- anonymous, or a turn whose
+   * rows didn't save -- it explains the text sent here and keeps nothing.
+   *
+   * On failure the partial text is dropped rather than left half-written, and
+   * the button comes back so the learner can try again.
+   */
+  async function explain(
+    key: string,
+    request: { kind: ExplainKind; messageId: string | null; text: string; original?: string },
+  ) {
+    if (explaining[key]) return;
+    setExplaining((s) => ({ ...s, [key]: true }));
+
+    const drop = () =>
+      setExplanations((s) => {
+        const next = { ...s };
+        delete next[key];
+        return next;
+      });
+
+    try {
+      const res = await fetch('/api/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...request, level }),
+      });
+
+      if (!res.ok || !res.body) {
+        notifyError(
+          res.status === 429
+            ? "You've used your free messages. Sign in to keep going."
+            : "Couldn't explain this one. Please try again.",
+          `explain-${key}`,
+        );
+        return;
+      }
+
+      // Anonymous explanations spend a free message server-side; mirror it.
+      setRemaining((r) => (r === null ? null : Math.max(0, r - 1)));
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let text = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        setExplanations((s) => ({ ...s, [key]: text }));
+      }
+      if (!text.trim()) {
+        drop();
+        notifyError("Couldn't explain this one. Please try again.", `explain-${key}`);
+      }
+    } catch {
+      drop();
+      notifyError("Couldn't explain this one. Please try again.", `explain-${key}`);
+    } finally {
+      setExplaining((s) => ({ ...s, [key]: false }));
+    }
+  }
+
   function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed || busy || capped) return;
-    sendMessage({ text: trimmed }, { body: { conversationId: conversationId.current } });
+    // `level` rides along so the reply uses the level on screen, not whatever
+    // the profile holds -- see the route for the race this closes.
+    sendMessage({ text: trimmed }, { body: { conversationId: conversationId.current, level } });
     setInput('');
     setRemaining((r) => (r === null ? null : Math.max(0, r - 1)));
   }
 
   return (
-    <div className="bg-paper text-ink flex min-h-dvh justify-center px-[18px] pb-6">
-      <div className="flex min-h-dvh w-full max-w-[860px] flex-col">
-        <SiteHeader
-          level={level}
-          onLevelChange={handleLevelChange}
-          userEmail={userEmail}
-          userName={userName}
-          conversations={conversations}
-          conversationId={conversationId.current}
-          remaining={remaining}
-          messageCap={messageCap}
-          theme={theme}
-          onThemeToggle={toggleTheme}
-          activePage="chat"
-        />
+    // The header sits outside the 860px column, on its own 1080px track (see
+    // SiteHeader) -- wider chrome, same readable line length for replies.
+    <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
+      <SiteHeader
+        level={level}
+        onLevelChange={handleLevelChange}
+        userEmail={userEmail}
+        userName={userName}
+        conversations={conversations}
+        conversationId={conversationId.current}
+        remaining={remaining}
+        messageCap={messageCap}
+        theme={theme}
+        onThemeToggle={toggleTheme}
+        activePage="chat"
+      />
 
+      <div className="flex w-full max-w-[860px] flex-1 flex-col">
         {messages.length === 0 ? (
           <main className="flex flex-1 flex-col justify-center gap-[26px] py-10">
             <div className="flex flex-col gap-2.5">
@@ -539,12 +379,22 @@ export default function Chat({
                 level {level}
                 {remaining !== null && ` · ${remaining} free messages`}
               </span>
+              <div className="flex items-center gap-3">
+                <PersonaAvatar persona={persona} size={48} />
+                <div className="flex flex-col">
+                  <span className="text-[17px] font-bold">{persona.name}</span>
+                  <span className="text-ink-3 font-mono text-[11px]">
+                    {[persona.age, persona.city].filter((v) => v != null).join(' · ')}
+                  </span>
+                </div>
+              </div>
               <h1 className="text-4xl leading-[1.05] font-extrabold tracking-[-0.025em]">
                 Sag einfach etwas.
               </h1>
-              <p className="text-ink-2 max-w-[48ch] text-base leading-relaxed">
-                Write in German, however rough. You get a reply, a word-by-word translation, and a
-                correction when something&apos;s off.
+              <p className="text-ink-2 max-w-[52ch] text-base leading-relaxed">
+                Chat with {persona.name} in German, however rough. Don&apos;t know a word? Just
+                write it in English and you&apos;ll see how to say it in German. Every reply comes
+                with a translation, and a correction when something&apos;s off.
               </p>
             </div>
 
@@ -579,7 +429,7 @@ export default function Chat({
             {messages.map((message, msgIndex) => {
               const replyGloss = message.parts.find((p) => p.type === 'data-gloss')?.data;
               // DEPRECATED -- the save chips this fed are gone; words are now
-              // saved from the gloss panel below. See vocab-chips.tsx.
+              // saved from the word menus. See vocab-chips.tsx.
               // const vocabCandidates = message.parts.find(
               //   (p) => p.type === 'data-vocabCandidates',
               // )?.data;
@@ -588,7 +438,14 @@ export default function Chat({
                 (p): p is Extract<typeof p, { type: 'data-correction' }> =>
                   p.type === 'data-correction',
               );
-              const correction = correctionPart?.data.hasMistake ? correctionPart.data : undefined;
+              const correction =
+                correctionPart && hasCorrectionCard(correctionPart.data)
+                  ? correctionPart.data
+                  : undefined;
+              const dbIds = message.parts.find((p) => p.type === 'data-messageIds')?.data;
+              const storedExplanations = message.parts.find(
+                (p) => p.type === 'data-explanations',
+              )?.data;
 
               const text = message.parts
                 .filter((p) => p.type === 'text')
@@ -639,102 +496,169 @@ export default function Chat({
                       .join(' ')
                   : '';
 
-              const replyOpen = openGloss[`${message.id}-reply`] ?? false;
-              const corrOpen = openGloss[`${message.id}-corr`] ?? false;
-              const streaming = status === 'streaming' && msgIndex === messages.length - 1;
+              const replyKey = `${message.id}-reply`;
+              const corrKey = `${message.id}-corr`;
+              const replyOpen = openPanel[replyKey] ?? false;
+              const corrOpen = openPanel[corrKey] ?? false;
+              // `busy` stays true after the reply text finishes: the response
+              // is held open until the gloss and correction have been written,
+              // so this also means "its attachments may still be coming".
+              const inFlight = busy && msgIndex === messages.length - 1;
+              // The reply text itself still arriving -- narrower than inFlight.
+              const textStreaming = message.parts.some(
+                (p) => p.type === 'text' && p.state === 'streaming',
+              );
+
+              // The correction check's state, made visible either way so a
+              // missing card can't be mistaken for "no mistake" (QA's
+              // "correction came missing" report): pending while in flight,
+              // then a card or "✓ no corrections". A failed check writes no
+              // part and toasts instead.
+              const checking = inFlight && !correctionPart && priorUserText.trim() !== '';
+              const checkedClean =
+                !!correctionPart &&
+                !correctionPart.data.hasMistake &&
+                !correctionPart.data.usedEnglish;
 
               return (
-                <div key={message.id} className="flex max-w-[92%] flex-col gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 text-[19px] leading-[1.6]">
-                      <GlossedText text={text} gloss={replyGloss} />
-                      {streaming && (
-                        <span className="bg-accent ml-[3px] inline-block h-[18px] w-[9px] animate-[blink_1s_step-end_infinite] align-[-3px]" />
-                      )}
-                    </div>
-                    {replyGloss && replyGloss.length > 0 && (
-                      <GlossButton
-                        open={replyOpen}
-                        onToggle={() =>
-                          setOpenGloss((s) => ({ ...s, [`${message.id}-reply`]: !replyOpen }))
-                        }
-                        className="mt-[5px]"
-                      />
-                    )}
-                  </div>
+                <div key={message.id} className="flex max-w-[92%] items-start gap-3">
+                  <PersonaAvatar persona={persona} size={32} className="mt-[3px]" />
 
-                  {replyGloss && (
-                    <GlossPanel
-                      gloss={replyGloss}
-                      open={replyOpen}
-                      canSave={canSave}
-                      isSaved={isSaved}
-                      onSave={(entry) => saveWord(entry, 'new_word', text)}
-                    />
-                  )}
-
-                  {streaming && !replyGloss && (
-                    <div className="text-ink-3 flex animate-[fade-rise_240ms_ease-out] gap-3.5 font-mono text-[10px] tracking-[0.06em]">
-                      <span>gloss …</span>
-                    </div>
-                  )}
-
-                  {correction && correction.correction && (
-                    <div className="border-line bg-panel relative animate-[fade-rise_240ms_ease-out] rounded-[14px] border-2 px-4 pt-[18px] pb-3.5 shadow-[3px_3px_0_var(--line)]">
-                      <span className="border-line bg-orange text-on-bright absolute -top-[11px] left-3.5 rounded-md border-2 px-2 py-px font-mono text-[10px] tracking-[0.08em] uppercase">
-                        {correction.mistakeType
-                          ? MISTAKE_TYPE_LABELS[correction.mistakeType]
-                          : 'grammar'}
-                      </span>
-
+                  <div className="flex min-w-0 flex-1 flex-col gap-4">
+                    <div className="flex flex-col gap-2">
                       <div className="flex items-start gap-3">
-                        <GlossedText
-                          className="flex-1 text-[18px] leading-[1.6]"
-                          text={correction.correction}
-                          gloss={correction.correctionGloss ?? undefined}
-                          highlight={changedWordIndices(priorUserText, correction.correction)}
-                        />
-                        {correction.correctionGloss && correction.correctionGloss.length > 0 && (
-                          <GlossButton
-                            open={corrOpen}
-                            onToggle={() =>
-                              setOpenGloss((s) => ({ ...s, [`${message.id}-corr`]: !corrOpen }))
-                            }
-                            className="mt-[3px]"
+                        <div className="flex-1 text-[19px] leading-[1.6]">
+                          <GlossedText
+                            text={text}
+                            words={replyGloss?.words}
+                            canSave={canSave}
+                            isSaved={isSaved}
+                            onSave={(entry) => saveWord(entry, 'new_word', text)}
                           />
+                          {textStreaming && (
+                            <span className="bg-accent ml-[3px] inline-block h-[18px] w-[9px] animate-[blink_1s_step-end_infinite] align-[-3px]" />
+                          )}
+                        </div>
+                        {replyGloss ? (
+                          <TranslateButton
+                            open={replyOpen}
+                            onToggle={() => setOpenPanel((s) => ({ ...s, [replyKey]: !replyOpen }))}
+                            className="mt-[5px]"
+                          />
+                        ) : (
+                          inFlight && (
+                            <TranslateButton
+                              open={false}
+                              pending
+                              onToggle={() => {}}
+                              className="mt-[5px]"
+                            />
+                          )
                         )}
                       </div>
 
-                      {correction.correctionGloss && (
-                        <div className="mt-3">
+                      {replyGloss && (
+                        <TranslationPanel
+                          open={replyOpen}
+                          translation={replyGloss.translation}
+                          explanation={explanations[replyKey] ?? storedExplanations?.reply ?? undefined}
+                          explaining={explaining[replyKey] ?? false}
+                          onExplain={() =>
+                            explain(replyKey, {
+                              kind: 'reply',
+                              messageId: dbIds?.assistant ?? null,
+                              text,
+                            })
+                          }
+                        />
+                      )}
+                    </div>
+
+                    {checking && (
+                      <span className="text-ink-3 animate-[fade-rise_240ms_ease-out] font-mono text-[10px] tracking-[0.06em]">
+                        checking your German…
+                      </span>
+                    )}
+                    {checkedClean && (
+                      <span className="text-ink-3 animate-[fade-rise_240ms_ease-out] font-mono text-[10px] tracking-[0.06em]">
+                        ✓ no corrections
+                      </span>
+                    )}
+
+                    {correction && correction.correction && (
+                      <div className="border-line bg-panel relative animate-[fade-rise_240ms_ease-out] rounded-[14px] border-2 px-4 pt-[18px] pb-3.5 shadow-[3px_3px_0_var(--line)]">
+                        {/* A mistake gets its type; English-only gets "in
+                            German" in yellow, so it doesn't read as an error --
+                            using English was invited. */}
+                        <span
+                          className={`border-line text-on-bright absolute -top-[11px] left-3.5 rounded-md border-2 px-2 py-px font-mono text-[10px] tracking-[0.08em] uppercase ${
+                            correction.hasMistake ? 'bg-orange' : 'bg-yellow'
+                          }`}
+                        >
+                          {correction.hasMistake
+                            ? correction.mistakeType
+                              ? MISTAKE_TYPE_LABELS[correction.mistakeType]
+                              : 'grammar'
+                            : 'in German'}
+                        </span>
+
+                        <div className="flex items-start gap-3">
                           {/* 'mistake', not 'new_word': a word met in a
-                              correction is one the learner got wrong, and
-                              /vocab can treat those differently. This is the
-                              half the old chips couldn't reach at all --
-                              they were built from the reply's gloss only. */}
-                          <GlossPanel
-                            gloss={correction.correctionGloss}
-                            open={corrOpen}
+                              correction is one the learner got wrong (or
+                              didn't know), and /vocab can treat those
+                              differently. */}
+                          <GlossedText
+                            className="flex-1 text-[18px] leading-[1.6]"
+                            text={correction.correction}
+                            words={correction.correctionGloss ?? undefined}
+                            highlight={changedWordIndices(priorUserText, correction.correction)}
                             canSave={canSave}
                             isSaved={isSaved}
-                            onSave={(entry) => saveWord(entry, 'mistake', correction.correction ?? '')}
+                            onSave={(entry) =>
+                              saveWord(entry, 'mistake', correction.correction ?? '')
+                            }
+                          />
+                          <TranslateButton
+                            open={corrOpen}
+                            onToggle={() => setOpenPanel((s) => ({ ...s, [corrKey]: !corrOpen }))}
+                            className="mt-[3px]"
                           />
                         </div>
-                      )}
 
-                      <p className="text-ink-2 mt-3 font-mono text-[12.5px] leading-[1.6]">
-                        {correction.explanation}
-                      </p>
-                    </div>
-                  )}
+                        <div className="mt-3">
+                          <TranslationPanel
+                            open={corrOpen}
+                            translation={correction.correctionTranslation ?? null}
+                            explanation={
+                              explanations[corrKey] ?? storedExplanations?.correction ?? undefined
+                            }
+                            explaining={explaining[corrKey] ?? false}
+                            onExplain={() =>
+                              explain(corrKey, {
+                                kind: 'correction',
+                                messageId: dbIds?.user ?? null,
+                                text: correction.correction ?? '',
+                                original: priorUserText,
+                              })
+                            }
+                          />
+                        </div>
 
-                  {/* DEPRECATED: {vocabCandidates && <VocabChips candidates={vocabCandidates} />} */}
+                        <p className="text-ink-2 mt-3 font-mono text-[12.5px] leading-[1.6]">
+                          {correction.explanation}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* DEPRECATED: {vocabCandidates && <VocabChips candidates={vocabCandidates} />} */}
+                  </div>
                 </div>
               );
             })}
 
             {status === 'submitted' && (
-              <div className="flex max-w-[92%] flex-col gap-2.5">
+              <div className="flex max-w-[92%] items-start gap-3">
+                <PersonaAvatar persona={persona} size={32} className="mt-[3px]" />
                 <div className="text-[19px] leading-[1.6]">
                   <span className="bg-accent inline-block h-[18px] w-[9px] animate-[blink_1s_step-end_infinite] align-[-3px]" />
                 </div>
@@ -764,8 +688,10 @@ export default function Chat({
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
               disabled={capped}
-              placeholder={capped ? 'Sign in to keep going' : 'Schreib etwas auf Deutsch…'}
-              className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
+              placeholder={
+                capped ? 'Sign in to keep going' : 'Schreib auf Deutsch… English words are fine too'
+              }
+              className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
             />
             <button
               type="submit"

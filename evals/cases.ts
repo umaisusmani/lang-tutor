@@ -8,6 +8,8 @@ export interface EvalCase {
   expectHasMistake: boolean;
   /** Only checked when expectHasMistake is true. */
   expectMistakeType?: MistakeType;
+  /** Checked only when set -- most cases are all-German and don't care. */
+  expectUsedEnglish?: boolean;
   note: string;
 }
 
@@ -104,9 +106,9 @@ export const EVAL_CASES: EvalCase[] = [
     id: 'word-choice-2',
     level: 'B1',
     input: 'Das war eine sehr excited Erfahrung für mich.',
-    expectHasMistake: true,
-    expectMistakeType: 'word_choice',
-    note: 'English code-switching where a German word ("aufregend") is expected.',
+    expectHasMistake: false,
+    expectUsedEnglish: true,
+    note: 'English code-switching ("aufregende" expected). Was a word_choice mistake until the UI started inviting English for unknown words -- now usedEnglish, shown as "in German", not recorded as a mistake.',
   },
 
   // --- Correct sentences: should NOT be flagged (catches over-correction) ---
@@ -178,5 +180,40 @@ export const EVAL_CASES: EvalCase[] = [
     input: 'Ja, genau.',
     expectHasMistake: false,
     note: 'Trivial acknowledgement -- nothing to correct.',
+  },
+
+  // --- English stand-ins: invited by the UI, so flagged as usedEnglish, never as a mistake ---
+  {
+    id: 'english-word-clean',
+    level: 'A1',
+    input: 'Ich habe einen dog.',
+    expectHasMistake: false,
+    expectUsedEnglish: true,
+    note: 'Correct German around one English noun -- not a mistake, but the card should show "der Hund".',
+  },
+  {
+    id: 'english-phrase-clean',
+    level: 'A2',
+    input: 'Am Wochenende gehe ich oft hiking mit meinen Freunden.',
+    expectHasMistake: false,
+    expectUsedEnglish: true,
+    note: 'English activity word in otherwise correct German.',
+  },
+  {
+    id: 'english-word-with-mistake',
+    level: 'B1',
+    input: 'Gestern ich habe ein neues laptop bag gekauft.',
+    expectHasMistake: true,
+    expectMistakeType: 'word_order',
+    expectUsedEnglish: true,
+    note: 'Both at once: verb-second is broken AND English words stand in -- each flag judged on its own.',
+  },
+  {
+    id: 'german-loanword-not-english',
+    level: 'A2',
+    input: 'Mein Handy ist kaputt.',
+    expectHasMistake: false,
+    expectUsedEnglish: false,
+    note: '"Handy" is the German word -- a loanword German uses is not an English stand-in.',
   },
 ];

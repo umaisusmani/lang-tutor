@@ -3,12 +3,14 @@ import { cookies } from 'next/headers';
 import Chat from '@/app/chat';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import { STARTERS, STARTERS_SHOWN, type Starter } from '@/lib/constants';
+import { normalizeReplyGloss } from '@/lib/gloss';
 import {
   getConversation,
   getLatestConversation,
   getMessages,
   listConversations,
 } from '@/lib/services/conversation.service';
+import { resolvePersona } from '@/lib/services/persona.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
 import { ANON_MESSAGE_CAP, getRemainingMessages } from '@/lib/services/session.service';
 import { getSavedLemmas } from '@/lib/services/vocab.service';
@@ -35,18 +37,37 @@ function toUIMessages(stored: Message[]): LangTutorUIMessage[] {
     const parts: LangTutorUIMessage['parts'] = [{ type: 'text', text: m.content }];
 
     if (m.role === 'assistant') {
-      if (m.gloss) {
-        parts.push({ type: 'data-gloss', id: `${m.id}-gloss`, data: m.gloss });
+      const gloss = normalizeReplyGloss(m.gloss);
+      if (gloss) {
+        parts.push({ type: 'data-gloss', id: `${m.id}-gloss`, data: gloss });
       }
 
       const previous = stored[i - 1];
-      if (previous?.role === 'user' && previous.correction) {
+      const pairedUser = previous?.role === 'user' ? previous : null;
+      if (pairedUser?.correction) {
         parts.push({
           type: 'data-correction',
           id: `${m.id}-correction`,
-          data: previous.correction,
+          data: pairedUser.correction,
         });
       }
+
+      // The same two parts a live turn gets from the stream (messageIds) or
+      // builds up in client state (explanations), so the UI reads one shape
+      // whether the turn is live or restored.
+      parts.push({
+        type: 'data-messageIds',
+        id: `${m.id}-ids`,
+        data: { user: pairedUser?.id ?? null, assistant: m.id },
+      });
+      parts.push({
+        type: 'data-explanations',
+        id: `${m.id}-explanations`,
+        data: {
+          reply: m.grammar_explanation,
+          correction: pairedUser?.grammar_explanation ?? null,
+        },
+      });
     }
 
     byId.set(m.id, { id: m.id, role: m.role, parts });
@@ -93,7 +114,7 @@ function pickStarters(count: number): Starter[] {
 function glossedLemmas(messages: LangTutorUIMessage[]): string[] {
   return messages.flatMap((m) =>
     m.parts.flatMap((p) => {
-      if (p.type === 'data-gloss') return p.data.map((g) => g.lemma).filter(Boolean);
+      if (p.type === 'data-gloss') return p.data.words.map((g) => g.lemma).filter(Boolean);
       if (p.type === 'data-correction') {
         return (p.data.correctionGloss ?? []).map((g) => g.lemma).filter(Boolean);
       }
@@ -142,6 +163,11 @@ export default async function Page({
     }
   }
 
+  // Who the chat is with: this conversation's persona, or the default for a
+  // new chat and for anonymous visitors -- the same one the route will pick
+  // when the first message creates the conversation.
+  const { profile: persona } = await resolvePersona(conversation?.persona_id);
+
   // Display only, never used for authorization: user_metadata is editable by
   // the user themselves. Google sign-ins carry a real name; email/password
   // accounts fall back to the part of the address before the @. First name
@@ -172,6 +198,7 @@ export default async function Page({
       starters={pickStarters(STARTERS_SHOWN)}
       initialConversationId={conversation?.id ?? null}
       conversations={conversations}
+      persona={persona}
     />
   );
 }

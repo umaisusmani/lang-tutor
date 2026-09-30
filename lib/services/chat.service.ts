@@ -1,9 +1,11 @@
-import { groq } from '@ai-sdk/groq';
 import { convertToModelMessages, streamText, type UIMessageStreamWriter } from 'ai';
 
 import type { LangTutorUIMessage, NoticeSource } from '@/lib/chat-types';
+import { hasCorrectionCard } from '@/lib/correction-card';
 import { glossText } from '@/lib/gloss';
-import { buildConversationSystemPrompt, type CefrLevel } from '@/lib/prompts';
+import type { PersonaProfile } from '@/lib/personas';
+import type { CefrLevel } from '@/lib/prompts';
+import { CHAT_MODEL, replySettings } from '@/lib/reply';
 import {
   annotateMessage,
   createConversation,
@@ -11,6 +13,7 @@ import {
   saveMessage,
 } from '@/lib/services/conversation.service';
 import { recordMistake } from '@/lib/services/mistake.service';
+import { resolvePersona } from '@/lib/services/persona.service';
 import { logUsage } from '@/lib/services/usage.service';
 import { getSavedLemmas } from '@/lib/services/vocab.service';
 import { detectCorrection } from '@/lib/tutor';
@@ -24,8 +27,6 @@ import type { Conversation } from '@/lib/types/db';
  * others. app/api/chat/route.ts stays a controller (parse the request, gate
  * anonymous traffic, build the response) and hands the work here.
  */
-
-const CHAT_MODEL = 'openai/gpt-oss-120b';
 
 /**
  * Tells the learner a background step failed, without touching the reply.
@@ -55,10 +56,15 @@ export type ChatTurn = {
   userText: string;
   conversation: Conversation | null;
   userMessageId: string | null;
+  persona: PersonaProfile;
 };
 
 export function lastUserMessageText(messages: LangTutorUIMessage[]): string {
-  const last = [...messages].reverse().find((m) => m.role === 'user');
+  return lastMessageText(messages, 'user');
+}
+
+function lastMessageText(messages: LangTutorUIMessage[], role: 'user' | 'assistant'): string {
+  const last = [...messages].reverse().find((m) => m.role === role);
   if (!last) return '';
   return last.parts
     .filter((p): p is Extract<typeof p, { type: 'text' }> => p.type === 'text')
@@ -85,10 +91,15 @@ export async function startChatTurn(input: {
   // messages proves ownership through the parent conversation, so an insert
   // naming someone else's conversation is rejected outright.
   let conversation: Conversation | null = null;
-  if (userId) {
-    conversation = conversationId
-      ? await getConversation(conversationId)
-      : await createConversation(userId, userText);
+  if (userId && conversationId) conversation = await getConversation(conversationId);
+
+  // An existing chat keeps the persona it was started with; a new one (and
+  // every anonymous turn) gets the default. Resolved before the conversation
+  // is created so the new row can record who it's with.
+  const persona = await resolvePersona(conversation?.persona_id);
+
+  if (userId && !conversationId) {
+    conversation = await createConversation(userId, userText, persona.id);
   }
 
   // Saved before anything downstream runs: what the learner wrote is worth
@@ -98,7 +109,15 @@ export async function startChatTurn(input: {
     ? await saveMessage(conversation.id, 'user', userText)
     : null;
 
-  return { userId, level, messages, userText, conversation, userMessageId };
+  return {
+    userId,
+    level,
+    messages,
+    userText,
+    conversation,
+    userMessageId,
+    persona: persona.profile,
+  };
 }
 
 /**
@@ -111,7 +130,7 @@ export async function runChatTurn(
   turn: ChatTurn,
   writer: UIMessageStreamWriter<LangTutorUIMessage>,
 ): Promise<void> {
-  const { userId, level, messages, userText, conversation, userMessageId } = turn;
+  const { userId, level, messages, userText, conversation, userMessageId, persona } = turn;
 
   // Tells the client which conversation this landed in, so a brand new
   // chat's second message appends to the same one instead of forking a
@@ -146,6 +165,24 @@ export async function runChatTurn(
   const correctionDone = userText.trim()
     ? detectCorrection(userText, level, { userId })
         .then(async (correction) => {
+          // One line per check, so a "the correction never showed up" report
+          // can be matched to what the model actually returned.
+          console.info('[correction]', {
+            hasMistake: correction.hasMistake,
+            usedEnglish: correction.usedEnglish,
+            mistakeType: correction.mistakeType,
+            hasCorrection: !!correction.correction,
+          });
+
+          // A verdict with nothing to show: "there's a mistake" (or English
+          // to translate) but no corrected sentence. Rendering it would draw
+          // nothing, and the learner would read that as "no mistake" -- QA
+          // hit exactly that once. It's a failed check, so it's reported as
+          // one, and not recorded or stored as if it were real.
+          if ((correction.hasMistake || correction.usedEnglish) && !hasCorrectionCard(correction)) {
+            throw new Error('correction verdict without a corrected sentence');
+          }
+
           writer.write({ type: 'data-correction', id: 'correction-1', data: correction });
 
           // The corrected sentence's own gloss is saveable word-by-word too,
@@ -179,15 +216,8 @@ export async function runChatTurn(
     : Promise.resolve();
 
   const result = streamText({
-    model: groq(CHAT_MODEL),
-    system: buildConversationSystemPrompt(level),
+    ...replySettings(level, persona, lastMessageText(messages, 'assistant')),
     messages: await convertToModelMessages(messages),
-    providerOptions: {
-      // A conversational reply doesn't need deep multi-step reasoning;
-      // keeping effort low cuts wasted reasoning tokens against Groq's
-      // per-minute cap.
-      groq: { reasoningEffort: 'low' },
-    },
     onFinish: ({ totalUsage }) => logUsage('chat', CHAT_MODEL, totalUsage, { userId }),
   });
 
@@ -208,6 +238,13 @@ export async function runChatTurn(
   const assistantSave = conversation
     ? Promise.resolve(result.text).then(async (replyText) => {
         const id = await saveMessage(conversation.id, 'assistant', replyText);
+        // Both rows' database ids, now that the reply has one -- see the
+        // `messageIds` part in chat-types.ts.
+        writer.write({
+          type: 'data-messageIds',
+          id: 'message-ids',
+          data: { user: userMessageId, assistant: id },
+        });
         // Written from inside this chain so it's awaited by the Promise.all
         // below -- a write made after the stream closes is silently dropped.
         if (!id && replyText.trim()) {
@@ -236,7 +273,7 @@ export async function runChatTurn(
       if (userId) {
         const saved = await getSavedLemmas(
           userId,
-          gloss.map((g) => g.lemma),
+          gloss.words.map((g) => g.lemma),
         );
         writer.write({ type: 'data-savedLemmas', id: 'saved-reply', data: saved });
       }

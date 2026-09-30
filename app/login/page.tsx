@@ -34,13 +34,13 @@ function LoginForm() {
     'border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] rounded-xl border-2 px-4 py-3 text-base outline-none';
 
   return (
-    <div className="bg-paper text-ink flex min-h-dvh justify-center px-[18px] pb-6">
-      <div className="flex min-h-dvh w-full max-w-[860px] flex-col">
-        <header className="flex flex-wrap items-center gap-3 pt-5 pb-3">
-          <Link href="/" className="no-underline">
-            <Brand />
-          </Link>
-        </header>
+    <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
+      <header className="flex w-full max-w-[1080px] flex-wrap items-center gap-3 pt-5 pb-3">
+        <Link href="/" className="no-underline">
+          <Brand />
+        </Link>
+      </header>
+      <div className="flex w-full max-w-[860px] flex-1 flex-col">
 
         <main className="flex max-w-[420px] flex-1 flex-col justify-center gap-[22px] py-12">
           <div className="flex flex-col gap-2">

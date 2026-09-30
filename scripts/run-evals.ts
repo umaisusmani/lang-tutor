@@ -4,13 +4,24 @@
  * the curated cases in evals/. No HTTP, no route handler, so this tests the
  * real functions, not a copy of them.
  *
- * Run with `npm run eval` (both suites), or `npm run eval -- correction` /
- * `npm run eval -- gloss` for one. Makes real Groq calls, so it needs
+ * Run with `npm run eval` (every suite), or name one or more:
+ * `npm run eval -- correction`, `-- gloss`, `-- reply`. Makes real Groq calls, so it needs
  * GROQ_API_KEY in .env.local and uses a little of the quota.
  */
+import { generateText } from 'ai';
+
 import { EVAL_CASES } from '@/evals/cases';
 import { GLOSS_EVAL_CASES } from '@/evals/gloss-cases';
+import {
+  HELPER_PHRASES,
+  MAX_QUESTION_SHARE,
+  QUESTION_SHARE_CONVERSATION,
+  REPLY_EVAL_CASES,
+  REPLY_LIMITS,
+} from '@/evals/reply-level-cases';
 import { glossText } from '@/lib/gloss';
+import { FALLBACK_PERSONA } from '@/lib/personas';
+import { replySettings } from '@/lib/reply';
 import { detectCorrection } from '@/lib/tutor';
 
 /**
@@ -65,8 +76,11 @@ async function runCorrectionSuite(): Promise<SuiteResult> {
       !testCase.expectHasMistake || !testCase.expectMistakeType
         ? true
         : result.mistakeType === testCase.expectMistakeType;
+    const englishOk =
+      testCase.expectUsedEnglish === undefined ||
+      result.usedEnglish === testCase.expectUsedEnglish;
 
-    const ok = hasMistakeOk && typeOk;
+    const ok = hasMistakeOk && typeOk && englishOk;
 
     if (ok) {
       passed++;
@@ -74,7 +88,9 @@ async function runCorrectionSuite(): Promise<SuiteResult> {
     } else {
       const detail = !hasMistakeOk
         ? `expected hasMistake=${testCase.expectHasMistake}, got ${result.hasMistake}`
-        : `expected mistakeType=${testCase.expectMistakeType}, got ${result.mistakeType}`;
+        : !typeOk
+          ? `expected mistakeType=${testCase.expectMistakeType}, got ${result.mistakeType}`
+          : `expected usedEnglish=${testCase.expectUsedEnglish}, got ${result.usedEnglish}`;
       failures.push(`${testCase.id}: ${detail} -- "${testCase.note}"`);
       console.log(`✗ ${testCase.id} (${detail})`);
     }
@@ -115,9 +131,10 @@ async function runGlossSuite(): Promise<SuiteResult> {
         problems.add(`threw: ${run.reason instanceof Error ? run.reason.message : run.reason}`);
         continue;
       }
+      if (!run.value.translation.trim()) problems.add('empty sentence translation');
       for (const [word, expected] of Object.entries(testCase.expectLemmas)) {
         const accepted = (Array.isArray(expected) ? expected : [expected]).map(normalizeLemma);
-        const entry = run.value.find((g) => g.word === word);
+        const entry = run.value.words.find((g) => g.word === word);
         if (!entry) {
           problems.add(`"${word}" missing from gloss`);
         } else if (!accepted.includes(normalizeLemma(entry.lemma))) {
@@ -139,9 +156,119 @@ async function runGlossSuite(): Promise<SuiteResult> {
   return { passed, total: GLOSS_EVAL_CASES.length, failures };
 }
 
+/** Sentences in a reply, split after . ! ? -- crude, but replies are short
+ * and plainly punctuated, and a miscount errs toward "longer", i.e. strict. */
+function sentencesOf(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Checks the conversation prompt against the limits it sets: per reply, the
+ * A1/A2 length and conjunction limits and the no-helper-phrasing rule; over
+ * one scripted conversation, that replies don't all end in a question. The model id and
+ * settings come from lib/reply.ts, the same ones chat streams with.
+ */
+async function runReplySuite(): Promise<SuiteResult> {
+  let passed = 0;
+  const failures: string[] = [];
+
+  for (const testCase of REPLY_EVAL_CASES) {
+    // Earlier learner turns are paired with a neutral placeholder reply so
+    // the model sees a real multi-turn history, not three user messages.
+    const messages = testCase.turns.flatMap((turn, i) =>
+      i < testCase.turns.length - 1
+        ? [
+            { role: 'user' as const, content: turn },
+            { role: 'assistant' as const, content: 'Schön!' },
+          ]
+        : [{ role: 'user' as const, content: turn }],
+    );
+
+    let reply: string;
+    try {
+      ({ text: reply } = await withRateLimitRetry(() =>
+        generateText({ ...replySettings(testCase.level, FALLBACK_PERSONA), messages }),
+      ));
+    } catch (err) {
+      failures.push(`${testCase.id}: threw an error -- ${err instanceof Error ? err.message : err}`);
+      console.log(`✗ ${testCase.id} (ERROR)`);
+      continue;
+    }
+
+    const problems: string[] = [];
+    const limits = REPLY_LIMITS[testCase.level];
+    if (limits) {
+      const sentences = sentencesOf(reply);
+      if (sentences.length > limits.maxSentences) {
+        problems.push(`${sentences.length} sentences (max ${limits.maxSentences})`);
+      }
+      for (const sentence of sentences) {
+        const words = sentence.split(/\s+/).length;
+        if (words > limits.maxWordsPerSentence) {
+          problems.push(`${words}-word sentence (max ${limits.maxWordsPerSentence}): "${sentence}"`);
+        }
+      }
+      for (const banned of limits.bannedWords) {
+        if (new RegExp(`\\b${banned}\\b`, 'i').test(reply)) problems.push(`uses "${banned}"`);
+      }
+    }
+    if (HELPER_PHRASES.some((re) => re.test(reply))) problems.push('helper phrasing');
+    for (const expected of testCase.expectContains ?? []) {
+      if (!reply.toLowerCase().includes(expected.toLowerCase())) {
+        problems.push(`doesn't contain "${expected}"`);
+      }
+    }
+
+    if (problems.length === 0) {
+      passed++;
+      console.log(`✓ ${testCase.id}  ${reply.replace(/\s+/g, ' ')}`);
+    } else {
+      const detail = problems.join('; ');
+      failures.push(`${testCase.id}: ${detail} -- reply: "${reply.replace(/\s+/g, ' ')}"`);
+      console.log(`✗ ${testCase.id} (${detail})`);
+    }
+  }
+
+  // The question rate, over a real conversation: each reply is generated
+  // from the actual history, exactly as chat does, so buildTurnGuidance()
+  // sees her previous reply.
+  const { level, turns } = QUESTION_SHARE_CONVERSATION;
+  const history: { role: 'user' | 'assistant'; content: string }[] = [];
+  let questions = 0;
+  try {
+    for (const turn of turns) {
+      history.push({ role: 'user', content: turn });
+      const previous = history.findLast((m) => m.role === 'assistant')?.content;
+      const { text } = await withRateLimitRetry(() =>
+        generateText({ ...replySettings(level, FALLBACK_PERSONA, previous), messages: history }),
+      );
+      history.push({ role: 'assistant', content: text });
+      if (text.trim().endsWith('?')) questions++;
+      console.log(`    > ${turn}\n    < ${text.replace(/\s+/g, ' ')}`);
+    }
+    const share = questions / turns.length;
+    const shareOk = share <= MAX_QUESTION_SHARE;
+    console.log(
+      `${shareOk ? '✓' : '✗'} question-share: ${questions}/${turns.length} replies end in a question` +
+        ` (max ${Math.round(MAX_QUESTION_SHARE * 100)}%)`,
+    );
+    if (shareOk) passed++;
+    else failures.push(`question-share: ${questions}/${turns.length} end in a question -- reads like an interview`);
+  } catch (err) {
+    failures.push(`question-share: threw an error -- ${err instanceof Error ? err.message : err}`);
+    console.log('✗ question-share (ERROR)');
+  }
+
+  return { passed, total: REPLY_EVAL_CASES.length + 1, failures };
+}
+
 const SUITES: Record<string, () => Promise<SuiteResult>> = {
   correction: runCorrectionSuite,
   gloss: runGlossSuite,
+  reply: runReplySuite,
 };
 
 async function main() {

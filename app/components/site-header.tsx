@@ -102,7 +102,10 @@ export function SiteHeader({
     remaining === null ? 0 : Math.round(((messageCap - remaining) / messageCap) * 100);
 
   return (
-    <header className="bg-paper sticky top-0 z-5 flex flex-col gap-3 pt-5 pb-3">
+    // Its own 1080px track, wider than the 860px content column below it: the
+    // pages render this as a sibling of that column rather than inside it, so
+    // the header can spread out while reply text keeps a readable line length.
+    <header className="bg-paper sticky top-0 z-5 flex w-full max-w-[1080px] flex-col gap-3 pt-5 pb-3">
       <div className="flex flex-wrap items-center gap-3">
         <Brand />
 

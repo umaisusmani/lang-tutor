@@ -3,7 +3,12 @@ import { cookies } from 'next/headers';
 
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import { runChatTurn, startChatTurn } from '@/lib/services/chat.service';
-import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
+import { isCefrLevel } from '@/lib/prompts';
+import {
+  getCurrentUserId,
+  resolveCefrLevel,
+  updateCefrLevel,
+} from '@/lib/services/profile.service';
 import { ANON_MESSAGE_CAP, checkAndIncrementUsage, getSessionId } from '@/lib/services/session.service';
 
 /**
@@ -16,7 +21,12 @@ export async function POST(req: Request) {
   const {
     messages,
     conversationId,
-  }: { messages: LangTutorUIMessage[]; conversationId?: string | null } = await req.json();
+    level: requestedLevel,
+  }: {
+    messages: LangTutorUIMessage[];
+    conversationId?: string | null;
+    level?: string;
+  } = await req.json();
 
   const userId = await getCurrentUserId();
 
@@ -42,8 +52,19 @@ export async function POST(req: Request) {
     }
   }
 
+  // The level the learner is looking at wins over the stored one. It used to
+  // be read only from the profile (signed in) or cookie, and the dropdown
+  // saved the profile with a Server Action nobody awaited -- so a message
+  // sent right after changing level could overtake that save and be answered
+  // at the old level. Sending it with the message removes the race; it's
+  // validated like the cookie is, since it ends up in a system prompt.
   const levelCookie = (await cookies()).get('cefr_level')?.value;
-  const level = await resolveCefrLevel(userId, levelCookie);
+  const storedLevel = await resolveCefrLevel(userId, levelCookie);
+  const level = isCefrLevel(requestedLevel) ? requestedLevel : storedLevel;
+
+  // Keep the profile in step, so the next page load opens at this level even
+  // if the dropdown's own save was the one that got lost.
+  if (userId && level !== storedLevel) await updateCefrLevel(userId, level);
 
   const turn = await startChatTurn({ userId, level, messages, conversationId });
 

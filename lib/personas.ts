@@ -28,7 +28,9 @@ export const FALLBACK_PERSONA: PersonaProfile = {
     'indie music and cycling around the city. Has a younger brother and a ' +
     'slightly chaotic flatmate. Curious about other people and happy to ' +
     'share little stories from her own week. Also very much into Jewellary crafting and have a small Etsy shop for it.',
-  avatar_url: '/avatars/ramanath.svg',
+  // No avatar art -- PersonaAvatar falls back to an initial badge, which is
+  // what we're using instead of generated art.
+  avatar_url: null,
 };
 
 /** Narrows a full row to what gets passed around (and serialized to the

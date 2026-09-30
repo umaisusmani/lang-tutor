@@ -57,7 +57,7 @@ values (
     || 'indie music and cycling around the city. Has a younger brother and a '
     || 'slightly chaotic flatmate. Curious about other people and happy to '
     || 'share little stories from her own week.',
-  '/avatars/ramanath.svg',
+  null, -- no avatar art; the UI falls back to an initial badge
   true
 )
 on conflict (slug) do nothing;

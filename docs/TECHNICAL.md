@@ -1,11 +1,19 @@
 # starfinch — Technical Documentation
 
-> State of the codebase as of 2026-09-22 (commit `0a92c6a`). This describes
+> State of the codebase as of 2026-09-30 (commit `fd7e4ac`). This describes
 > what is **built**. What is planned lives in local working docs that aren't
 > committed (`PLAN.md` for v1, `PHASE2.md` for phases 2-3, `FLASHCARDS.md` for
 > the SRS feature). For the user-facing overview, see
 > [README.md](../README.md). Where the plan and the code disagree, the code is
 > right. Section 11 lists every known difference.
+>
+> **Since the last revision of this doc (2026-09-22, `0a92c6a`):** a persona
+> system (the tutor is now a specific character, "Ramanath", stored in a
+> `personas` table), on-demand grammar explanations (a fourth, on-demand LLM
+> call, saved to history), a reworked gloss/translation UI (per-word hover
+> menus plus a whole-sentence translation panel, replacing the old word-list
+> panel), a fix for a level/profile race condition, and a wider header laid
+> out outside the chat column. See the delta table in §11.
 
 ## Contents
 
@@ -26,31 +34,43 @@
 
 ## 1. System overview
 
-starfinch is a German conversation tutor. The learner chats in German at a
-chosen CEFR level (A1–C1). For every message the app makes **three LLM calls**:
+starfinch is a German conversation tutor: a specific persona (currently
+"Ramanath", 24, Düsseldorf — see §6's `personas` table) the learner chats
+with in German at a chosen CEFR level (A1–C1). For every message the app
+makes **three LLM calls**:
 
 | Call | Input | Output | When |
 |---|---|---|---|
-| **Reply** | full conversation | streamed German reply | immediately |
-| **Correction** | the learner's last message only | `{hasMistake, mistakeType, correction, explanation, correctionGloss}` | immediately, in parallel with the reply |
-| **Gloss** | the finished reply text | word-by-word `{word, lemma, lemmaTranslation, translation}[]` | after the reply finishes |
+| **Reply** | full conversation, persona, level, "don't ask a question if the last reply did" guidance | streamed German reply | immediately |
+| **Correction** | the learner's last message only | `{hasMistake, usedEnglish, mistakeType, correction, correctionTranslation, explanation, correctionGloss}` | immediately, in parallel with the reply |
+| **Gloss** | the finished reply text | `{translation, words: {word, lemma, lemmaTranslation, translation}[]}` | after the reply finishes |
 
-Every result is streamed to the browser as a typed part of the message and,
-for signed-in users, stored with the message so a reopened chat looks exactly
-as it did live without calling the model again.
+A **fourth call is on demand**: `/api/explain` streams a plain-language
+grammar explanation of a reply or a correction, only when the learner clicks
+"explain grammar" (§5.1, §8.2). It is not part of the per-message `Promise.all`
+below.
+
+Every result from the three per-message calls is streamed to the browser as a
+typed part of the message and, for signed-in users, stored with the message so
+a reopened chat looks exactly as it did live without calling the model again.
 
 ```
 Browser (useChat)                      Next.js server (Vercel)                  External
 ─────────────────                      ────────────────────────                 ────────
 POST /api/chat ───────────────────────► route.ts
                                          ├─ auth? ── no ─► session cap check ──► Supabase (service role)
-                                         ├─ resolve CEFR level
+                                         ├─ resolve CEFR level (body > profile/cookie, see §4.1)
+                                         ├─ resolve persona (conversation's own, or the default)
                                          ├─ startChatTurn: create conv + save user msg ─► Supabase (RLS)
                                          └─ runChatTurn ─┬─ streamText (reply) ──────────► Groq
    ◄── text deltas ──────────────────────────────────────┤
    ◄── data-correction ──────────────────────────────────┼─ detectCorrection ───────────► Groq
    ◄── data-gloss ───────────────────────────────────────┴─ glossText (after reply) ────► Groq
-   ◄── data-savedLemmas / data-conversation / data-notice
+   ◄── data-savedLemmas / data-conversation / data-messageIds / data-notice
+
+POST /api/explain ─────────────────────► route.ts (on demand, user click)
+   ◄── plain-text stream ─────────────────── streamGrammarExplanation ───────► Groq
+                                         (saved onto the message row if signed in)
 ```
 
 ## 2. Stack and runtime
@@ -75,35 +95,58 @@ exposure. A free-tier Groq key has no spend surface at all.
 
 ```
 app/
-  page.tsx                 Server Component: loads user, level, conversation, saved lemmas; renders <Chat>
-  chat.tsx                 Client Component: useChat, messages, corrections, gloss panels, word saving
+  page.tsx                 Server Component: loads user, level, persona, conversation, saved lemmas; renders <Chat>
+  chat.tsx                 Client Component: useChat, messages, corrections, translation panels, word saving, explain-grammar
   layout.tsx               Root layout, fonts, <ConfirmProvider>, <AppToaster>
   globals.css              Tailwind v4 + theme tokens, gloss-panel transitions
   api/chat/route.ts        POST /api/chat — thin controller
+  api/explain/route.ts     POST /api/explain — on-demand grammar explanation, text/plain stream
   auth/actions.ts          Server Actions: signIn, signUp, signInWithGoogle, signOut, saveLevel
   auth/callback/route.ts   OAuth code → session exchange
   conversations/actions.ts deleteConversationAction
-  vocab/                   /vocab page, saveVocabAction, deleteVocabAction, remove button, header
+  vocab/                   /vocab page, saveVocabAction, deleteVocabAction, vocab-grid (flip cards), header
   login/page.tsx           Email/password + Google sign-in form
-  components/              SiteHeader (level, chats menu, sign-out), Brand, ConfirmModal, Toaster,
-                           vocab-chips (DEPRECATED)
+  components/              SiteHeader (level, chats menu, sign-out; now a 1080px sibling of the
+                           860px content column, not nested inside it), Brand, ConfirmModal, Toaster,
+                           GlossedText (per-word hover/tap menu + save), TranslationPanel (sentence
+                           translation + explain-grammar), PersonaAvatar, vocab-chips (DEPRECATED)
 lib/
-  prompts.ts               Every system prompt, CEFR levels, LEVEL_GUIDANCE, STRICTNESS_BY_LEVEL, LEMMA_RULES
-  tutor.ts                 detectCorrection() + CorrectionSchema
-  gloss.ts                 glossText() + WordGlossSchema
-  chat-types.ts            LangTutorUIMessage (typed data parts)
+  prompts.ts               Every system prompt: persona + level + turn-by-turn question guidance for
+                           the reply, STRICTNESS_BY_LEVEL + English-stand-in rules for the correction,
+                           buildGlossSystemPrompt, buildGrammarExplanationPrompt, LEMMA_RULES
+  reply.ts                 replySettings(level, persona, previousReply) — the reply call's model,
+                           system prompt and provider options, shared by chat.service.ts and the
+                           reply-level eval so both exercise identical settings
+  explain.ts               streamGrammarExplanation() — the on-demand grammar-explanation call
+  tutor.ts                 detectCorrection() + CorrectionSchema (usedEnglish, correctionTranslation)
+  correction-card.ts       hasCorrectionCard() — whether a Correction has anything to render; its own
+                           module (not tutor.ts) so the client component can import it without pulling
+                           in the Groq SDK
+  gloss.ts                 glossText() + WordGlossSchema + ReplyGloss (translation + words) +
+                           normalizeReplyGloss() (reads old bare-array rows and new {translation,words} rows alike)
+  personas.ts              PersonaProfile type, FALLBACK_PERSONA (used if the personas table/row is
+                           unreachable, and by evals, which have no Supabase session)
+  chat-types.ts            LangTutorUIMessage (typed data parts: correction, gloss, messageIds,
+                           explanations, rateLimited, conversation, savedLemmas, notice)
   mistake-types.ts         MISTAKE_TYPES taxonomy (single source of truth)
   constants.ts             Conversation starters
   stopwords.ts             DEPRECATED (only used by the deprecated chips)
-  services/                One module per table, plus chat.service (orchestration)
+  services/                One module per table, plus chat.service (orchestration), persona.service
+                           (read-only personas lookups)
   supabase/                client.ts (browser), server.ts (per-request), proxy.ts (session refresh),
                            service-role.ts (RLS-bypassing PostgREST client)
-  types/db.ts              Hand-written row types mirroring the migrations
-evals/                     cases.ts (20 correction cases), gloss-cases.ts (17 lemma cases)
-scripts/run-evals.ts       Eval runner
-supabase/migrations/       0001 schema + RLS, 0002 gloss endpoint, 0003 annotations + titles
+  types/db.ts              Hand-written row types mirroring the migrations (now includes Persona,
+                           conversations.persona_id, messages.grammar_explanation)
+evals/                     cases.ts (24 correction cases, now incl. English-stand-in cases),
+                           gloss-cases.ts (17 lemma cases), reply-level-cases.ts (A1/A2 sentence-length
+                           and tense limits, helper-phrasing check, question-share over a scripted chat)
+scripts/run-evals.ts       Eval runner — correction | gloss | reply
+supabase/migrations/       0001 schema + RLS, 0002 gloss endpoint, 0003 annotations + titles,
+                           0004 personas + persona_id + grammar_explanation + 'explain' usage endpoint
 proxy.ts                   Next 16 proxy (ex-middleware): Supabase session refresh
 next.config.ts             Server Action allowedOrigins for Vercel aliases
+public/avatars/            empty — the persona currently has no avatar image (avatar_url is null);
+                           PersonaAvatar falls back to an initial badge. See §8.2 and §12.
 ```
 
 ### Layering
@@ -123,23 +166,38 @@ app/ (controllers, UI)  →  lib/services/*  →  lib/supabase/*  →  Postgres
 
 ### 4.1 `app/api/chat/route.ts` (controller)
 
-1. Parse `{ messages, conversationId }` from the body. The client sends the
-   whole message list, as `useChat` does by default.
+1. Parse `{ messages, conversationId, level }` from the body. The client sends
+   the whole message list, as `useChat` does by default, plus the level
+   currently shown in its own UI.
 2. `getCurrentUserId()` uses `supabase.auth.getUser()`, which checks the token
    with Supabase instead of trusting the cookie.
 3. **Anonymous only:** `getSessionId()` reads or creates an httpOnly
    `session_id` cookie, then `checkAndIncrementUsage()`. If the cap
    (`ANON_MESSAGE_CAP = 5`) is reached, it returns a stream holding one
    `data-rateLimited` part and **makes no Groq call**.
-4. `resolveCefrLevel()`: the profile level if signed in, otherwise the
-   `cefr_level` cookie (validated, because it ends up inside a system prompt),
-   otherwise `A2`.
+4. **Level resolution, and the race it fixes:** the body's `level` wins when
+   present and valid; otherwise the profile level if signed in, else the
+   `cefr_level` cookie (validated either way, because it ends up inside a
+   system prompt), else `A2`. If the resolved level differs from the stored
+   profile, the profile is updated to match. This exists because the level
+   dropdown used to save via an un-awaited Server Action
+   (`void saveLevel(next)`) — a message sent immediately after changing level
+   could reach the server before that save landed, and be answered at the old
+   level. Sending the level with the request removes the race outright; the
+   profile write is now just keeping the stored value in step.
 5. `startChatTurn()`, then `createUIMessageStream({ execute: runChatTurn })`.
 
 ### 4.2 `startChatTurn()` (before the stream opens)
 
 - Signed in: load the conversation named by `conversationId`, or create a new
   one with its title taken from the first ~60 characters of the message.
+- **Persona resolution:** an existing conversation keeps the persona it was
+  started with (`conversations.persona_id`); a new conversation, and every
+  anonymous turn, gets the default persona (`personas.is_default`). If the
+  `personas` table or row is unreachable, `resolvePersona()` falls back to a
+  persona hardcoded in `lib/personas.ts` (`FALLBACK_PERSONA`) rather than
+  failing the turn — a missing persona should cost the chat its character, not
+  the reply.
 - Save the user message **before any LLM call**, so what the learner wrote is
   kept even if everything after it fails. Its row id is returned so the
   correction can be attached to it later.
@@ -151,22 +209,41 @@ write data-conversation {id}                           (signed in)
 write data-notice 'history' if the save failed         (signed in)
 
 correctionDone = detectCorrection(userText)            ─┐ starts now
+   → if hasMistake/usedEnglish but no `correction`:     │
+     throw (treated as a failed check, not "no mistake")│
    → write data-correction                              │
    → getSavedLemmas(correctionGloss) → data-savedLemmas │ (id 'saved-correction')
    → recordMistake → mistake_history                    │
    → annotateMessage(userMessageId, {correction})       │
                                                         │ run
-result = streamText(reply); writer.merge(...)          ─┤ concurrently
+result = streamText(reply, persona, level); writer.merge(...) ┤ concurrently
                                                         │
 assistantSave = result.text → saveMessage(assistant)   ─┤
+   → write data-messageIds {user, assistant}            │
                                                         │
 glossDone = result.text → glossText(reply)             ─┘
-   → write data-gloss
+   → write data-gloss {translation, words}
    → annotateMessage(assistantId, {gloss})
-   → getSavedLemmas(gloss) → data-savedLemmas           (id 'saved-reply')
+   → getSavedLemmas(gloss.words) → data-savedLemmas      (id 'saved-reply')
 
 await Promise.all([correctionDone, result.text, glossDone, assistantSave])
 ```
+
+**Correction verdicts without a corrected sentence are failures, not
+"nothing to flag."** QA once saw a reply render with no correction card where
+one was expected; the fix is that `hasMistake: true` (or `usedEnglish: true`)
+with a null `correction` now throws inside the correction chain, which routes
+to the same `data-notice` failure path as a thrown Groq call, instead of
+silently writing a correction part with nothing to render. Every verdict —
+success, "no mistake", or failure — is logged server-side
+(`console.info('[correction]', …)`) so a future report like that one can be
+matched against what the model actually returned.
+
+**`data-messageIds`** carries the database ids of the turn's two rows (the
+user message, which holds the correction, and the assistant reply). The
+client's own message ids are generated in the browser and match nothing in
+the database; this is what lets "explain grammar" (§5.1) save its answer onto
+the right row for a live (not-yet-reloaded) turn.
 
 **The rule that matters most in this file:** `writer.merge()` does not wait
 for anything, and the HTTP response closes when `execute`'s promise settles.
@@ -185,8 +262,10 @@ or gloss never breaks a reply the learner already has. Notices are sent with
 | Part | Payload | Written by | Persisted? |
 |---|---|---|---|
 | `text` | reply deltas | `streamText` | yes (`messages.content`) |
-| `data-correction` | `Correction` | correction branch | yes, on the **user** row |
-| `data-gloss` | `WordGloss` | gloss branch | yes, on the **assistant** row |
+| `data-correction` | `Correction` (now incl. `usedEnglish`, `correctionTranslation`) | correction branch | yes, on the **user** row |
+| `data-gloss` | `{translation, words: WordGloss}` | gloss branch | yes, on the **assistant** row (`messages.gloss`) |
+| `data-messageIds` | `{user, assistant}` (database row ids) | assistant-save branch | no (derivable from the conversation on reload) |
+| `data-explanations` | `{reply, correction}` (stored grammar explanations) | only on reload, by `app/page.tsx`'s `toUIMessages()` — a live turn has none yet | n/a — this part *is* the persisted value |
 | `data-savedLemmas` | `string[]` (lowercased) | both branches, distinct ids | no (recomputed on load) |
 | `data-conversation` | `{id}` | start of turn | no |
 | `data-rateLimited` | `{cap}` | route, instead of everything | no |
@@ -198,29 +277,71 @@ or gloss never breaks a reply the learner already has. Notices are sent with
 
 | Function | File | AI SDK call | Temperature | Schema |
 |---|---|---|---|---|
-| reply | `lib/services/chat.service.ts` | `streamText` | default | — |
+| reply | `lib/reply.ts` (settings) + `lib/services/chat.service.ts` (call site) | `streamText` | default | — |
 | `detectCorrection()` | `lib/tutor.ts` | `generateObject` | 0 | `CorrectionSchema` |
-| `glossText()` | `lib/gloss.ts` | `generateObject` | 0 | `{ words: WordGlossSchema }` |
+| `glossText()` | `lib/gloss.ts` | `generateObject` | 0 | `{ translation: z.string(), words: WordGlossSchema }` |
+| `streamGrammarExplanation()` | `lib/explain.ts` | `streamText` | default | — (plain text, not structured) |
 
-All three use `providerOptions.groq.reasoningEffort = 'low'`. gpt-oss-120b is
+The first three use `providerOptions.groq.reasoningEffort = 'low'`.
+`streamGrammarExplanation` uses the same setting — explaining a rule needs a
+little more than chatting, but not deep multi-step reasoning. gpt-oss-120b is
 a reasoning model, and its hidden reasoning tokens count against Groq's
 per-minute token limit.
 
 Groq's structured-output mode rejects a bare array as the top-level schema.
-That's why `glossText` wraps the array in `{ words }` and unwraps it after the
-call. Nested inside `CorrectionSchema` the array is accepted.
+That's why `glossText`'s schema wraps the array in `{ translation, words }`
+and the function returns that object directly (callers read `.words` and
+`.translation`). Nested inside `CorrectionSchema` the array is still accepted
+as-is.
+
+**`/api/explain` (on demand, not part of the per-message calls):** takes
+`{ kind: 'reply' | 'correction', text, original?, level, messageId? }`. With a
+signed-in user and a `messageId`, it reads the text to explain from that
+database row (not from the request body) and, if that row already has a
+`grammar_explanation`, returns it without calling the model at all — so
+reopening an explanation is free. Otherwise it streams a new one and saves it
+onto the row via `annotateMessage`. Without a usable `messageId` (anonymous,
+or a turn whose rows failed to save), it explains the text sent in the
+request and saves nothing; anonymous requests spend one unit of the same
+free-message cap chat uses (`checkAndIncrementUsage`).
 
 ### 5.2 Prompts (`lib/prompts.ts`)
 
-- **`buildConversationSystemPrompt(level)`**: base persona (short replies,
-  always end with a question, **never** correct the learner, since that
-  happens separately) plus `LEVEL_GUIDANCE[level]`.
-- **`buildCorrectionSystemPrompt(level)`**: `STRICTNESS_BY_LEVEL[level]` (A1
-  very lenient, up to B2/C1 strict), an explicit "decide hasMistake **as if
-  the category list didn't exist**" instruction, category tie-break rules
-  (case_declension vs preposition vs word_choice), and `LEMMA_RULES`.
-- **`buildGlossSystemPrompt()`**: one entry per word, punctuation stripped,
-  meaning in this sentence, plus `LEMMA_RULES`.
+- **`buildConversationSystemPrompt(level, persona)`**: a persona section built
+  from the persona's fields (name, age, city, bio — see §6), instructions to
+  act as a real person having a conversation rather than a helper (react to
+  what the learner said, share things about herself, ask a question in only
+  roughly half of replies, understand English words the learner substitutes
+  for ones they don't know and use the German word naturally in the reply),
+  **never** correct the learner directly (that happens separately), then
+  `LEVEL_GUIDANCE[level]` last, since its hard limits are what the persona's
+  chattiness most wants to break and the last instruction in a prompt tends to
+  win that tug-of-war. A1/A2 guidance is now hard numeric limits (sentence
+  count, words per sentence, which tenses/conjunctions are allowed), not
+  prose description — a vaguer version of this under-constrained gpt-oss at
+  low reasoning effort (see `evals/reply-level-cases.ts`, §9).
+- **`buildTurnGuidance(previousReply)`**: appended to the system prompt only
+  when the persona's own previous reply ended in a question — "this reply
+  must not contain a question." The prompt alone couldn't reliably keep the
+  question rate down (the model can't count across turns within one call);
+  this makes the one-questions-every-other-turn rule a per-call decision in
+  code instead of a hope in the prompt text.
+- **`buildCorrectionSystemPrompt(level)`**: unchanged leniency/category logic
+  (`STRICTNESS_BY_LEVEL[level]`, the "decide hasMistake as if the category
+  list didn't exist" instruction, category tie-break rules), plus a new
+  English-stand-in block: when the learner substitutes English words for ones
+  they don't know, `usedEnglish` is set and judged entirely separately from
+  `hasMistake` — an English stand-in is never itself a mistake — but
+  `correction`/`correctionTranslation`/`correctionGloss`/`explanation` are
+  still filled in (the all-German version of the sentence), so the UI has
+  something to show even when there's no grammar mistake to flag. Plus
+  `LEMMA_RULES`.
+- **`buildGlossSystemPrompt()`**: now asks for the whole-text translation
+  first, then one entry per word as before (punctuation stripped, meaning in
+  this sentence), plus `LEMMA_RULES`.
+- **`buildGrammarExplanationPrompt(level, kind)`**: plain-text, bullet-only
+  output (`• ` lines, no Markdown) explaining either a reply's notable grammar
+  points or the rule behind a correction, capped around 120 words.
 
 **Why the "as if the category list didn't exist" instruction exists:** putting
 `z.enum(MISTAKE_TYPES)` in the schema changed what the model decided, not just
@@ -271,26 +392,34 @@ written by hand and **must be updated whenever a migration changes a table**.
 | `profiles` | `user_id` PK → auth.users, `cefr_level` (CHECK A1–C1, default A2) | signup trigger; `updateCefrLevel` | select/update own; no insert/delete policy |
 | `vocab_entries` | `term`, `lemma`, `translation`, `example_sentence`, `source` (`new_word`/`mistake`), **UNIQUE(user_id, lemma)** | `saveVocabEntry` (upsert, `ignoreDuplicates`) | full CRUD on own rows |
 | `mistake_history` | `mistake_type` (CHECK), `user_input`, `correction`, `explanation`; index `(user_id, mistake_type)` | `recordMistake` | select/insert/delete own; **no update**, since history can't be edited |
-| `conversations` | `title` (0003) | `createConversation` | select/insert/delete own |
-| `messages` | `role`, `content`, `correction jsonb`, `gloss jsonb` (0003); index `(conversation_id, created_at)`; FK **ON DELETE CASCADE** | `saveMessage`, `annotateMessage` | ownership proven via `EXISTS` on parent conversation; update policy added in 0003 |
+| `personas` (0004) | `slug` UNIQUE, `name`, `age`, `city`, `bio`, `avatar_url`, `is_default` (partial unique index: at most one default) | migration seed only — content, not user data | select for `anon, authenticated`; no insert/update/delete policy at all (managed only via migrations / service role) |
+| `conversations` | `title` (0003), `persona_id` (0004, FK → `personas`, **ON DELETE SET NULL**) | `createConversation` | select/insert/delete own |
+| `messages` | `role`, `content`, `correction jsonb`, `gloss jsonb` (0003), `grammar_explanation text` (0004); index `(conversation_id, created_at)`; FK **ON DELETE CASCADE** | `saveMessage`, `annotateMessage` | ownership proven via `EXISTS` on parent conversation; update policy added in 0003 |
 | `session_usage` | `session_id` PK, `message_count` | `checkAndIncrementUsage` (service role) | **RLS on, zero policies**: invisible to every client |
-| `token_usage` | `endpoint` (CHECK chat/correction/gloss), token counts, `user_id` **ON DELETE SET NULL** | `logUsage` (service role) | **RLS on, zero policies** |
+| `token_usage` | `endpoint` (CHECK chat/correction/gloss/**explain**, extended in 0004), token counts, `user_id` **ON DELETE SET NULL** | `logUsage` (service role) | **RLS on, zero policies** |
 
 **Trigger:** `on_auth_user_created`, then `handle_new_user()` (`SECURITY
 DEFINER`, `search_path = ''`), inserts a `profiles` row for each new user.
+0004 adds a second trigger-free mechanism: `personas` is seeded directly by
+the migration (one row, `slug = 'ramanath'`, `is_default = true`), not by any
+app-level insert path, since the table has no insert policy for any role.
 
 **Annotation placement:** the correction describes what the learner wrote, so
 it's stored on the **user** message even though the UI draws it under the
 following reply. `app/page.tsx` → `toUIMessages()` reattaches it when
 rebuilding the thread. The gloss describes the assistant's own text, so it's
-stored on the **assistant** row.
+stored on the **assistant** row. `grammar_explanation` follows the same rule:
+explaining a reply lands on the assistant row, explaining a correction lands
+on the user row next to the correction it explains.
 
 **JSONB, not typed columns:** the Zod schemas define these shapes, so typed
 columns would need a migration every time a field is added. Nothing queries
 inside them. The cost is that old rows can be missing newer fields
-(`lemma`, `lemmaTranslation`). Readers handle this with fallbacks, for example
-`entry.lemmaTranslation || entry.translation`, and rows with no lemma can't be
-saved.
+(`lemma`, `lemmaTranslation`, and now `gloss.translation` — a gloss saved
+before the sentence-translation field existed is a bare array rather than
+`{translation, words}`). Readers handle this with fallbacks, for example
+`entry.lemmaTranslation || entry.translation` and `gloss.ts`'s
+`normalizeReplyGloss()`, and rows with no lemma can't be saved.
 
 **RLS conventions used throughout:** `TO authenticated` (not an
 `auth.role()` check), `(select auth.uid())` so it's evaluated once per query,
@@ -346,13 +475,20 @@ only exists to protect a free Groq quota.
 
 ### 8.1 `app/page.tsx` (Server Component)
 
-- Loads the user, level, remaining anonymous messages, conversation list, the
+- Loads the user, level, persona (the conversation's own, or the default —
+  `resolvePersona()`), remaining anonymous messages, conversation list, the
   requested conversation (`?c=<id>`, `?c=new`, or the latest by default), and
   its messages.
 - `toUIMessages()` rebuilds stored rows into `LangTutorUIMessage` without any
-  extra queries.
+  extra queries. It now also: normalizes a stored gloss through
+  `normalizeReplyGloss()` (old bare-array rows get `translation: null`),
+  attaches a `data-messageIds` part per assistant row (so "explain grammar"
+  works immediately after a reload, same as a live turn), and attaches a
+  `data-explanations` part carrying any already-saved `grammar_explanation`
+  text for the reply and its paired correction.
 - **One** `getSavedLemmas` call for the whole thread (batched in groups of 100
-  lemmas to keep request URLs under proxy limits).
+  lemmas to keep request URLs under proxy limits), reading lemmas out of
+  `gloss.words` rather than a bare array.
 - `pickStarters()` runs on the server (partial Fisher-Yates) so the starters
   match between server render and hydration.
 - `<Chat key={conversation?.id ?? 'new'}>` remounts the client component when
@@ -364,8 +500,10 @@ only exists to protect a free Groq quota.
   `data-notice` parts into toasts, using the notice source as the toast id so
   repeats replace each other instead of stacking).
 - `conversationId` is kept in a ref, updated from `data-conversation`, and
-  sent in the `body` of each `sendMessage`. That's how a new chat's second
-  message goes to the same conversation.
+  sent in the `body` of each `sendMessage`, **alongside `level`** (§4.1's race
+  fix). That's how a new chat's second message goes to the same conversation,
+  and how a level change takes effect on the very next message instead of
+  racing an un-awaited profile save.
 - **Saved-lemma Set** is computed on each render from three sources: lemmas
   known at page load, lemmas from streamed `data-savedLemmas` parts, and
   lemmas saved locally this session. It isn't state updated in an effect, so
@@ -373,15 +511,38 @@ only exists to protect a free Groq quota.
 - **Saving a word** is optimistic: the ✓ appears immediately, `saveVocabAction`
   runs, and on `ok: false` or an exception the ✓ is removed and a toast shows.
   The saved example sentence is the one sentence containing the word
-  (`sentenceContaining`).
+  (`sentenceContaining`, now in `app/components/glossed-text.tsx`).
 - **Correction card:** the changed words are highlighted by a local multiset
   diff of the original and corrected sentences (`changedWordIndices`), not by
-  anything the model returns.
-- **Gloss panel:** `groupGlossByLemma` merges words that share a lemma into one
-  row (joined with "…" when the words aren't next to each other). The panel
-  stays mounted and is collapsed with CSS so it can animate, and it's `inert`
-  when closed so keyboard and screen-reader users can't reach hidden buttons.
-- Level changes write the cookie and, if signed in, call `saveLevel`. The
+  anything the model returns. A card now shows for `usedEnglish` sentences
+  too, labeled "in German" (a different color from a mistake-type label)
+  rather than a grammar category — `hasCorrectionCard()` (`lib/correction-card.ts`)
+  decides whether a `Correction` has anything to render at all, used both here
+  and in `chat.service.ts`'s failure check (§4.3).
+- **Per-word reading is now `GlossedText`** (`app/components/glossed-text.tsx`,
+  moved out of this file): hovering a word still shows a quick translation;
+  clicking/tapping it pins a small menu with the dictionary form and a
+  **+ save** button. This replaced the old always-visible word-list panel
+  (`groupGlossByLemma`/`GlossPanel`), which QA felt was noise once per-word
+  meanings lived in the words themselves.
+- **`TranslationPanel`** (`app/components/translation-panel.tsx`) is the
+  "translate" button's panel: the whole-sentence translation plus an
+  **explain grammar** button. Clicking it calls `/api/explain`, streams the
+  answer into the panel (client-held state keyed by message id — reading the
+  stream directly from `fetch`, not through `useChat`), and — for a signed-in
+  user with a known `messageId` (from `data-messageIds` or a reload's
+  `data-explanations`) — the server saves it, so it survives a reload without
+  a second model call. While a reply is still streaming and no translation
+  exists yet, the translate button renders disabled and pulsing in its final
+  position rather than a separate "gloss…" line, so there's no layout jump
+  when it becomes clickable.
+- **Persona avatar:** `PersonaAvatar` (`app/components/persona-avatar.tsx`)
+  renders next to each of the persona's replies and on the empty-chat screen.
+  It shows an image from `avatar_url` when set, or an initial badge when not
+  (currently always the latter — see §12).
+- Level changes write the cookie and, if signed in, call `saveLevel` — now a
+  best-effort sync of the stored profile rather than something the next
+  message depends on, since the message itself carries the level. The
   theme is stored in localStorage (`starfinch_theme`, falling back to the
   pre-rename `starprache_theme` on read), and every access is
   wrapped in try/catch.
@@ -390,24 +551,42 @@ only exists to protect a free Groq quota.
 
 - `SiteHeader`: level select, chats menu (open, delete with confirm modal),
   remaining-message indicator for anonymous visitors, theme toggle, sign
-  in/out.
-- `/vocab`: saved words newest first, with example sentence and source, and a
-  remove button that calls `deleteVocabAction`.
+  in/out. Now rendered as a sibling of the 860px content column, in its own
+  1080px-wide wrapper (`app/chat.tsx`, `app/vocab/page.tsx`, `app/login/page.tsx`
+  each changed their top-level layout for this), rather than nested inside
+  that column — wider chrome without widening the reply text's line length.
+- `/vocab`: `VocabGrid` (`app/vocab/vocab-grid.tsx`) renders saved words as a
+  responsive grid of click-to-reveal cards (lemma always visible; translation
+  and example sentence hidden until tapped), plus a page-level "show all /
+  hide all" toggle. A card's own flip state and the toggle combine with XOR,
+  so toggling "show all" clears individual flips rather than fighting them.
+  Resets to all-hidden on every page load/navigation by design — it's meant
+  to double as light self-testing, not a persistent reading view. Replaced
+  the earlier flat list.
 - `ConfirmProvider` / `useConfirm()`: a confirm dialog returned as a promise.
 
 ## 9. Evals
 
-`npm run eval [correction|gloss]` runs `scripts/run-evals.ts` through `tsx`
-with `.env.local`, calling `detectCorrection` and `glossText` directly.
+`npm run eval [correction|gloss|reply]` runs `scripts/run-evals.ts` through
+`tsx` with `.env.local`, calling `detectCorrection`, `glossText` and the
+reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
+`chat.service.ts` streams with) directly.
 
 | Suite | Cases | Pass rule | Expected |
 |---|---|---|---|
-| correction (`evals/cases.ts`) | 20 | `hasMistake` matches, and `mistakeType` matches when specified. Includes clean sentences and A1-vs-C1 pairs. | 19–20/20 (`auxiliary-verb-1` flips between runs because of Groq non-determinism) |
-| gloss (`evals/gloss-cases.ts`) | 17 | Each listed word gets an accepted lemma (case- and whitespace-insensitive) in **all 3 runs** | all pass |
+| correction (`evals/cases.ts`) | 24 | `hasMistake` matches, `mistakeType` matches when specified, and `usedEnglish` matches when specified. Includes clean sentences, A1-vs-C1 pairs, and English-stand-in cases (clean, with a mistake layered on, and a German loanword that must *not* be flagged as English). | 19–20/20 of the original 20 (`auxiliary-verb-1` flips between runs because of Groq non-determinism); the 4 newer English cases pass steadily |
+| gloss (`evals/gloss-cases.ts`) | 17 | Each listed word gets an accepted lemma (case- and whitespace-insensitive) in **all 3 runs**; every run's sentence `translation` must be non-empty | all pass |
+| reply (`evals/reply-level-cases.ts`) | 13 single-turn cases + 1 scripted 8-turn conversation | Per case: A1/A2 replies stay within their sentence-count/length/tense limits (`REPLY_LIMITS`), no helper phrasing (`HELPER_PHRASES`), and an English stand-in comes back used in German (`expectContains`). Across the scripted conversation: at most half the replies end in a question (`MAX_QUESTION_SHARE`), checked turn-by-turn against the real `buildTurnGuidance()` behavior, not just a static sample. | all pass as of the prompt in `lib/prompts.ts` as of 2026-09-30 |
 
 - `withRateLimitRetry` waits as long as Groq's 429 message asks, so hitting
-  the free tier's 8k tokens/min limit doesn't count as a failed case.
-- Gloss cases run one at a time and take a few minutes.
+  the free tier's 8k tokens/min limit doesn't count as a failed case. It also
+  doesn't protect against Groq's **daily** token cap (200k tokens/day on the
+  free/on-demand tier) — that one isn't retryable within a run, and a day of
+  repeated full-suite runs can exhaust it and start 429ing live chat too, so
+  run only the suite a change actually touches.
+- Gloss cases run one at a time and take a few minutes. The reply suite's
+  question-share check runs its 8 turns sequentially (each depends on the
+  previous reply, for `buildTurnGuidance`), so it's not parallelizable either.
 - **Nothing runs evals automatically.** There's no CI and no git hook. Run
   them after any change to `lib/prompts.ts`, `lib/tutor.ts` or `lib/gloss.ts`.
 
@@ -441,26 +620,43 @@ with `.env.local`, calling `detectCorrection` and `glossText` directly.
 | PLAN.md says | The code does |
 |---|---|
 | Step 3 "in progress"; Google OAuth ⬜; vocab CRUD ⬜ | **Done.** Google OAuth works; saving and deleting vocab work through Server Actions |
-| Step 4 rate limiting not started | **Done.** 5-message anonymous cap (`session.service.ts`) |
+| Step 4 rate limiting not started | **Done, for anonymous visitors.** 5-message lifetime cap (`session.service.ts`). **Authenticated users are still uncapped**, as step 8 explicitly planned for v1 — but a generous, time-windowed cap for signed-in users (discussed as "~5 hours, resets") is scoped for before public launch and **not yet built**; nothing below describes it as done |
 | Vocab extraction is deterministic (tokenize → lemmatize → stopwords) | **LLM-derived lemmas** from the gloss call. The deterministic stopword path and the chips were built and are now deprecated |
-| Vocab candidates shown as chips under each reply | Replaced by **+ buttons in the gloss panel** (`vocab-chips.tsx` and `getVocabCandidates` kept, deprecated) |
+| Vocab candidates shown as chips under each reply | Replaced by **+ buttons in a per-word hover/tap menu** (`GlossedText`); the candidate-chip path (`vocab-chips.tsx`, `getVocabCandidates`) stays deprecated |
 | `/app/api/vocab/*` REST routes | **Server Actions** (`app/vocab/actions.ts`) |
 | `lib/usage.ts` | `lib/services/usage.service.ts`, persisting to `token_usage` |
-| `token_usage.endpoint` ∈ chat, correction | Also `gloss` (migration 0002) |
-| Two LLM calls per turn | **Three** (reply, correction, gloss) |
-| — | Not in the plan: conversation history with reopen/delete, persisted annotations (0003), error toasts, confirm modal, theme toggle, conversation starters, gloss eval suite |
+| `token_usage.endpoint` ∈ chat, correction | Also `gloss` (0002) and `explain` (0004) |
+| Two LLM calls per turn | **Three per turn, plus a fourth on demand** (reply, correction, gloss; `explain` only when the learner asks) |
+| A single generic conversation partner | **A named persona** (`personas` table, §6), currently one row ("Ramanath"), designed to extend to several later. `conversations.persona_id` pins each chat to the persona it started with |
+| Gloss = word-by-word only | **Gloss = whole-sentence translation + word-by-word**, surfaced as a translation panel with per-word hover/tap menus, not an always-visible word list |
+| Corrections only flag mistakes | **Corrections also surface English-stand-in sentences** (`usedEnglish`) under an "in German" label, distinct from a mistake card, reflecting that the UI now explicitly invites English for unknown words |
+| — | Not in PLAN.md at all: the persona system, on-demand saved grammar explanations (`/api/explain`), the level/profile race fix (§4.1), the correction-without-a-sentence failure fix (§4.3), the wider header layout, the vocab flip-card grid, the reply-level eval suite, conversation history with reopen/delete, persisted annotations (0003), error toasts, confirm modal, theme toggle, conversation starters |
 | Step 5 Grammar RAG, step 6 memory RAG, step 7 UI pass | **Not started.** No Pinecone, no embeddings. `getMistakesByType()` exists but nothing calls it yet |
+| *(FLASHCARDS.md, not in PLAN.md)* SRS flashcards, migration numbered `0004_flashcards.sql` | **Not started**, and that migration number is now taken by `0004_personas_and_explanations.sql` — whoever builds flashcards next renumbers it to `0005` |
 
 ## 12. Known limitations and tradeoffs
 
 - **Rate-limit race:** read-then-write, not an atomic increment, so two
   simultaneous requests from one anonymous session can go one message over
   the cap. Accepted at this scale.
+- **Authenticated users have no rate limit at all**, by original v1 design —
+  acceptable for a low-traffic personal project, but a real gap once the app
+  has a public domain. See the §11 row above; this is the one piece of the
+  public-launch checklist still open.
+- **The persona has no avatar image.** `avatar_url` is `null` for the seeded
+  row; `PersonaAvatar` falls back to an initial badge everywhere. Several
+  generated-art options were tried and rejected (see git history around
+  `lib/personas.ts` and `public/avatars/`); the project doesn't want
+  AI-generated art, so this needs real artwork, not another generation
+  attempt.
 - **The whole message list is sent every turn.** Nothing trims history before
   `streamText`, so the reply prompt grows with the conversation.
-- **The model name is repeated three times** (`CHAT_MODEL`,
-  `CORRECTION_MODEL`, `GLOSS_MODEL`) and the Groq provider is imported in each
-  file. There's no single place to switch model or provider.
+- **The model name is repeated across call sites** (`lib/reply.ts`'s
+  `CHAT_MODEL`, plus a `CORRECTION_MODEL`/`GLOSS_MODEL`/`EXPLAIN_MODEL`
+  constant in each of `tutor.ts`/`gloss.ts`/`explain.ts`) and the Groq
+  provider is imported in each file. There's no single place to switch model
+  or provider — `PHASE2.md`'s bring-your-own-model section (`lib/llm.ts`)
+  would be the place this gets fixed, if that's ever built.
 - **The mistake taxonomy is in sync by hand** between TypeScript and the SQL
   CHECK constraint.
 - **Row types are hand-written.** They drift if a migration changes and
@@ -468,6 +664,10 @@ with `.env.local`, calling `detectCorrection` and `glossText` directly.
 - **Lemmas depend on the model.** The gloss eval guards the known-hard cases,
   but a new construction can still get an inconsistent lemma and end up saved
   twice.
-- **Old JSONB rows** can lack newer gloss fields. Readers must keep their
-  fallbacks.
+- **Old JSONB rows** can lack newer gloss fields (`lemma`, `lemmaTranslation`,
+  and now the whole-sentence `translation` on `messages.gloss`). Readers must
+  keep their fallbacks (`normalizeReplyGloss`, `lemmaTranslation || translation`).
 - **No automated tests or CI.** Evals are run by hand.
+- **`docs/TECHNICAL.md` itself lags the code** unless someone remembers to
+  update it — there is no check that catches this doc going stale again, the
+  same way nothing catches an un-run eval suite.

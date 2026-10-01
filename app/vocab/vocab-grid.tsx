@@ -54,8 +54,18 @@ export function VocabGrid({ entries }: { entries: VocabEntry[] }) {
             // trigger the flip on its way to the remove.
             <div
               key={entry.id}
-              className={`border-line relative flex min-h-[112px] flex-col rounded-[14px] border-2 transition-shadow ${
-                revealed ? 'bg-soft' : 'bg-panel hover:shadow-[3px_3px_0_var(--line)]'
+              className={`border-line relative flex min-h-[112px] flex-col rounded-[14px] border-2 transition-[background-color,box-shadow] ${
+                // `bg-soft` used to mark "revealed", but --soft sits only
+                // ~0.07 (light) / ~0.04 (dark) lightness away from --panel --
+                // close enough that the two card states read as nearly
+                // identical in both themes. A tint of --accent-ink instead:
+                // that token is chosen specifically to contrast with the
+                // panel color in both themes (it's what text sits in on a
+                // bright fill), so even a faint wash of it stays visible
+                // either way.
+                revealed
+                  ? 'bg-accent-ink/[0.08]'
+                  : 'bg-panel hover:shadow-[3px_3px_0_var(--line)]'
               }`}
             >
               <button

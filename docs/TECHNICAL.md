@@ -1,19 +1,19 @@
 # starfinch — Technical Documentation
 
-> State of the codebase as of 2026-09-30 (commit `fd7e4ac`). This describes
-> what is **built**. What is planned lives in local working docs that aren't
-> committed (`PLAN.md` for v1, `PHASE2.md` for phases 2-3, `FLASHCARDS.md` for
-> the SRS feature). For the user-facing overview, see
-> [README.md](../README.md). Where the plan and the code disagree, the code is
-> right. Section 11 lists every known difference.
+> State of the codebase as of 2026-10-08 (flashcards F1, on top of `584a504`). This describes
+> what is **built**. Feature status is in [ROADMAP.md](../ROADMAP.md); design
+> notes live in local `plans/*.md` files that aren't committed. For the
+> user-facing overview, see [README.md](../README.md). Where a plan and the
+> code disagree, the code is right. Section 11 lists where the build departed
+> from the original design.
 >
-> **Since the last revision of this doc (2026-09-22, `0a92c6a`):** a persona
-> system (the tutor is now a specific character, "Ramanath", stored in a
-> `personas` table), on-demand grammar explanations (a fourth, on-demand LLM
-> call, saved to history), a reworked gloss/translation UI (per-word hover
-> menus plus a whole-sentence translation panel, replacing the old word-list
-> panel), a fix for a level/profile race condition, and a wider header laid
-> out outside the chat column. See the delta table in §11.
+> **Since the last revision of this doc (2026-10-01, `584a504`):** flashcards
+> F1, the foundations, with no UI yet: migration 0005 (`cards`,
+> `review_logs`, a trigger that creates a card per saved word, the
+> `record_review` RPC, `profiles.timezone`), the FSRS scheduler wrapper
+> (`lib/srs.ts`), cloze building and answer checking (`lib/cloze.ts`),
+> `card.service.ts`, and the project's first unit tests (`npm test`). See §3
+> and §6. Nothing in the app calls the card service yet; F2 adds `/review`.
 
 ## Contents
 
@@ -27,8 +27,9 @@
 8. [Frontend](#8-frontend)
 9. [Evals](#9-evals)
 10. [Configuration and deployment](#10-configuration-and-deployment)
-11. [Plan vs. implementation](#11-plan-vs-implementation)
+11. [Design vs. implementation](#11-design-vs-implementation)
 12. [Known limitations and tradeoffs](#12-known-limitations-and-tradeoffs)
+13. [Gotchas](#13-gotchas)
 
 ---
 
@@ -87,6 +88,8 @@ POST /api/explain ────────────────────�
 | Toasts | `sonner` | Wrapped in `app/components/toaster.tsx` |
 | Hosting | Vercel (Fluid Compute, Node runtime) | GitHub-connected auto deploys |
 | Evals | `tsx` script against real Groq | `npm run eval` |
+| Spaced repetition | `ts-fsrs` (FSRS-6) | Wrapped by `lib/srs.ts`, the only importer |
+| Unit tests | Node's built-in runner via `tsx --test` | `npm test`; pure functions only |
 
 **Why Groq direct, not AI Gateway:** the project aims for zero billing
 exposure. A free-tier Groq key has no spend surface at all.
@@ -130,8 +133,16 @@ lib/
                            explanations, rateLimited, conversation, savedLemmas, notice)
   mistake-types.ts         MISTAKE_TYPES taxonomy (single source of truth)
   constants.ts             Conversation starters
+  srs.ts                   FSRS wrapper: row <-> ts-fsrs Card, gradeCard, previewIntervals,
+                           retrievability, dayStart (4am local); NEW_PER_DAY / REVIEWS_PER_DAY
+  cloze.ts                 buildVocabCloze (blank the saved word, emphasize a separable particle,
+                           English->German fallback) + checkAnswer (umlaut substitutes, case note)
+  text.ts                  stripPunctuation, changedWordIndices, sentenceContaining (moved out of
+                           chat.tsx / glossed-text.tsx so the server can use them)
+  *.test.ts                Unit tests for srs, cloze and text (`npm test`)
   stopwords.ts             DEPRECATED (only used by the deprecated chips)
-  services/                One module per table, plus chat.service (orchestration), persona.service
+  services/                One module per table, plus chat.service (orchestration), persona.service,
+                           card.service (review queue, due count, recordReview over cards + review_logs)
                            (read-only personas lookups)
   supabase/                client.ts (browser), server.ts (per-request), proxy.ts (session refresh),
                            service-role.ts (RLS-bypassing PostgREST client)
@@ -141,11 +152,15 @@ evals/                     cases.ts (24 correction cases, now incl. English-stan
                            gloss-cases.ts (17 lemma cases), reply-level-cases.ts (A1/A2 sentence-length
                            and tense limits, helper-phrasing check, question-share over a scripted chat)
 scripts/run-evals.ts       Eval runner — correction | gloss | reply
+scripts/docs-status.sh     `npm run docs:status`: code commits the docs haven't caught up with
+.github/workflows/         docs-sync.yml runs docs-status.sh on every push (warning only)
 supabase/migrations/       0001 schema + RLS, 0002 gloss endpoint, 0003 annotations + titles,
-                           0004 personas + persona_id + grammar_explanation + 'explain' usage endpoint
+                           0004 personas + persona_id + grammar_explanation + 'explain' usage endpoint,
+                           0005 flashcards (cards, review_logs, vocab-card trigger, record_review, timezone)
 proxy.ts                   Next 16 proxy (ex-middleware): Supabase session refresh
 next.config.ts             Server Action allowedOrigins for Vercel aliases
-public/avatars/            empty — the persona currently has no avatar image (avatar_url is null);
+(no public/avatars/)        the persona has no avatar image (avatar_url is null); the placeholder
+                           ramanath.svg was deleted in fd7e4ac, so the folder no longer exists.
                            PersonaAvatar falls back to an initial badge. See §8.2 and §12.
 ```
 
@@ -389,20 +404,34 @@ written by hand and **must be updated whenever a migration changes a table**.
 
 | Table | Key columns | Written by | RLS |
 |---|---|---|---|
-| `profiles` | `user_id` PK → auth.users, `cefr_level` (CHECK A1–C1, default A2) | signup trigger; `updateCefrLevel` | select/update own; no insert/delete policy |
+| `profiles` | `user_id` PK → auth.users, `cefr_level` (CHECK A1–C1, default A2), `timezone` (0005, IANA name, default UTC) | signup trigger; `updateCefrLevel` | select/update own; no insert/delete policy |
 | `vocab_entries` | `term`, `lemma`, `translation`, `example_sentence`, `source` (`new_word`/`mistake`), **UNIQUE(user_id, lemma)** | `saveVocabEntry` (upsert, `ignoreDuplicates`) | full CRUD on own rows |
 | `mistake_history` | `mistake_type` (CHECK), `user_input`, `correction`, `explanation`; index `(user_id, mistake_type)` | `recordMistake` | select/insert/delete own; **no update**, since history can't be edited |
 | `personas` (0004) | `slug` UNIQUE, `name`, `age`, `city`, `bio`, `avatar_url`, `is_default` (partial unique index: at most one default) | migration seed only — content, not user data | select for `anon, authenticated`; no insert/update/delete policy at all (managed only via migrations / service role) |
 | `conversations` | `title` (0003), `persona_id` (0004, FK → `personas`, **ON DELETE SET NULL**) | `createConversation` | select/insert/delete own |
 | `messages` | `role`, `content`, `correction jsonb`, `gloss jsonb` (0003), `grammar_explanation text` (0004); index `(conversation_id, created_at)`; FK **ON DELETE CASCADE** | `saveMessage`, `annotateMessage` | ownership proven via `EXISTS` on parent conversation; update policy added in 0003 |
 | `session_usage` | `session_id` PK, `message_count` | `checkAndIncrementUsage` (service role) | **RLS on, zero policies**: invisible to every client |
-| `token_usage` | `endpoint` (CHECK chat/correction/gloss/**explain**, extended in 0004), token counts, `user_id` **ON DELETE SET NULL** | `logUsage` (service role) | **RLS on, zero policies** |
+| `cards` (0005) | `kind` (vocab_cloze/grammar_cloze), `vocab_entry_id` **or** `mistake_id` (each UNIQUE, ON DELETE CASCADE; CHECK exactly one), FSRS state (`state`, `due`, `stability`, `difficulty`, `scheduled_days`, `learning_steps`, `reps`, `lapses`, `last_review`), `suspended`; partial index `(user_id, due) where not suspended` | `create_vocab_card` trigger; `record_review` | full CRUD on own rows |
+| `review_logs` (0005) | `card_id`, `rating` 1–4, `state` **before** the review, FSRS snapshot, `reviewed_at`, `duration_ms`, `surface` (panel/review_page), `answer_given` | `record_review` | select own; insert own **and only against a card you own**; no update/delete |
+| `token_usage` | `endpoint` (CHECK chat/correction/gloss/explain/**drill**, extended in 0004 and 0005), token counts, `user_id` **ON DELETE SET NULL** | `logUsage` (service role) | **RLS on, zero policies** |
 
 **Trigger:** `on_auth_user_created`, then `handle_new_user()` (`SECURITY
 DEFINER`, `search_path = ''`), inserts a `profiles` row for each new user.
 0004 adds a second trigger-free mechanism: `personas` is seeded directly by
 the migration (one row, `slug = 'ramanath'`, `is_default = true`), not by any
 app-level insert path, since the table has no insert policy for any role.
+
+**Flashcard trigger (0005):** `on_vocab_entry_created` → `create_vocab_card()`
+(`SECURITY INVOKER`) inserts a New card for each new `vocab_entries` row. The
+vocab upsert's `ignoreDuplicates` path inserts no row, so a re-save creates no
+second card. Words saved before 0005 were backfilled in the migration.
+
+**`record_review` RPC (0005):** writes a graded card and its log line in one
+transaction. The scheduling maths runs in TypeScript (`lib/srs.ts`); the
+function only stores the result. It takes the card's `reps` as an expected
+version and updates `where reps = expected`, so a second tab grading the same
+card gets `false` (reported as `stale`) instead of overwriting the first.
+`SECURITY INVOKER`, so RLS applies, and `EXECUTE` is revoked from `anon`.
 
 **Annotation placement:** the correction describes what the learner wrote, so
 it's stored on the **user** message even though the UI draws it under the
@@ -511,7 +540,8 @@ only exists to protect a free Groq quota.
 - **Saving a word** is optimistic: the ✓ appears immediately, `saveVocabAction`
   runs, and on `ok: false` or an exception the ✓ is removed and a toast shows.
   The saved example sentence is the one sentence containing the word
-  (`sentenceContaining`, now in `app/components/glossed-text.tsx`).
+  (`sentenceContaining`, still in `app/chat.tsx`; only `stripPunctuation`
+  moved to `app/components/glossed-text.tsx`).
 - **Correction card:** the changed words are highlighted by a local multiset
   diff of the original and corrected sentences (`changedWordIndices`), not by
   anything the model returns. A card now shows for `usedEnglish` sentences
@@ -562,7 +592,9 @@ only exists to protect a free Groq quota.
   so toggling "show all" clears individual flips rather than fighting them.
   Resets to all-hidden on every page load/navigation by design — it's meant
   to double as light self-testing, not a persistent reading view. Replaced
-  the earlier flat list.
+  the earlier flat list. A revealed card is tinted with a faint wash of
+  `--accent-ink` (`bg-accent-ink/[0.08]`), not `bg-soft`: `--soft` is too
+  close to `--panel` in both themes for the two states to read as different.
 - `ConfirmProvider` / `useConfirm()`: a confirm dialog returned as a promise.
 
 ## 9. Evals
@@ -587,8 +619,9 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
 - Gloss cases run one at a time and take a few minutes. The reply suite's
   question-share check runs its 8 turns sequentially (each depends on the
   previous reply, for `buildTurnGuidance`), so it's not parallelizable either.
-- **Nothing runs evals automatically.** There's no CI and no git hook. Run
-  them after any change to `lib/prompts.ts`, `lib/tutor.ts` or `lib/gloss.ts`.
+- **Nothing runs evals automatically.** CI (`.github/workflows/docs-sync.yml`)
+  only checks whether this doc is behind the code, and no git hook runs evals.
+  Run them after any change to `lib/prompts.ts`, `lib/tutor.ts` or `lib/gloss.ts`.
 
 ## 10. Configuration and deployment
 
@@ -615,12 +648,14 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
   the app fails to reach the database until the project is resumed in the
   dashboard.
 
-## 11. Plan vs. implementation
+## 11. Design vs. implementation
 
-| PLAN.md says | The code does |
+Where the build departed from the original v1 design. Whether a feature is
+done is in [ROADMAP.md](../ROADMAP.md), not here.
+
+| Originally designed | The code does |
 |---|---|
-| Step 3 "in progress"; Google OAuth ⬜; vocab CRUD ⬜ | **Done.** Google OAuth works; saving and deleting vocab work through Server Actions |
-| Step 4 rate limiting not started | **Done, for anonymous visitors.** 5-message lifetime cap (`session.service.ts`). **Authenticated users are still uncapped**, as step 8 explicitly planned for v1 — but a generous, time-windowed cap for signed-in users (discussed as "~5 hours, resets") is scoped for before public launch and **not yet built**; nothing below describes it as done |
+| Rate limit for anonymous visitors only | As designed: 5-message lifetime cap (`session.service.ts`), signed-in users uncapped. A time-windowed signed-in cap is on the roadmap for before public launch |
 | Vocab extraction is deterministic (tokenize → lemmatize → stopwords) | **LLM-derived lemmas** from the gloss call. The deterministic stopword path and the chips were built and are now deprecated |
 | Vocab candidates shown as chips under each reply | Replaced by **+ buttons in a per-word hover/tap menu** (`GlossedText`); the candidate-chip path (`vocab-chips.tsx`, `getVocabCandidates`) stays deprecated |
 | `/app/api/vocab/*` REST routes | **Server Actions** (`app/vocab/actions.ts`) |
@@ -630,9 +665,7 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
 | A single generic conversation partner | **A named persona** (`personas` table, §6), currently one row ("Ramanath"), designed to extend to several later. `conversations.persona_id` pins each chat to the persona it started with |
 | Gloss = word-by-word only | **Gloss = whole-sentence translation + word-by-word**, surfaced as a translation panel with per-word hover/tap menus, not an always-visible word list |
 | Corrections only flag mistakes | **Corrections also surface English-stand-in sentences** (`usedEnglish`) under an "in German" label, distinct from a mistake card, reflecting that the UI now explicitly invites English for unknown words |
-| — | Not in PLAN.md at all: the persona system, on-demand saved grammar explanations (`/api/explain`), the level/profile race fix (§4.1), the correction-without-a-sentence failure fix (§4.3), the wider header layout, the vocab flip-card grid, the reply-level eval suite, conversation history with reopen/delete, persisted annotations (0003), error toasts, confirm modal, theme toggle, conversation starters |
-| Step 5 Grammar RAG, step 6 memory RAG, step 7 UI pass | **Not started.** No Pinecone, no embeddings. `getMistakesByType()` exists but nothing calls it yet |
-| *(FLASHCARDS.md, not in PLAN.md)* SRS flashcards, migration numbered `0004_flashcards.sql` | **Not started**, and that migration number is now taken by `0004_personas_and_explanations.sql` — whoever builds flashcards next renumbers it to `0005` |
+| — | Not in the original design at all: the persona system, on-demand saved grammar explanations (`/api/explain`), the level/profile race fix (§4.1), the correction-without-a-sentence failure fix (§4.3), the wider header layout, the vocab flip-card grid, the reply-level eval suite, conversation history with reopen/delete, persisted annotations (0003), error toasts, confirm modal, theme toggle, conversation starters |
 
 ## 12. Known limitations and tradeoffs
 
@@ -655,7 +688,7 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
   `CHAT_MODEL`, plus a `CORRECTION_MODEL`/`GLOSS_MODEL`/`EXPLAIN_MODEL`
   constant in each of `tutor.ts`/`gloss.ts`/`explain.ts`) and the Groq
   provider is imported in each file. There's no single place to switch model
-  or provider — `PHASE2.md`'s bring-your-own-model section (`lib/llm.ts`)
+  or provider — the bring-your-own-model design (`plans/byom.md`, `lib/llm.ts`)
   would be the place this gets fixed, if that's ever built.
 - **The mistake taxonomy is in sync by hand** between TypeScript and the SQL
   CHECK constraint.
@@ -667,7 +700,44 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
 - **Old JSONB rows** can lack newer gloss fields (`lemma`, `lemmaTranslation`,
   and now the whole-sentence `translation` on `messages.gloss`). Readers must
   keep their fallbacks (`normalizeReplyGloss`, `lemmaTranslation || translation`).
-- **No automated tests or CI.** Evals are run by hand.
-- **`docs/TECHNICAL.md` itself lags the code** unless someone remembers to
-  update it — there is no check that catches this doc going stale again, the
-  same way nothing catches an un-run eval suite.
+- **Unit tests cover pure functions only** (`lib/srs.ts`, `lib/cloze.ts`,
+  `lib/text.ts`). Services, routes and UI have none, and evals are run by hand.
+- **No flashcard UI yet.** `card.service.ts` exists but nothing calls it
+  until F2. `profiles.timezone` is never set yet either, so every learner's
+  day currently starts at 4am UTC.
+- **`docs/TECHNICAL.md` and `ROADMAP.md` can lag the code.** `npm run
+  docs:status` (also run in CI on every push) lists the code commits made
+  since each was last updated, but it only warns. Someone still has to write the update. The check
+  goes by when each file was last committed, so a typo fix also counts as
+  "synced". See the "Keeping docs in sync" section of `CLAUDE.md`.
+
+## 13. Gotchas
+
+Things that cost real debugging time. Most are explained where they apply;
+this is the index.
+
+- **`writer.merge()` doesn't wait.** A branch left out of the final
+  `Promise.all` writes to a closed stream and is silently lost. §4.3.
+- **An enum in the schema changes the verdict.** `z.enum(MISTAKE_TYPES)` made
+  the correction model flag sentences it left alone with `z.string()`. §5.2.
+- **gpt-oss-120b's hidden reasoning tokens count against Groq's per-minute
+  limit.** Keep `reasoningEffort: 'low'`. §5.1.
+- **`temperature: 0` isn't deterministic on Groq.** The same input can take a
+  different reasoning path (visible as a different token count) and flip a
+  verdict, a side effect of batching on high-throughput inference. That's
+  why `auxiliary-verb-1` flips between runs and 19–20/20 is the expected
+  correction score. Investigate only a real drop, not one flaky boundary case. §9.
+- **Check Groq's live `/v1/models`, not bundled docs.** The AI SDK's bundled
+  Groq docs listed `llama-3.3-70b-versatile` after Groq had deprecated it.
+- **Vercel SSO protection covers every `*.vercel.app` URL, production
+  included,** and silently breaks anonymous chat. Re-check if the project
+  ever moves to another team. §10.
+- **Free-tier Supabase pauses after 7 days idle** and looks like a production
+  outage. §10.
+- **The Marketplace Supabase project belongs to a Vercel-managed org.** Open it
+  with `vercel integration open supabase <resource>`. Claiming it moves it out
+  of Vercel billing. §10.
+- **Next 16 renamed `middleware.ts` to `proxy.ts`** (the exported function is
+  `proxy` too). The old name still works but warns on every build. §2.
+- **supabase-js builds a Realtime client that throws on Node < 22.** That's why
+  the service-role client is a bare `PostgrestClient`. §7.1.

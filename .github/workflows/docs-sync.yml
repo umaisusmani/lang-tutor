@@ -1,0 +1,17 @@
+name: Docs sync check
+
+# Warns (never fails) when docs/TECHNICAL.md or ROADMAP.md hasn't been
+# updated since the last code change. Same check as `npm run docs:status`.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  docs-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the check walks history back to the doc's last commit
+      - run: bash scripts/docs-status.sh

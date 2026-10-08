@@ -4,14 +4,10 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import type { WordGloss } from '@/lib/gloss';
+import { stripPunctuation } from '@/lib/text';
 
 type GlossEntry = WordGloss[number];
 
-/** Strips leading/trailing punctuation so a gloss entry still matches a word
- * that carries a comma or full stop in the sentence. */
-export function stripPunctuation(word: string): string {
-  return word.replace(/^[^\wäöüÄÖÜß]+|[^\wäöüÄÖÜß]+$/g, '');
-}
 
 /**
  * What opens when a word is clicked: its meaning here, its dictionary form,

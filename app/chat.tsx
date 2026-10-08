@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { saveLevel } from '@/app/auth/actions';
-import { GlossedText, stripPunctuation } from '@/app/components/glossed-text';
+import { GlossedText } from '@/app/components/glossed-text';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
 import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
@@ -20,6 +20,7 @@ import type { WordGloss } from '@/lib/gloss';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import type { PersonaProfile } from '@/lib/personas';
 import type { CefrLevel } from '@/lib/prompts';
+import { changedWordIndices, sentenceContaining } from '@/lib/text';
 import type { Conversation, VocabSource } from '@/lib/types/db';
 
 const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
@@ -42,53 +43,6 @@ const LEGACY_THEME_KEY = 'starprache_theme';
 
 function writeLevelCookie(level: CefrLevel) {
   document.cookie = `${LEVEL_COOKIE}=${level}; path=/; max-age=31536000; SameSite=Lax`;
-}
-
-/**
- * Which words in the corrected sentence weren't in what the learner wrote --
- * those get the orange highlight.
- *
- * Deliberately a local diff rather than something the model returns: the
- * correction call already gives us both strings, so asking it to also mark the
- * changed word would be a wider schema (and another thing it can get wrong)
- * for information we can derive exactly. Consuming matches from a multiset
- * means a word the learner used once but the correction uses twice still
- * highlights the second one.
- */
-function changedWordIndices(original: string, corrected: string): Set<number> {
-  const pool = new Map<string, number>();
-  for (const token of original.split(/\s+/)) {
-    const key = stripPunctuation(token).toLowerCase();
-    if (key) pool.set(key, (pool.get(key) ?? 0) + 1);
-  }
-
-  const changed = new Set<number>();
-  corrected.split(/\s+/).forEach((token, i) => {
-    const key = stripPunctuation(token).toLowerCase();
-    if (!key) return;
-    const left = pool.get(key) ?? 0;
-    if (left > 0) pool.set(key, left - 1);
-    else changed.add(i);
-  });
-  return changed;
-}
-
-/**
- * The sentence a saved word came from, stored as the vocab entry's example.
- * A reply can run to several sentences, and a word is easier to remember in
- * the one sentence it was used in than in a whole paragraph.
- *
- * Splits after . ! ? and takes the first sentence containing the word (compared
- * the same way as changedWordIndices). Falls back to the whole text if nothing
- * matches, so an example is never dropped just because the split was imperfect.
- */
-function sentenceContaining(text: string, word: string): string {
-  const target = stripPunctuation(word).toLowerCase();
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  const match = sentences.find((sentence) =>
-    sentence.split(/\s+/).some((token) => stripPunctuation(token).toLowerCase() === target),
-  );
-  return (match ?? text).trim();
 }
 
 export default function Chat({

@@ -146,8 +146,9 @@ lib/
                            (read-only personas lookups)
   supabase/                client.ts (browser), server.ts (per-request), proxy.ts (session refresh),
                            service-role.ts (RLS-bypassing PostgREST client)
-  types/db.ts              Hand-written row types mirroring the migrations (now includes Persona,
-                           conversations.persona_id, messages.grammar_explanation)
+  types/db.ts              Hand-written row types mirroring the migrations (incl. Persona,
+                           conversations.persona_id, messages.grammar_explanation, and from 0005
+                           Card, CardSchedule, ReviewLog, Profile.timezone)
 evals/                     cases.ts (24 correction cases, now incl. English-stand-in cases),
                            gloss-cases.ts (17 lemma cases), reply-level-cases.ts (A1/A2 sentence-length
                            and tense limits, helper-phrasing check, question-share over a scripted chat)

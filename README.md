@@ -83,6 +83,8 @@ npm run dev                  # http://localhost:3000
 | `npm run build` | Production build |
 | `npm run lint` | ESLint |
 | `npm run eval` | Run every eval suite (see below) |
+| `npm test` | Unit tests for the pure helpers (flashcard scheduling, cloze, text) |
+| `npm run docs:status` | List code commits the docs haven't caught up with |
 
 ## Evals
 
@@ -101,7 +103,7 @@ npm run eval -- reply        # just the reply prompt (level limits, question rat
 
 Each case prints ✓ or ✗ with the wrong lemmas listed, and the runner exits with an error if any case fails. The gloss suite takes a few minutes on Groq's free tier because it waits out the per-minute token limit instead of failing.
 
-**Nothing runs this automatically.** There's no CI workflow and no git hook — run it yourself after any change to `lib/prompts.ts`, `lib/gloss.ts` or `lib/tutor.ts`, before you commit.
+**Nothing runs this automatically.** The only CI workflow checks whether the docs are behind the code, and there's no git hook — run it yourself after any change to `lib/prompts.ts`, `lib/gloss.ts` or `lib/tutor.ts`, before you commit.
 
 When you find a word the app gets wrong, add it as a case so it stays fixed.
 

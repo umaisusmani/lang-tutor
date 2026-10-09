@@ -8,12 +8,13 @@
 > from the original design.
 >
 > **Since the last revision of this doc (2026-10-01, `584a504`):** flashcards
-> F1, the foundations, with no UI yet: migration 0005 (`cards`,
+> F1, the foundations: migration 0005 (`cards`,
 > `review_logs`, a trigger that creates a card per saved word, the
 > `record_review` RPC, `profiles.timezone`), the FSRS scheduler wrapper
 > (`lib/srs.ts`), cloze building and answer checking (`lib/cloze.ts`),
-> `card.service.ts`, and the project's first unit tests (`npm test`). See §3
-> and §6. Nothing in the app calls the card service yet; F2 adds `/review`.
+> `card.service.ts`, and the project's first unit tests (`npm test`); and F2,
+> the `/review` page and the due-count badge in the header. See §3, §6 and
+> §8.3. Cards can be reviewed on `/review` only; reviewing inside the chat is F3.
 
 ## Contents
 
@@ -107,9 +108,12 @@ app/
   auth/actions.ts          Server Actions: signIn, signUp, signInWithGoogle, signOut, saveLevel
   auth/callback/route.ts   OAuth code → session exchange
   conversations/actions.ts deleteConversationAction
-  vocab/                   /vocab page, saveVocabAction, deleteVocabAction, vocab-grid (flip cards), header
+  vocab/                   /vocab page, saveVocabAction, deleteVocabAction, vocab-grid (flip cards)
+  review/                  /review page (loads the queue, builds each card's front), review-session
+                           (client: type, check, grade), gradeCardAction
   login/page.tsx           Email/password + Google sign-in form
-  components/              SiteHeader (level, chats menu, sign-out; now a 1080px sibling of the
+  components/              PageHeader (SiteHeader plus level/theme state for /vocab and /review),
+                           SiteHeader (level, chats menu, review badge, sign-out; now a 1080px sibling of the
                            860px content column, not nested inside it), Brand, ConfirmModal, Toaster,
                            GlossedText (per-word hover/tap menu + save), TranslationPanel (sentence
                            translation + explain-grammar), PersonaAvatar, vocab-chips (DEPRECATED)
@@ -596,6 +600,29 @@ only exists to protect a free Groq quota.
   the earlier flat list. A revealed card is tinted with a faint wash of
   `--accent-ink` (`bg-accent-ink/[0.08]`), not `bg-soft`: `--soft` is too
   close to `--panel` in both themes for the two states to read as different.
+- `/review` (`app/review/`): the full review session. `page.tsx` loads
+  `getReviewQueue()` and builds each card's front with `buildVocabCloze()` on
+  the server (a card with nothing to ask is skipped), so the client gets plain
+  data. `review-session.tsx` runs the session:
+  - Type the missing word, then **Check**. A correct answer offers Hard / Good
+    / Easy with Good highlighted; a wrong one offers Again, plus "I was right"
+    (graded Good) for typos and synonyms. **Hard is never offered after a
+    wrong answer**: it is a passing grade in FSRS, so using it for a forgotten
+    card inflates that card's intervals. Each button shows when the card
+    returns (`previewIntervals` + `formatInterval`). Enter takes the
+    highlighted button; keys 1-4 pick one.
+  - Grading awaits `gradeCardAction` (not optimistic), because a failed or
+    still-learning card has to be requeued on the schedule the server just
+    set. A card in learning comes back this session after its step (1m, then
+    10m); with only waiting cards left the page shows a countdown and
+    advances on its own. A graduated card leaves until its due date.
+  - A `stale` result (another tab graded the card first) or an error drops
+    the card from this session with a toast; it stays due.
+  - Every grade is logged with `surface = 'review_page'`, the time taken, and
+    what was typed.
+- **Due badge:** `SiteHeader` shows a `review` link with the number of cards in
+  the queue. `app/page.tsx` and `/vocab` compute it with `getDueCount()` on
+  each load; `gradeCardAction` revalidates the layout so it updates.
 - `ConfirmProvider` / `useConfirm()`: a confirm dialog returned as a promise.
 
 ## 9. Evals
@@ -703,9 +730,15 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
   keep their fallbacks (`normalizeReplyGloss`, `lemmaTranslation || translation`).
 - **Unit tests cover pure functions only** (`lib/srs.ts`, `lib/cloze.ts`,
   `lib/text.ts`). Services, routes and UI have none, and evals are run by hand.
-- **No flashcard UI yet.** `card.service.ts` exists but nothing calls it
-  until F2. `profiles.timezone` is never set yet either, so every learner's
-  day currently starts at 4am UTC.
+- **Reviewing only works on `/review`** until F3 puts cards in the chat
+  panel. `profiles.timezone` is never set, so every learner's day currently
+  starts at 4am UTC.
+- **The due badge can count a card `/review` won't show.** A card with no
+  example sentence and no translation has nothing to ask, so the page skips
+  it, but `getDueCount()` still counts it.
+- **The review page has no automated tests** beyond the pure helpers; it was
+  checked by rendering each state and by running the queue queries as a real
+  user against the database.
 - **`docs/TECHNICAL.md` and `ROADMAP.md` can lag the code.** `npm run
   docs:status` (also run in CI on every push) lists the code commits made
   since each was last updated, but it only warns. Someone still has to write the update. The check

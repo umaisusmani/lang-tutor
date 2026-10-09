@@ -11,6 +11,7 @@ German conversation practice with an AI tutor — currently a specific persona, 
 - **Corrections.** When your message has a mistake, you get the corrected sentence with the changed words highlighted, a short explanation, and the mistake type (word order, case, gender/article, verb conjugation, and so on).
 - **Translation and word lookup.** Hover a word for a quick translation, or tap it for its dictionary form and a **+** to save it. The **translate** button opens the whole-sentence translation, plus an **explain grammar** button for a short plain-English breakdown — saved to history once generated, so reopening it is free.
 - **Vocab page** (`/vocab`). Your saved words as click-to-reveal cards, with a show-all/hide-all toggle — doubles as light self-testing. Remove the ones you no longer want.
+- **Review** (`/review`). Every word you save becomes a flashcard. You see the sentence you met it in with the word blanked out, type it, and say how hard it was; the card comes back right before you'd forget it (spaced repetition, FSRS). A badge in the header shows how many are due.
 - **Chat history.** Conversations are saved, with their corrections, translations and grammar explanations, and you can reopen or delete them from the chats menu. The logo always opens a new chat.
 - **Try before signing in.** You can send 5 messages without an account. Sign in with email/password or Google to keep going and save your progress.
 

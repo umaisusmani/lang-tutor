@@ -24,6 +24,7 @@ export function SiteHeader({
   theme,
   onThemeToggle,
   activePage = 'chat',
+  dueCount = 0,
 }: {
   level: CefrLevel;
   onLevelChange: (next: CefrLevel) => void;
@@ -35,7 +36,9 @@ export function SiteHeader({
   messageCap: number;
   theme?: 'light' | 'dark' | null;
   onThemeToggle?: () => void;
-  activePage?: 'chat' | 'vocab';
+  activePage?: 'chat' | 'vocab' | 'review';
+  /** Cards waiting in the review queue; the badge on the review link. */
+  dueCount?: number;
 }) {
   const [chatsOpen, setChatsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -143,6 +146,25 @@ export function SiteHeader({
                 aria-current={activePage === 'vocab' ? 'page' : undefined}
               >
                 vocab
+              </Link>
+              <Link
+                href="/review"
+                className={`font-mono text-xs underline underline-offset-[3px] transition-colors ${
+                  activePage === 'review'
+                    ? 'text-ink bg-yellow text-on-bright rounded-full px-2 py-1 no-underline'
+                    : 'text-ink-2 hover:text-ink'
+                }`}
+                aria-current={activePage === 'review' ? 'page' : undefined}
+              >
+                review
+                {dueCount > 0 && (
+                  <span
+                    className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
+                    aria-label={`${dueCount} cards due`}
+                  >
+                    {dueCount > 99 ? '99+' : dueCount}
+                  </span>
+                )}
               </Link>
             </div>
           )}

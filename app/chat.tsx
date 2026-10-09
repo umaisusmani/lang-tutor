@@ -51,6 +51,7 @@ export default function Chat({
   userName,
   initialRemaining,
   messageCap,
+  dueCount,
   initialMessages,
   initialSavedLemmas,
   starters,
@@ -63,6 +64,7 @@ export default function Chat({
   userName: string | null;
   initialRemaining: number | null;
   messageCap: number;
+  dueCount: number;
   initialMessages: LangTutorUIMessage[];
   initialSavedLemmas: string[];
   starters: Starter[];
@@ -323,6 +325,7 @@ export default function Chat({
         theme={theme}
         onThemeToggle={toggleTheme}
         activePage="chat"
+        dueCount={dueCount}
       />
 
       <div className="flex w-full max-w-[860px] flex-1 flex-col">

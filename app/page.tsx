@@ -12,6 +12,7 @@ import {
 } from '@/lib/services/conversation.service';
 import { resolvePersona } from '@/lib/services/persona.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
+import { getDueCount } from '@/lib/services/card.service';
 import { ANON_MESSAGE_CAP, getRemainingMessages } from '@/lib/services/session.service';
 import { getSavedLemmas } from '@/lib/services/vocab.service';
 import type { Conversation, Message } from '@/lib/types/db';
@@ -135,6 +136,7 @@ export default async function Page({
   // Only anonymous visitors have an allowance to show -- signed-in users are
   // uncapped, so the header's progress row is hidden for them entirely.
   const remaining = user ? null : await getRemainingMessages();
+  const dueCount = user ? await getDueCount(user.id) : 0;
 
   // History is a signed-in feature: anonymous turns are never persisted, so
   // there is nothing to restore for them.
@@ -193,6 +195,7 @@ export default async function Page({
       userName={userName}
       initialRemaining={remaining}
       messageCap={ANON_MESSAGE_CAP}
+      dueCount={dueCount}
       initialMessages={initialMessages}
       initialSavedLemmas={initialSavedLemmas}
       starters={pickStarters(STARTERS_SHOWN)}

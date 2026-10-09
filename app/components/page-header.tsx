@@ -11,16 +11,22 @@ const THEME_KEY = 'starfinch_theme';
 /** Pre-rename key, still read so a theme chosen before the rename survives it. */
 const LEGACY_THEME_KEY = 'starprache_theme';
 
-export function VocabPageHeader({
+/** The header for the pages that aren't the chat (/vocab, /review): the same
+ * SiteHeader, with the level and theme state the chat page keeps for itself. */
+export function PageHeader({
   initialLevel,
   userEmail,
   userName,
   conversations,
+  activePage,
+  dueCount,
 }: {
   initialLevel: CefrLevel;
   userEmail: string | null;
   userName: string | null;
   conversations: Conversation[];
+  activePage: 'vocab' | 'review';
+  dueCount: number;
 }) {
   const [level, setLevel] = useState<CefrLevel>(initialLevel);
   const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
@@ -74,7 +80,8 @@ export function VocabPageHeader({
       messageCap={0}
       theme={theme}
       onThemeToggle={toggleTheme}
-      activePage="vocab"
+      activePage={activePage}
+      dueCount={dueCount}
     />
   );
 }

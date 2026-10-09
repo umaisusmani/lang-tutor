@@ -133,6 +133,19 @@ export function previewIntervals(row: CardSchedule, now: Date): Record<Grade, Da
   } as Record<Grade, Date>;
 }
 
+/** "10m", "3h", "5d", "2mo": how far off a due date is, as the grade buttons
+ * label it. Rounds to the nearest whole unit; never shows less than "1m". */
+export function formatInterval(from: Date, to: Date): string {
+  const minutes = Math.max(1, Math.round((to.getTime() - from.getTime()) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d`;
+  const months = Math.round(days / 30);
+  return months < 12 ? `${months}mo` : `${Math.round(days / 365)}y`;
+}
+
 /** Predicted probability (0-1) the learner recalls this card right now. Used
  * to see the most-likely-forgotten cards first when there's a backlog. */
 export function retrievability(row: CardSchedule, now: Date): number {

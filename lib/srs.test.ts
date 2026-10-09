@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { cardToRow, dayStart, gradeCard, Grades, previewIntervals, rowToCard } from '@/lib/srs';
+import {
+  cardToRow,
+  dayStart,
+  formatInterval,
+  gradeCard,
+  Grades,
+  previewIntervals,
+  rowToCard,
+} from '@/lib/srs';
 import type { CardSchedule } from '@/lib/types/db';
 
 /** A card as the database creates it: the column defaults in 0005. */
@@ -112,5 +120,22 @@ describe('dayStart (4am local)', () => {
       dayStart(at('2026-10-08T10:00:00Z'), 'Not/AZone').toISOString(),
       '2026-10-08T04:00:00.000Z',
     );
+  });
+});
+
+describe('formatInterval', () => {
+  const from = at('2026-10-08T10:00:00Z');
+  const after = (ms: number) => new Date(from.getTime() + ms);
+  const MIN = 60_000;
+
+  test('minutes, hours, days, months', () => {
+    assert.equal(formatInterval(from, after(10 * MIN)), '10m');
+    assert.equal(formatInterval(from, after(3 * 60 * MIN)), '3h');
+    assert.equal(formatInterval(from, after(5 * 24 * 60 * MIN)), '5d');
+    assert.equal(formatInterval(from, after(70 * 24 * 60 * MIN)), '2mo');
+  });
+
+  test('never shows less than a minute', () => {
+    assert.equal(formatInterval(from, from), '1m');
   });
 });

@@ -36,8 +36,8 @@ export function SiteHeader({
   messageCap: number;
   theme?: 'light' | 'dark' | null;
   onThemeToggle?: () => void;
-  activePage?: 'chat' | 'vocab' | 'review';
-  /** Cards waiting in the review queue; the badge on the review link. */
+  activePage?: 'chat' | 'vocab';
+  /** Cards waiting in the review queue; the badge on the vocab link. */
   dueCount?: number;
 }) {
   const [chatsOpen, setChatsOpen] = useState(false);
@@ -146,17 +146,6 @@ export function SiteHeader({
                 aria-current={activePage === 'vocab' ? 'page' : undefined}
               >
                 vocab
-              </Link>
-              <Link
-                href="/review"
-                className={`font-mono text-xs underline underline-offset-[3px] transition-colors ${
-                  activePage === 'review'
-                    ? 'text-ink bg-yellow text-on-bright rounded-full px-2 py-1 no-underline'
-                    : 'text-ink-2 hover:text-ink'
-                }`}
-                aria-current={activePage === 'review' ? 'page' : undefined}
-              >
-                review
                 {dueCount > 0 && (
                   <span
                     className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"

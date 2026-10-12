@@ -1,20 +1,19 @@
 # starfinch — Technical Documentation
 
-> State of the codebase as of 2026-10-08 (flashcards F1, on top of `584a504`). This describes
+> State of the codebase as of 2026-10-10 (the vocab-page flashcard session, on top of `372b424`). This describes
 > what is **built**. Feature status is in [ROADMAP.md](../ROADMAP.md); design
 > notes live in local `plans/*.md` files that aren't committed. For the
 > user-facing overview, see [README.md](../README.md). Where a plan and the
 > code disagree, the code is right. Section 11 lists where the build departed
 > from the original design.
 >
-> **Since the last revision of this doc (2026-10-01, `584a504`):** flashcards
-> F1, the foundations: migration 0005 (`cards`,
-> `review_logs`, a trigger that creates a card per saved word, the
-> `record_review` RPC, `profiles.timezone`), the FSRS scheduler wrapper
-> (`lib/srs.ts`), cloze building and answer checking (`lib/cloze.ts`),
-> `card.service.ts`, and the project's first unit tests (`npm test`); and F2,
-> the `/review` page and the due-count badge in the header. See §3, §6 and
-> §8.3. Cards can be reviewed on `/review` only; reviewing inside the chat is F3.
+> **Since the last revision of this doc (2026-10-08, F1):** flashcards F2 was
+> built as a separate `/review` page with typed fill-in-the-blank cards, then
+> reworked. Cards are now reviewed in an Anki-style flip-card session started
+> from `/vocab` ("Start session"); `/review` just redirects there and the due
+> badge sits on the `vocab` link. The scheduler, tables and RPC (migration
+> 0005) are unchanged. See §3 and §8.3. `lib/cloze.ts` is no longer used by
+> any page (§12). Reviewing inside the chat is still F3.
 
 ## Contents
 
@@ -108,12 +107,14 @@ app/
   auth/actions.ts          Server Actions: signIn, signUp, signInWithGoogle, signOut, saveLevel
   auth/callback/route.ts   OAuth code → session exchange
   conversations/actions.ts deleteConversationAction
-  vocab/                   /vocab page, saveVocabAction, deleteVocabAction, vocab-grid (flip cards)
-  review/                  /review page (loads the queue, builds each card's front), review-session
-                           (client: type, check, grade), gradeCardAction
+  vocab/                   /vocab page; vocab-browser (list <-> session switch + "Start session");
+                           vocab-grid (tap-to-reveal word cards); flashcard-session (Anki-style
+                           flip-card session); actions: saveVocabAction, deleteVocabAction,
+                           startSessionAction, gradeCardAction
+  review/page.tsx          redirects to /vocab (old links)
   login/page.tsx           Email/password + Google sign-in form
-  components/              PageHeader (SiteHeader plus level/theme state for /vocab and /review),
-                           SiteHeader (level, chats menu, review badge, sign-out; now a 1080px sibling of the
+  components/              PageHeader (SiteHeader plus level/theme state for /vocab),
+                           SiteHeader (level, chats menu, vocab link with due badge, sign-out; now a 1080px sibling of the
                            860px content column, not nested inside it), Brand, ConfirmModal, Toaster,
                            GlossedText (per-word hover/tap menu + save), TranslationPanel (sentence
                            translation + explain-grammar), PersonaAvatar, vocab-chips (DEPRECATED)
@@ -140,7 +141,8 @@ lib/
   srs.ts                   FSRS wrapper: row <-> ts-fsrs Card, gradeCard, previewIntervals,
                            retrievability, dayStart (4am local); NEW_PER_DAY / REVIEWS_PER_DAY
   cloze.ts                 buildVocabCloze (blank the saved word, emphasize a separable particle,
-                           English->German fallback) + checkAnswer (umlaut substitutes, case note)
+                           English->German fallback) + checkAnswer (umlaut substitutes, case note).
+                           Currently unused by the UI; kept for typed/grammar cards (F4)
   text.ts                  stripPunctuation, changedWordIndices, sentenceContaining (moved out of
                            chat.tsx / glossed-text.tsx so the server can use them)
   *.test.ts                Unit tests for srs, cloze and text (`npm test`)
@@ -600,28 +602,30 @@ only exists to protect a free Groq quota.
   the earlier flat list. A revealed card is tinted with a faint wash of
   `--accent-ink` (`bg-accent-ink/[0.08]`), not `bg-soft`: `--soft` is too
   close to `--panel` in both themes for the two states to read as different.
-- `/review` (`app/review/`): the full review session. `page.tsx` loads
-  `getReviewQueue()` and builds each card's front with `buildVocabCloze()` on
-  the server (a card with nothing to ask is skipped), so the client gets plain
-  data. `review-session.tsx` runs the session:
-  - Type the missing word, then **Check**. A correct answer offers Hard / Good
-    / Easy with Good highlighted; a wrong one offers Again, plus "I was right"
-    (graded Good) for typos and synonyms. **Hard is never offered after a
-    wrong answer**: it is a passing grade in FSRS, so using it for a forgotten
-    card inflates that card's intervals. Each button shows when the card
-    returns (`previewIntervals` + `formatInterval`). Enter takes the
-    highlighted button; keys 1-4 pick one.
+- **Flashcard session** (`app/vocab/vocab-browser.tsx`, `flashcard-session.tsx`):
+  `/vocab` shows a **Start session** button with the due count. Clicking it
+  calls `startSessionAction()`, which runs `getReviewQueue()` on demand (so
+  browsing the list costs nothing extra) and returns plain card data; the
+  session replaces the grid in place and ends back on the list.
+  - Anki-style flip card: the German lemma shows, **Show answer** (Space /
+    Enter) reveals the meaning and the saved example sentence, then four
+    buttons (Again / Hard / Good / Easy, keys 1-4), each labelled with when
+    the card returns (`previewIntervals` + `formatInterval`).
   - Grading awaits `gradeCardAction` (not optimistic), because a failed or
     still-learning card has to be requeued on the schedule the server just
     set. A card in learning comes back this session after its step (1m, then
-    10m); with only waiting cards left the page shows a countdown and
-    advances on its own. A graduated card leaves until its due date.
+    10m); with only waiting cards left, a countdown shows and advances on its
+    own. A graduated card leaves until its due date.
   - A `stale` result (another tab graded the card first) or an error drops
     the card from this session with a toast; it stays due.
-  - Every grade is logged with `surface = 'review_page'`, the time taken, and
-    what was typed.
-- **Due badge:** `SiteHeader` shows a `review` link with the number of cards in
-  the queue. `app/page.tsx` and `/vocab` compute it with `getDueCount()` on
+  - Every grade is logged with `surface = 'review_page'` (the only surface
+    value besides `panel`, kept as is) and the time taken. `answer_given` is
+    null, since nothing is typed.
+  - A card with no translation still shows (the back says "no translation
+    saved"), so the due badge and the session agree.
+- `/review` is a one-line redirect to `/vocab`.
+- **Due badge:** `SiteHeader` shows the number of cards in the queue on the
+  `vocab` link. `app/page.tsx` and `/vocab` compute it with `getDueCount()` on
   each load; `gradeCardAction` revalidates the layout so it updates.
 - `ConfirmProvider` / `useConfirm()`: a confirm dialog returned as a promise.
 
@@ -730,15 +734,16 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
   keep their fallbacks (`normalizeReplyGloss`, `lemmaTranslation || translation`).
 - **Unit tests cover pure functions only** (`lib/srs.ts`, `lib/cloze.ts`,
   `lib/text.ts`). Services, routes and UI have none, and evals are run by hand.
-- **Reviewing only works on `/review`** until F3 puts cards in the chat
+- **Reviewing only works from `/vocab`** until F3 puts cards in the chat
   panel. `profiles.timezone` is never set, so every learner's day currently
   starts at 4am UTC.
-- **The due badge can count a card `/review` won't show.** A card with no
-  example sentence and no translation has nothing to ask, so the page skips
-  it, but `getDueCount()` still counts it.
-- **The review page has no automated tests** beyond the pure helpers; it was
-  checked by rendering each state and by running the queue queries as a real
-  user against the database.
+- **The session has no automated tests** beyond the pure helpers
+  (`lib/srs.ts`).
+- **`lib/cloze.ts` is dead weight for now.** The flip-card session doesn't
+  use it. It has tests and is the intended basis for grammar cards (F4); delete
+  it if F4 goes another way.
+- **A session is the whole queue** (up to `NEW_PER_DAY` new + due reviews,
+  capped at `REVIEWS_PER_DAY`), not a fixed-size batch.
 - **`docs/TECHNICAL.md` and `ROADMAP.md` can lag the code.** `npm run
   docs:status` (also run in CI on every push) lists the code commits made
   since each was last updated, but it only warns. Someone still has to write the update. The check

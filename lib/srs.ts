@@ -121,7 +121,7 @@ export function gradeCard(
   return { next: cardToRow(card), log: logToRow(log) };
 }
 
-/** When the card would come back for each button -- the labels on /review's
+/** When the card would come back for each button -- the labels on the session's
  * four buttons ("Good · 3d"), as Anki shows them. */
 export function previewIntervals(row: CardSchedule, now: Date): Record<Grade, Date> {
   const preview = scheduler.repeat(rowToCard(row), now);

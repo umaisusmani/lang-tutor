@@ -4,7 +4,7 @@ The one place feature status is recorded. Design notes live in local
 `plans/*.md` files (not committed), and they don't carry status. What is
 built, and how, is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-**Next up:** flashcards F3 (review cards inside the chat). Then F4–F5, then grammar RAG.
+**Next up:** grammar RAG (v1 step 5). Then F3 (review cards inside the chat), F4–F5, conversation-memory RAG.
 
 Status: ✅ done · 🟡 partly done · ⬜ not started
 
@@ -31,8 +31,8 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Feature | Status | Commit | Notes |
 |---|---|---|---|
 | Flashcards F1: schema, FSRS wrapper, tests | ✅ | `7c5fec0` | Migration `0005` applied 2026-10-08. Design: `plans/flashcards.md` |
-| Flashcards F2: `/review` page, due badge | ✅ | *(uncommitted)* | Typed answer, 4 graded buttons with intervals, learning steps requeue in-session. Timezone isn't saved yet (day starts 4am UTC) |
-| Flashcards F3: review cards inside chat | ⬜ | | |
+| Flashcards F2: Anki-style session on `/vocab`, due badge | ✅ | *(uncommitted; first version `372b424`)* | "Start session" on the vocab page, flip card, 4 graded buttons with intervals, learning steps requeue in-session. `/review` redirects. Timezone isn't saved yet (day starts 4am UTC) |
+| Flashcards F3: review cards inside chat | ⬜ | | Next after the RAG work is scoped; reuses the flip card |
 | Flashcards F4: grammar cards from repeated mistakes | ⬜ | | |
 | Flashcards F5: leeches, steering the tutor toward due words | ⬜ | | |
 | Personas | 🟡 | `69615a7` | One persona (Ramanath), pinned per conversation. No selector, no scenario personas, no avatar art. Design: `plans/phase2.md` |

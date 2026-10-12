@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { PageHeader } from '@/app/components/page-header';
-import { VocabGrid } from '@/app/vocab/vocab-grid';
+import { VocabBrowser } from '@/app/vocab/vocab-browser';
 import { getDueCount } from '@/lib/services/card.service';
 import { listConversations } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
@@ -44,7 +44,7 @@ export default async function VocabPage() {
               Nothing saved yet. Words you save from the chat will show up here.
             </p>
           ) : (
-            <VocabGrid entries={entries} />
+            <VocabBrowser entries={entries} dueCount={dueCount} />
           )}
         </main>
       </div>

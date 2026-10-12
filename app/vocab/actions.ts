@@ -1,12 +1,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 
-import { getReviewQueue, recordReview, type RecordReviewResult } from '@/lib/services/card.service';
-import { getCurrentUserId } from '@/lib/services/profile.service';
-import { deleteVocabEntry, saveVocabEntry } from '@/lib/services/vocab.service';
+import { getPracticeQueue, getReviewQueue, recordReview, type RecordReviewResult } from '@/lib/services/card.service';
+import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
+import { deleteVocabEntry, listVocab, saveVocabEntry } from '@/lib/services/vocab.service';
+import { findStarterWord, pickStarterWords } from '@/lib/starter-vocab';
+import { translateStarterWord } from '@/lib/starter-vocab/translate';
 import type { Grade } from '@/lib/srs';
-import type { CardSchedule, ReviewSurface, VocabSource } from '@/lib/types/db';
+import type { CardDirection, CardSchedule, ReviewSurface, VocabSource } from '@/lib/types/db';
 
 /**
  * `source` records where the learner met the word, which is the whole
@@ -53,27 +56,54 @@ export async function deleteVocabAction(entryId: string): Promise<{ ok: boolean 
  * back, and the schedule the grade buttons preview their intervals from. */
 export type SessionCard = {
   id: string;
+  /** forward: German -> meaning. reverse: meaning -> German. */
+  direction: CardDirection;
   lemma: string;
   translation: string | null;
   exampleSentence: string | null;
   schedule: CardSchedule;
 };
 
+/** A word from the starter list, offered mid-session with an "Add" button. */
+export type DiscoverCard = { lemma: string; example: string; exampleTranslation: string };
+
+export type SessionPayload = { cards: SessionCard[]; discover: DiscoverCard[] };
+
+/** New words offered per session. */
+const DISCOVER_PER_SESSION = 3;
+
 /**
- * Loads today's queue for a "Start session" click. Done on click, not with the
+ * Loads the queue for a "Start session" click ('due'), or a round of extra
+ * practice ('practice') once nothing is due. Done on click, not with the
  * page, so opening /vocab to browse costs no more than it did before.
  */
-export async function startSessionAction(): Promise<SessionCard[] | null> {
+export async function startSessionAction(
+  mode: 'due' | 'practice' = 'due',
+  /** Starter words the learner skipped before (kept in their browser). */
+  skippedLemmas: string[] = [],
+): Promise<SessionPayload | null> {
   const userId = await getCurrentUserId();
   if (!userId) return null;
 
-  const queue = await getReviewQueue(userId);
+  const queue = mode === 'practice' ? await getPracticeQueue(userId) : await getReviewQueue(userId);
   const cards: SessionCard[] = [];
+  // A word has a card per direction. Only one of them goes into a session, so
+  // answering one doesn't hand over the answer to its sibling (Anki calls this
+  // burying siblings). The other waits for the next session.
+  const seenWords = new Set<string>();
   for (const item of queue) {
     // Grammar cards (F4) carry no vocab_entry and have their own front.
     if (!item.vocab_entry) continue;
+    const direction = item.direction ?? 'forward';
+    // A reverse card asks from the English meaning; without one it can't ask.
+    if (direction === 'reverse' && !item.vocab_entry.translation) continue;
+    if (item.vocab_entry_id) {
+      if (seenWords.has(item.vocab_entry_id)) continue;
+      seenWords.add(item.vocab_entry_id);
+    }
     cards.push({
       id: item.id,
+      direction,
       lemma: item.vocab_entry.lemma,
       translation: item.vocab_entry.translation,
       exampleSentence: item.vocab_entry.example_sentence,
@@ -90,7 +120,44 @@ export async function startSessionAction(): Promise<SessionCard[] | null> {
       },
     });
   }
-  return cards;
+
+  // New words from the starter list, for the learner's level, skipping
+  // anything already saved. Not scheduled: they only become cards if added.
+  const level = await resolveCefrLevel(userId, (await cookies()).get('cefr_level')?.value);
+  const saved = new Set((await listVocab(userId)).map((e) => e.lemma.toLowerCase()));
+  for (const lemma of skippedLemmas.slice(0, 1000)) saved.add(String(lemma).toLowerCase());
+  const discover = pickStarterWords(level, saved, DISCOVER_PER_SESSION);
+
+  return { cards, discover };
+}
+
+/**
+ * Adds a starter word to the learner's vocab (which creates its card, via the
+ * database trigger). The example and level come from the shipped list, looked
+ * up by lemma -- the client only says which word.
+ */
+export async function addStarterWordAction(lemma: string): Promise<{ ok: boolean }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { ok: false };
+
+  const word = findStarterWord(lemma);
+  if (!word) return { ok: false };
+
+  try {
+    const translation = await translateStarterWord(word, { userId });
+    const ok = await saveVocabEntry(userId, {
+      term: word.lemma,
+      lemma: word.lemma,
+      translation,
+      exampleSentence: word.example,
+      source: 'new_word',
+    });
+    if (ok) revalidatePath('/', 'layout');
+    return { ok };
+  } catch (err) {
+    console.error('[vocab] addStarterWordAction failed:', err);
+    return { ok: false };
+  }
 }
 
 /**

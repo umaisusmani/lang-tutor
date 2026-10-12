@@ -31,7 +31,8 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Feature | Status | Commit | Notes |
 |---|---|---|---|
 | Flashcards F1: schema, FSRS wrapper, tests | ✅ | `7c5fec0` | Migration `0005` applied 2026-10-08. Design: `plans/flashcards.md` |
-| Flashcards F2: Anki-style session on `/vocab`, due badge | ✅ | *(uncommitted; first version `372b424`)* | "Start session" on the vocab page, flip card, 4 graded buttons with intervals, learning steps requeue in-session. `/review` redirects. Timezone isn't saved yet (day starts 4am UTC) |
+| Flashcards F2: Anki-style session on `/vocab`, due badge | ✅ | `372b424`, `80e837b` | "Start session" on the vocab page, flip card, 4 graded buttons with intervals, learning steps requeue in-session. `/review` redirects. "Practice 10 more" gives on-demand rounds past what's due. Timezone is saved from the browser. Reverse (English → German) cards need migration `0006` applied |
+| Starter vocab by level, offered as new-word cards with "add to my vocab" | ✅ | *(uncommitted)* | Goethe A1–B1 lists (~2,900 words), 3 per session, translated when added. Skips remembered per browser. Source licence still to check |
 | Flashcards F3: review cards inside chat | ⬜ | | Next after the RAG work is scoped; reuses the flip card |
 | Flashcards F4: grammar cards from repeated mistakes | ⬜ | | |
 | Flashcards F5: leeches, steering the tutor toward due words | ⬜ | | |

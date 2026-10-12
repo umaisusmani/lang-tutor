@@ -60,6 +60,22 @@ export async function resolveCefrLevel(
   return isCefrLevel(cookieValue) ? cookieValue : DEFAULT_CEFR_LEVEL;
 }
 
+/**
+ * Saves the learner's IANA timezone (from the browser), which decides where
+ * the flashcard day starts. The name is validated here because it comes from
+ * the client and is later handed to Intl.DateTimeFormat.
+ */
+export async function updateTimezone(userId: string, timezone: string): Promise<void> {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+  } catch {
+    return;
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.from('profiles').update({ timezone }).eq('user_id', userId);
+  if (error) console.error('[profile.service] updateTimezone failed:', error.message);
+}
+
 export async function updateCefrLevel(userId: string, level: CefrLevel): Promise<void> {
   const supabase = await createClient();
   await supabase.from('profiles').update({ cefr_level: level }).eq('user_id', userId);

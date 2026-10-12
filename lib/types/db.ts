@@ -128,10 +128,15 @@ export interface CardSchedule {
   last_review: string | null;
 }
 
+/** Which way a vocab card asks. Absent on rows from before migration 0006,
+ * which read as 'forward'. */
+export type CardDirection = 'forward' | 'reverse';
+
 export interface Card extends CardSchedule {
   id: string;
   user_id: string;
   kind: CardKind;
+  direction?: CardDirection;
   /** Exactly one of these two is set (a CHECK enforces it). */
   vocab_entry_id: string | null;
   mistake_id: string | null;

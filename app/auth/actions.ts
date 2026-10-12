@@ -5,7 +5,11 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 
 import { isCefrLevel } from '@/lib/prompts';
-import { getCurrentUserId, updateCefrLevel } from '@/lib/services/profile.service';
+import {
+  getCurrentUserId,
+  updateCefrLevel,
+  updateTimezone,
+} from '@/lib/services/profile.service';
 import { createClient } from '@/lib/supabase/server';
 
 export type AuthState = { error: string } | null;
@@ -90,6 +94,17 @@ export async function signOut() {
  * write -- they keep using the cookie, which the client writes directly and
  * the chat route reads as a fallback.
  */
+export async function saveTimezone(timezone: string) {
+  if (typeof timezone !== 'string' || timezone.length > 64) return;
+
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+
+  await updateTimezone(userId, timezone);
+  // Today's due counts depend on it.
+  revalidatePath('/', 'layout');
+}
+
 export async function saveLevel(level: string) {
   if (!isCefrLevel(level)) return;
 

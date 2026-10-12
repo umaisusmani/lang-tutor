@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { signOut } from '@/app/auth/actions';
+import { saveTimezone, signOut } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
 import { useConfirm } from '@/app/components/confirm-modal';
 import { notifyError } from '@/app/components/toaster';
@@ -45,6 +45,20 @@ export function SiteHeader({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const confirm = useConfirm();
   const router = useRouter();
+
+  // Tell the server the learner's timezone once per browser session, so the
+  // flashcard day rolls over at 4am where they are, not at 4am UTC.
+  useEffect(() => {
+    if (!userEmail) return;
+    try {
+      if (sessionStorage.getItem('starfinch_tz_synced')) return;
+      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (zone) void saveTimezone(zone);
+      sessionStorage.setItem('starfinch_tz_synced', '1');
+    } catch {
+      // Storage or Intl unavailable: the profile keeps its current timezone.
+    }
+  }, [userEmail]);
 
   useEffect(() => {
     if (!chatsOpen && !accountOpen) return;

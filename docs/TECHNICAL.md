@@ -163,7 +163,8 @@ scripts/docs-status.sh     `npm run docs:status`: code commits the docs haven't 
 .github/workflows/         docs-sync.yml runs docs-status.sh on every push (warning only)
 supabase/migrations/       0001 schema + RLS, 0002 gloss endpoint, 0003 annotations + titles,
                            0004 personas + persona_id + grammar_explanation + 'explain' usage endpoint,
-                           0005 flashcards (cards, review_logs, vocab-card trigger, record_review, timezone)
+                           0005 flashcards (cards, review_logs, vocab-card trigger, record_review, timezone),
+                           0006 reverse cards (cards.direction, two cards per word, backfill)
 proxy.ts                   Next 16 proxy (ex-middleware): Supabase session refresh
 next.config.ts             Server Action allowedOrigins for Vercel aliases
 (no public/avatars/)        the persona has no avatar image (avatar_url is null); the placeholder
@@ -623,6 +624,44 @@ only exists to protect a free Groq quota.
     null, since nothing is typed.
   - A card with no translation still shows (the back says "no translation
     saved"), so the due badge and the session agree.
+- **Practice more** (on-demand sessions): when a session ends (or nothing is
+  due), "Practice 10 more" calls `startSessionAction('practice')` →
+  `getPracticeQueue()`: review cards not due until tomorrow or later (lowest
+  retrievability first), then new cards past today's allowance. They're graded
+  like any card; FSRS accounts for the shorter elapsed time, so an early review
+  stretches the interval less. This is Anki's "review ahead", and means the
+  due schedule is never a wall.
+- **Two directions per word (migration 0006):** `cards.direction` is
+  `forward` (German → meaning) or `reverse` (meaning → German, production).
+  The trigger creates both when a word is saved, and 0006 backfills reverse
+  cards for existing words. `UNIQUE (vocab_entry_id)` became `UNIQUE
+  (vocab_entry_id, direction)`. A session holds at most one card per word
+  (siblings are buried until the next session, so one answer doesn't give
+  away the other); a reverse card is skipped when the word has no saved
+  translation. Code treats a missing `direction` as `forward`, so it runs
+  before 0006 is applied, just without reverse cards.
+- **Front sentence toggle:** `sentence: on/off` in the session header shows
+  the saved example on a forward card's front (remembered in
+  `localStorage`).
+- **Timezone:** `SiteHeader` calls `saveTimezone` once per browser session,
+  writing the browser's IANA zone to `profiles.timezone`, so the 4am day start
+  is the learner's, not UTC's.
+- **New-word cards (starter vocab):** `startSessionAction` also returns up to
+  3 words from `lib/starter-vocab/{a1,a2,b1}.json` the learner hasn't saved,
+  about two thirds from their CEFR level and the rest from the level below
+  (B2/C1 use B1). The session shows one after every 4 reviewed cards, and
+  whenever the queue is empty or waiting out a learning step. A new-word card
+  shows the lemma, then the German example and its English translation, with
+  **Add to my vocab** / **Skip**. Add calls `addStarterWordAction`, which looks
+  the lemma up in the shipped list (the client sends only the lemma), asks the
+  model for the word's English meaning (`lib/starter-vocab/translate.ts`, one
+  small call per added word, logged as `gloss`), and saves it as a normal
+  `new_word` entry; the trigger makes its cards. Skipped words are kept in
+  the browser's `localStorage` and sent with each session request.
+- **Starter data:** `scripts/import-wordlist.ts` parses the Goethe-Institut
+  TSV lists (github.com/ilkermeliksitki/goethe-institute-wordlist) into the
+  JSON files: cleaned lemma ("die Adresse,-en" → "die Adresse"), one entry
+  per lemma at its lowest level. About 640 A1, 540 A2 and 1,700 B1 words.
 - `/review` is a one-line redirect to `/vocab`.
 - **Due badge:** `SiteHeader` shows the number of cards in the queue on the
   `vocab` link. `app/page.tsx` and `/vocab` compute it with `getDueCount()` on
@@ -735,13 +774,22 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
 - **Unit tests cover pure functions only** (`lib/srs.ts`, `lib/cloze.ts`,
   `lib/text.ts`). Services, routes and UI have none, and evals are run by hand.
 - **Reviewing only works from `/vocab`** until F3 puts cards in the chat
-  panel. `profiles.timezone` is never set, so every learner's day currently
-  starts at 4am UTC.
+  panel. `profiles.timezone` is set from the browser on the first page load of a
+  session, and stays `UTC` until then.
 - **The session has no automated tests** beyond the pure helpers
   (`lib/srs.ts`).
 - **`lib/cloze.ts` is dead weight for now.** The flip-card session doesn't
   use it. It has tests and is the intended basis for grammar cards (F4); delete
   it if F4 goes another way.
+- **Starter words have no per-word translation in the source,** only a
+  sentence and its translation; the word's meaning is generated when the
+  learner adds it. The source lists are Goethe-Institut material; the
+  licence for redistributing them hasn't been checked, and the parser leaves
+  some noise (a few conjugated headwords such as "packt ein").
+- **Skipped starter words are remembered per browser only**, so another
+  device can offer them again.
+- **No suspend / undo / leech handling yet** (F5). Suspending needs a way to
+  un-suspend, so it ships with that UI.
 - **A session is the whole queue** (up to `NEW_PER_DAY` new + due reviews,
   capped at `REVIEWS_PER_DAY`), not a fixed-size batch.
 - **`docs/TECHNICAL.md` and `ROADMAP.md` can lag the code.** `npm run

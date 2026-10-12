@@ -124,7 +124,8 @@ export const PRACTICE_SIZE = 10;
 /**
  * Cards to practice when nothing (more) is due -- Anki's "review ahead".
  *
- * Takes cards the normal queue wouldn't show today: review cards not due until
+ * Takes cards the normal queue wouldn't show right now: cards still waiting
+ * out a learning step (failed a minute ago), then review cards not due until
  * tomorrow or later, lowest retrievability first (the ones closest to being
  * forgotten), then new cards past today's allowance. Graded exactly like a
  * due card; FSRS accounts for the shorter elapsed time, so an early "Good"
@@ -141,7 +142,8 @@ export async function getPracticeQueue(
   const base = () =>
     supabase.from('cards').select(REVIEW_ITEM_COLUMNS).eq('user_id', userId).eq('suspended', false);
 
-  const [ahead, fresh] = await Promise.all([
+  const [waiting, ahead, fresh] = await Promise.all([
+    base().in('state', [1, 3]).gt('due', now.toISOString()).order('due').limit(limit),
     base().eq('state', 2).gte('due', end.toISOString()).limit(500),
     // Skip the first `newLeft` new cards: the regular queue already offers them.
     base()
@@ -150,7 +152,7 @@ export async function getPracticeQueue(
       .range(newLeft, newLeft + limit - 1),
   ]);
 
-  for (const result of [ahead, fresh]) {
+  for (const result of [waiting, ahead, fresh]) {
     if (result.error) {
       console.error('[card.service] getPracticeQueue failed:', result.error.message);
       return [];
@@ -162,7 +164,13 @@ export async function getPracticeQueue(
     .sort((a, b) => a.r - b.r)
     .map(({ card }) => card);
 
-  return shuffle([...byRecall, ...((fresh.data ?? []) as ReviewItem[])].slice(0, limit));
+  return shuffle(
+    [
+      ...((waiting.data ?? []) as ReviewItem[]),
+      ...byRecall,
+      ...((fresh.data ?? []) as ReviewItem[]),
+    ].slice(0, limit),
+  );
 }
 
 /**

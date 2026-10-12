@@ -55,6 +55,7 @@ function toQueueItem(card: SessionCard): QueueItem {
 export function FlashcardSession({
   initialCards,
   initialDiscover = [],
+  extra = false,
   onExit,
   onPracticeMore,
   onSkipWord,
@@ -62,6 +63,8 @@ export function FlashcardSession({
   initialCards: SessionCard[];
   /** New words from the starter list, offered with Add / Skip. */
   initialDiscover?: DiscoverCard[];
+  /** These cards aren't due yet: extra practice rather than scheduled reviews. */
+  extra?: boolean;
   onExit: () => void;
   /** Starts a round of extra cards that aren't due yet. Hidden when absent. */
   onPracticeMore?: () => void;
@@ -301,6 +304,7 @@ export function FlashcardSession({
       <div className="flex items-center justify-between">
         <span className="text-ink-3 font-mono text-[11px]">
           {queue.length} {queue.length === 1 ? 'card' : 'cards'} left · {reviewed} done
+          {extra && ' · extra practice, not due yet'}
         </span>
         <div className="flex items-center gap-2">
           <button

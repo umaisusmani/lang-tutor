@@ -624,10 +624,12 @@ only exists to protect a free Groq quota.
     null, since nothing is typed.
   - A card with no translation still shows (the back says "no translation
     saved"), so the due badge and the session agree.
-- **Practice more** (on-demand sessions): when a session ends (or nothing is
-  due), "Practice 10 more" calls `startSessionAction('practice')` →
-  `getPracticeQueue()`: review cards not due until tomorrow or later (lowest
-  retrievability first), then new cards past today's allowance. They're graded
+- **Practice more** (on-demand sessions): when nothing is due, **Start
+  session** goes straight to extra practice (`SessionPayload.extra`); when a
+  session ends, "Practice 10 more" does the same via
+  `startSessionAction('practice')` → `getPracticeQueue()`: cards still waiting
+  out a learning step, then review cards not due until tomorrow or later
+  (lowest retrievability first), then new cards past today's allowance. They're graded
   like any card; FSRS accounts for the shorter elapsed time, so an early review
   stretches the interval less. This is Anki's "review ahead", and means the
   due schedule is never a wall.

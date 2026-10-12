@@ -67,7 +67,12 @@ export type SessionCard = {
 /** A word from the starter list, offered mid-session with an "Add" button. */
 export type DiscoverCard = { lemma: string; example: string; exampleTranslation: string };
 
-export type SessionPayload = { cards: SessionCard[]; discover: DiscoverCard[] };
+export type SessionPayload = {
+  cards: SessionCard[];
+  discover: DiscoverCard[];
+  /** True when these are extra cards that aren't due yet. */
+  extra: boolean;
+};
 
 /** New words offered per session. */
 const DISCOVER_PER_SESSION = 3;
@@ -85,7 +90,14 @@ export async function startSessionAction(
   const userId = await getCurrentUserId();
   if (!userId) return null;
 
-  const queue = mode === 'practice' ? await getPracticeQueue(userId) : await getReviewQueue(userId);
+  let queue = mode === 'practice' ? await getPracticeQueue(userId) : await getReviewQueue(userId);
+  // Nothing due: start on extra practice instead of an empty screen. The
+  // schedule is a guide to what's most useful, not a gate on practising.
+  let extra = mode === 'practice';
+  if (queue.length === 0 && !extra) {
+    queue = await getPracticeQueue(userId);
+    extra = true;
+  }
   const cards: SessionCard[] = [];
   // A word has a card per direction. Only one of them goes into a session, so
   // answering one doesn't hand over the answer to its sibling (Anki calls this
@@ -128,7 +140,7 @@ export async function startSessionAction(
   for (const lemma of skippedLemmas.slice(0, 1000)) saved.add(String(lemma).toLowerCase());
   const discover = pickStarterWords(level, saved, DISCOVER_PER_SESSION);
 
-  return { cards, discover };
+  return { cards, discover, extra };
 }
 
 /**

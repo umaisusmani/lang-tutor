@@ -65,6 +65,7 @@ export function VocabBrowser({ entries, dueCount }: { entries: VocabEntry[]; due
         key={round}
         initialCards={cards.cards}
         initialDiscover={cards.discover}
+        extra={cards.extra}
         onExit={() => setCards(null)}
         onPracticeMore={() => void start('practice')}
         onSkipWord={rememberSkipped}

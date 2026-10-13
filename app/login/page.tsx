@@ -4,7 +4,13 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useActionState, useState } from 'react';
 
-import { signIn, signInWithGoogle, signUp, type AuthState } from '@/app/auth/actions';
+import {
+  resendConfirmation,
+  signIn,
+  signInWithGoogle,
+  signUp,
+  type AuthState,
+} from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
 
 // useSearchParams() (used below, for surfacing a failed Google redirect)
@@ -23,11 +29,16 @@ function LoginForm() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const action = mode === 'signin' ? signIn : signUp;
   const [state, formAction, pending] = useActionState<AuthState, FormData>(action, null);
+  const [resendState, resendAction, resending] = useActionState<AuthState, FormData>(
+    resendConfirmation,
+    null,
+  );
 
   // Set by app/auth/callback/route.ts when Google's code exchange fails, or
   // by signInWithGoogle() if Supabase never returned a redirect URL at all.
   const errorParam = useSearchParams().get('error');
   const oauthFailed = errorParam === 'auth_callback_failed' || errorParam === 'oauth_failed';
+  const confirmFailed = errorParam === 'confirm_failed';
 
   const fieldLabel = 'text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase';
   const fieldInput =
@@ -86,6 +97,9 @@ function LoginForm() {
                 {state.error}
               </p>
             )}
+            {state?.notice && (
+              <p className="text-ink-2 font-mono text-[11px] leading-[1.7]">{state.notice}</p>
+            )}
 
             <button
               type="submit"
@@ -95,6 +109,35 @@ function LoginForm() {
               {pending ? '…' : mode === 'signin' ? 'Anmelden' : 'Registrieren'}
             </button>
           </form>
+
+          {state?.unconfirmedEmail && (
+            <form action={resendAction} className="flex flex-col gap-1.5">
+              <input type="hidden" name="email" value={state.unconfirmedEmail} />
+              <button
+                type="submit"
+                disabled={resending}
+                className="text-ink-3 hover:text-ink cursor-pointer text-left font-mono text-[11px] underline underline-offset-[3px] disabled:opacity-50"
+              >
+                {resending ? 'Sending…' : 'Resend the confirmation email'}
+              </button>
+              {resendState?.notice && (
+                <p className="text-ink-2 font-mono text-[11px] leading-[1.7]">
+                  {resendState.notice}
+                </p>
+              )}
+              {resendState?.error && (
+                <p className="font-mono text-[11px] leading-[1.7] text-red-600 dark:text-red-400">
+                  {resendState.error}
+                </p>
+              )}
+            </form>
+          )}
+
+          {confirmFailed && (
+            <p className="font-mono text-[11px] leading-[1.7] text-red-600 dark:text-red-400">
+              That confirmation link is invalid or has expired. Sign in to get a new one.
+            </p>
+          )}
 
           {oauthFailed && (
             <p className="font-mono text-[11px] leading-[1.7] text-red-600 dark:text-red-400">

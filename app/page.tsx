@@ -13,7 +13,7 @@ import {
 import { resolvePersona } from '@/lib/services/persona.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
 import { getDueCount } from '@/lib/services/card.service';
-import { ANON_MESSAGE_CAP, getRemainingMessages } from '@/lib/services/session.service';
+import { dailyCapFor, getRemainingMessages } from '@/lib/services/session.service';
 import { getSavedLemmas } from '@/lib/services/vocab.service';
 import type { Conversation, Message } from '@/lib/types/db';
 
@@ -133,9 +133,8 @@ export default async function Page({
   const levelCookie = (await cookies()).get('cefr_level')?.value;
   const level = await resolveCefrLevel(user?.id ?? null, levelCookie);
 
-  // Only anonymous visitors have an allowance to show -- signed-in users are
-  // uncapped, so the header's progress row is hidden for them entirely.
-  const remaining = user ? null : await getRemainingMessages();
+  // Everyone has a daily allowance now; the header shows how much is left.
+  const remaining = await getRemainingMessages(user?.id ?? null);
   const dueCount = user ? await getDueCount(user.id) : 0;
 
   // History is a signed-in feature: anonymous turns are never persisted, so
@@ -194,7 +193,7 @@ export default async function Page({
       userEmail={user?.email ?? null}
       userName={userName}
       initialRemaining={remaining}
-      messageCap={ANON_MESSAGE_CAP}
+      messageCap={dailyCapFor(user?.id ?? null)}
       dueCount={dueCount}
       initialMessages={initialMessages}
       initialSavedLemmas={initialSavedLemmas}

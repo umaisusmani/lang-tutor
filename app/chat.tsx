@@ -45,6 +45,28 @@ function writeLevelCookie(level: CefrLevel) {
   document.cookie = `${LEVEL_COOKIE}=${level}; path=/; max-age=31536000; SameSite=Lax`;
 }
 
+/**
+ * When the daily allowance next resets (00:00 UTC), in the learner's own
+ * clock. Only called from client-side events, never during the server render,
+ * so the local formatting can't cause a hydration mismatch.
+ */
+function resetTimeLabel(): string {
+  const now = new Date();
+  const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  return reset.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+/** What to tell someone the daily limit has stopped. */
+function limitMessage(reason: 'user' | 'global' | undefined, signedIn: boolean): string {
+  const resets = `Resets at ${resetTimeLabel()}.`;
+  if (reason === 'global') {
+    return `The tutor has hit its limit for today. ${resets}`;
+  }
+  return signedIn
+    ? `You've used today's messages. ${resets}`
+    : `You've used your free messages for today. ${resets} Or sign in to get more.`;
+}
+
 export default function Chat({
   initialLevel,
   userEmail,
@@ -266,17 +288,20 @@ export default function Chat({
       });
 
       if (!res.ok || !res.body) {
-        notifyError(
-          res.status === 429
-            ? "You've used your free messages. Sign in to keep going."
-            : "Couldn't explain this one. Please try again.",
-          `explain-${key}`,
-        );
+        let message = "Couldn't explain this one. Please try again.";
+        if (res.status === 429) {
+          const body = await res.json().catch(() => null);
+          message = limitMessage(body?.reason, body?.signedIn === true);
+          setRemaining(0);
+        }
+        notifyError(message, `explain-${key}`);
         return;
       }
 
-      // Anonymous explanations spend a free message server-side; mirror it.
-      setRemaining((r) => (r === null ? null : Math.max(0, r - 1)));
+      // A fresh explanation spends a message server-side; a cached one doesn't.
+      // The server says where the allowance stands either way.
+      const left = Number(res.headers.get('X-Messages-Remaining'));
+      if (res.headers.has('X-Messages-Remaining') && Number.isFinite(left)) setRemaining(left);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -334,7 +359,7 @@ export default function Chat({
             <div className="flex flex-col gap-2.5">
               <span className="text-ink-3 font-mono text-[10px] tracking-[0.12em] uppercase">
                 level {level}
-                {remaining !== null && ` · ${remaining} free messages`}
+                {remaining !== null && ` · ${remaining} ${userEmail ? 'messages left' : 'free messages'}`}
               </span>
               <div className="flex items-center gap-3">
                 <PersonaAvatar persona={persona} size={48} />
@@ -375,9 +400,9 @@ export default function Chat({
             {remaining !== null && (
               <div className="text-ink-3 flex items-center gap-2 font-mono text-[11px]">
                 <span className="bg-yellow text-on-bright rounded-[5px] px-[7px] py-0.5 font-medium">
-                  {messageCap} free
+                  {messageCap} {userEmail ? 'per day' : 'free'}
                 </span>
-                <span>messages before signing in</span>
+                <span>{userEmail ? 'messages today' : 'messages a day before signing in'}</span>
               </div>
             )}
           </main>
@@ -416,21 +441,24 @@ export default function Chat({
                     className="border-line bg-yellow text-on-bright flex flex-col items-start gap-2 rounded-[18px] border-2 p-6 shadow-[4px_4px_0_var(--line)]"
                   >
                     <span className="font-mono text-[10px] tracking-[0.12em] uppercase">
-                      {rateLimited.cap} of {rateLimited.cap} messages
+                      {rateLimited.reason === 'global'
+                        ? 'tutor is resting'
+                        : `${rateLimited.cap} of ${rateLimited.cap} messages`}
                     </span>
                     <h2 className="text-[26px] font-extrabold tracking-[-0.02em]">
                       Das war&apos;s für heute.
                     </h2>
                     <p className="max-w-[46ch] text-[15px] leading-[1.55]">
-                      You&apos;ve used your {rateLimited.cap} free messages. Sign in to keep the
-                      conversation going and save your progress.
+                      {limitMessage(rateLimited.reason, rateLimited.signedIn)}
                     </p>
-                    <Link
-                      href="/login"
-                      className="bg-ink text-paper mt-2 rounded-full px-5 py-2.5 text-[15px] font-bold no-underline transition-transform hover:translate-x-px hover:translate-y-px"
-                    >
-                      Sign in →
-                    </Link>
+                    {!rateLimited.signedIn && (
+                      <Link
+                        href="/login"
+                        className="bg-ink text-paper mt-2 rounded-full px-5 py-2.5 text-[15px] font-bold no-underline transition-transform hover:translate-x-px hover:translate-y-px"
+                      >
+                        Sign in →
+                      </Link>
+                    )}
                   </div>
                 );
               }
@@ -646,7 +674,11 @@ export default function Chat({
               onChange={(e) => setInput(e.currentTarget.value)}
               disabled={capped}
               placeholder={
-                capped ? 'Sign in to keep going' : 'Schreib auf Deutsch… English words are fine too'
+                capped
+                  ? userEmail
+                    ? 'Back tomorrow'
+                    : 'Sign in to keep going'
+                  : 'Schreib auf Deutsch… English words are fine too'
               }
               className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
             />

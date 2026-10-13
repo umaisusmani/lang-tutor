@@ -20,8 +20,8 @@ export type NoticeSource = 'correction' | 'gloss' | 'history';
  * different text, fetched by a different call, that finishes at a different
  * time.
  *
- * "rateLimited" is written instead of everything else when an anonymous
- * visitor has hit their message cap (lib/services/session.service.ts) -- the
+ * "rateLimited" is written instead of everything else when the caller has
+ * hit their daily message cap, or the app-wide one (lib/services/session.service.ts) -- the
  * route never calls the LLM at all in that case, so this is the only part on
  * that message.
  */
@@ -42,7 +42,7 @@ export type LangTutorUIMessage = UIMessage<
     // a thread is reloaded (app/page.tsx). A live turn has none yet; they're
     // fetched on demand and held in client state.
     explanations: { reply: string | null; correction: string | null };
-    rateLimited: { cap: number };
+    rateLimited: { cap: number; reason: 'user' | 'global'; signedIn: boolean };
     // Which conversation the turn was stored in. Written on every persisted
     // turn so a brand-new chat's second message appends to the conversation
     // the first one created, rather than forking a new one each turn.

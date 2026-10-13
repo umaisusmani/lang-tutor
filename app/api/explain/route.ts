@@ -4,7 +4,7 @@ import { streamGrammarExplanation, type ExplainKind } from '@/lib/explain';
 import { isCefrLevel } from '@/lib/prompts';
 import { annotateMessage, getMessage } from '@/lib/services/conversation.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
-import { checkAndIncrementUsage, getSessionId } from '@/lib/services/session.service';
+import { consumeMessage } from '@/lib/services/session.service';
 
 /** Longest text an unpersisted request may ask about. Replies are a few
  * sentences; this only stops the endpoint being used as a free model proxy. */
@@ -27,8 +27,8 @@ function clip(value: unknown): string {
  *   again (or after a reload) costs nothing. getMessage() goes through RLS,
  *   so another user's id reads as missing; no ownership check needed here.
  * - Anonymous, or a turn whose rows didn't save: the text comes from the
- *   request and nothing is stored. Anonymous requests count against the same
- *   free-message cap as chat, checked before any model call.
+ *   request and nothing is stored. A fresh explanation counts against the same
+ *   daily message cap as chat, checked before any model call.
  */
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -70,16 +70,20 @@ export async function POST(req: Request) {
       original = row.content;
     }
     persist = (explanation) => annotateMessage(row.id, { grammar_explanation: explanation });
-  } else if (!userId) {
-    const sessionId = await getSessionId();
-    const { allowed } = await checkAndIncrementUsage(sessionId);
-    if (!allowed) {
-      return Response.json({ error: 'Free message limit reached.' }, { status: 429 });
-    }
   }
 
   if (!text.trim()) {
     return Response.json({ error: 'Nothing to explain.' }, { status: 400 });
+  }
+
+  // A fresh explanation spends a message from the same daily allowance as
+  // chat, signed in or not. Cached ones returned above and cost nothing.
+  const usage = await consumeMessage(userId);
+  if (!usage.allowed) {
+    return Response.json(
+      { error: 'Daily message limit reached.', reason: usage.reason, signedIn: userId !== null },
+      { status: 429 },
+    );
   }
 
   const result = streamGrammarExplanation({
@@ -91,5 +95,9 @@ export async function POST(req: Request) {
     onText: persist,
   });
 
-  return result.toTextStreamResponse();
+  // Lets the client show the new allowance without guessing whether this
+  // request was a cached (free) one -- cached answers return early, above.
+  return result.toTextStreamResponse({
+    headers: { 'X-Messages-Remaining': String(usage.remaining) },
+  });
 }

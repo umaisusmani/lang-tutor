@@ -4,8 +4,23 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
 const SESSION_COOKIE = 'session_id';
 
-/** Anonymous visitors get this many messages before being asked to sign in. */
-export const ANON_MESSAGE_CAP = 5;
+/** Anonymous visitors get this many messages per day before being asked to sign in. */
+export const ANON_DAILY_CAP = 5;
+
+/** Signed-in users: messages per day. Grammar explanations count too. */
+export const USER_DAILY_CAP = 35;
+
+/**
+ * Messages the whole app will serve per day, the backstop for the monthly
+ * model budget. Tune it with GLOBAL_DAILY_MESSAGE_CAP rather than a deploy.
+ */
+export const GLOBAL_DAILY_CAP = Number(process.env.GLOBAL_DAILY_MESSAGE_CAP) || 300;
+
+export type LimitReason = 'user' | 'global';
+
+export type UsageResult =
+  | { allowed: true; remaining: number; cap: number }
+  | { allowed: false; reason: LimitReason; remaining: 0; cap: number };
 
 /**
  * Returns the visitor's session id, creating one if this is their first
@@ -14,6 +29,8 @@ export const ANON_MESSAGE_CAP = 5;
  * this an actual rate limit rather than a UI suggestion (a counter kept in
  * localStorage or component state resets the moment someone opens DevTools,
  * uses incognito, or just calls /api/chat directly with curl).
+ *
+ * Route handlers only: it writes a cookie, which a Server Component can't.
  */
 export async function getSessionId(): Promise<string> {
   const cookieStore = await cookies();
@@ -29,65 +46,78 @@ export async function getSessionId(): Promise<string> {
   return sessionId;
 }
 
-/**
- * How many messages this visitor has left, without touching anything.
- *
- * Read-only on purpose, and deliberately NOT built on getSessionId(): that one
- * writes a cookie, which a Server Component isn't allowed to do. This only
- * reads an existing cookie, so app/page.tsx can call it during render. No
- * cookie yet means nobody has sent a message from this browser, so the full
- * cap is still available.
- */
-export async function getRemainingMessages(): Promise<number> {
-  const sessionId = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!sessionId) return ANON_MESSAGE_CAP;
+export function dailyCapFor(userId: string | null): number {
+  return userId ? USER_DAILY_CAP : ANON_DAILY_CAP;
+}
 
-  const supabase = createServiceRoleClient();
-  const { data } = await supabase
-    .from('session_usage')
-    .select('message_count')
-    .eq('session_id', sessionId)
-    .single();
-
-  return Math.max(0, ANON_MESSAGE_CAP - (data?.message_count ?? 0));
+function utcDay(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 /**
- * Checks the session's message count against the cap and, if under it,
- * increments it. Only ever called for anonymous requests -- signed-in users
- * skip this entirely (see app/api/chat/route.ts).
+ * How many messages this caller has left today, without touching anything.
  *
- * Uses the service-role client because `session_usage` has RLS enabled with
- * zero policies: no user session (anon or authenticated) can read or write it
- * directly, specifically so a client can't just overwrite its own counter.
- *
- * Read-then-write, not a single atomic increment: a genuine race (two
- * concurrent requests from the exact same anonymous session) would let it
- * overshoot the cap by one. Accepted tradeoff for this project's scale --
- * one person typing in one chat tab, not concurrent bot traffic -- rather
- * than adding a Postgres function just to close a one-message race window.
+ * Read-only on purpose, and deliberately NOT built on getSessionId(): that one
+ * writes a cookie, which a Server Component isn't allowed to do. No cookie
+ * yet means nobody has sent a message from this browser, so the full cap is
+ * still available. Does not look at the global counter -- that one only shows
+ * up as the "resting" notice when someone actually sends.
  */
-export async function checkAndIncrementUsage(
-  sessionId: string,
-): Promise<{ allowed: boolean; remaining: number }> {
-  const supabase = createServiceRoleClient();
+export async function getRemainingMessages(userId: string | null): Promise<number> {
+  const cap = dailyCapFor(userId);
 
-  const { data: existing } = await supabase
-    .from('session_usage')
-    .select('message_count')
-    .eq('session_id', sessionId)
-    .single();
-
-  const currentCount = existing?.message_count ?? 0;
-
-  if (currentCount >= ANON_MESSAGE_CAP) {
-    return { allowed: false, remaining: 0 };
+  let key: string;
+  if (userId) {
+    key = `user:${userId}`;
+  } else {
+    const sessionId = (await cookies()).get(SESSION_COOKIE)?.value;
+    if (!sessionId) return cap;
+    key = `anon:${sessionId}`;
   }
 
-  const newCount = currentCount + 1;
-  await supabase
-    .from('session_usage')
-    .upsert({ session_id: sessionId, message_count: newCount }, { onConflict: 'session_id' });
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from('daily_usage')
+    .select('message_count')
+    .eq('key', key)
+    .eq('day', utcDay())
+    .maybeSingle();
 
-  return { allowed: true, remaining: ANON_MESSAGE_CAP - newCount };
+  return Math.max(0, cap - (data?.message_count ?? 0));
+}
+
+/**
+ * Takes one message out of today's allowance -- the caller's own and the
+ * global one -- or says why it can't. Called for every model-spending request
+ * (chat, grammar explanations), signed in or not, before any model call.
+ *
+ * Uses the service-role client because `daily_usage` has RLS enabled with zero
+ * policies: no user session can read or write it directly, so a client can't
+ * overwrite its own counter. The increment itself is the atomic Postgres
+ * function consume_message (0007), not a read-then-write.
+ *
+ * Fails closed: if the counter can't be reached, the request is refused
+ * rather than waved through, because this is the guard on the budget.
+ */
+export async function consumeMessage(userId: string | null): Promise<UsageResult> {
+  const cap = dailyCapFor(userId);
+  const key = userId ? `user:${userId}` : `anon:${await getSessionId()}`;
+
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase.rpc('consume_message', {
+    p_key: key,
+    p_cap: cap,
+    p_global_cap: GLOBAL_DAILY_CAP,
+  });
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) {
+    console.error('[session.service] consume_message failed:', error?.message);
+    return { allowed: false, reason: 'global', remaining: 0, cap };
+  }
+
+  if (!row.allowed) {
+    return { allowed: false, reason: row.reason === 'user' ? 'user' : 'global', remaining: 0, cap };
+  }
+  return { allowed: true, remaining: row.remaining, cap };
 }

@@ -349,7 +349,7 @@ export function SiteHeader({
 
       {remaining !== null && (
         <div className="text-ink-3 flex items-center gap-2.5 font-mono text-[10px]">
-          <span>free trial</span>
+          <span>{userEmail ? 'today' : 'free trial'}</span>
           <div className="bg-soft h-1.5 flex-1 overflow-hidden rounded-full">
             <div
               className="bg-accent h-full rounded-full transition-[width] duration-500 ease-out"

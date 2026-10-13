@@ -9,11 +9,11 @@ import {
   resolveCefrLevel,
   updateCefrLevel,
 } from '@/lib/services/profile.service';
-import { ANON_MESSAGE_CAP, checkAndIncrementUsage, getSessionId } from '@/lib/services/session.service';
+import { consumeMessage } from '@/lib/services/session.service';
 
 /**
  * Controller for the chat endpoint: parse the request, work out who is asking,
- * gate anonymous traffic, and shape the streaming response. The turn itself --
+ * enforce the daily limits, and shape the streaming response. The turn itself --
  * persistence, the reply, corrections, glosses, vocab -- lives in
  * lib/services/chat.service.ts.
  */
@@ -30,26 +30,23 @@ export async function POST(req: Request) {
 
   const userId = await getCurrentUserId();
 
-  // Rate limit check happens before anything else -- specifically before any
-  // Groq call -- so a capped-out anonymous visitor costs us zero tokens, not
-  // just zero *visible* reply. Signed-in users skip this entirely; the cap
-  // only exists to protect against unauthenticated traffic.
-  if (!userId) {
-    const sessionId = await getSessionId();
-    const { allowed } = await checkAndIncrementUsage(sessionId);
+  // The daily limit is checked before anything else -- specifically before any
+  // Groq call -- so a capped-out caller costs us zero tokens, not just zero
+  // *visible* reply. Applies to everyone: signed-in users have their own,
+  // larger daily cap, and all traffic shares the global budget cap.
+  const usage = await consumeMessage(userId);
 
-    if (!allowed) {
-      const stream = createUIMessageStream<LangTutorUIMessage>({
-        execute: async ({ writer }) => {
-          writer.write({
-            type: 'data-rateLimited',
-            id: 'rate-limit-1',
-            data: { cap: ANON_MESSAGE_CAP },
-          });
-        },
-      });
-      return createUIMessageStreamResponse({ stream });
-    }
+  if (!usage.allowed) {
+    const stream = createUIMessageStream<LangTutorUIMessage>({
+      execute: async ({ writer }) => {
+        writer.write({
+          type: 'data-rateLimited',
+          id: 'rate-limit-1',
+          data: { cap: usage.cap, reason: usage.reason, signedIn: userId !== null },
+        });
+      },
+    });
+    return createUIMessageStreamResponse({ stream });
   }
 
   // The level the learner is looking at wins over the stored one. It used to

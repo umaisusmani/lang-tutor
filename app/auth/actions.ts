@@ -13,11 +13,11 @@ import {
 import { createClient } from '@/lib/supabase/server';
 
 /**
- * `error` is a failure to show; `notice` is a neutral message (check your
- * inbox); `unconfirmedEmail` is set when the failure was an unconfirmed
- * address, so the form can offer to resend the link.
+ * `error` is a failure to show; `notice` is a neutral message; `pendingEmail`
+ * is set when the account exists but its email isn't confirmed yet, which
+ * switches the login page to the "enter the code" screen for that address.
  */
-export type AuthState = { error?: string; notice?: string; unconfirmedEmail?: string } | null;
+export type AuthState = { error?: string; notice?: string; pendingEmail?: string } | null;
 
 /**
  * This request's own origin, for links that email or OAuth providers send the
@@ -50,9 +50,13 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
 
   if (error) {
     if (error.code === 'email_not_confirmed') {
+      // Only reached with the right password, so it's safe to send a fresh
+      // code here. A resend inside Supabase's cooldown fails; that's fine, the
+      // earlier code is still good, so the code screen opens either way.
+      await supabase.auth.resend({ type: 'signup', email });
       return {
-        error: 'Please confirm your email first. We sent you a link when you registered.',
-        unconfirmedEmail: email,
+        pendingEmail: email,
+        notice: "Your email isn't confirmed yet. Enter the code we just sent you.",
       };
     }
     return { error: error.message };
@@ -70,7 +74,8 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    // Where the confirmation link lands: app/auth/confirm/route.ts.
+    // Only used if the email template still carries a link instead of (or as
+    // well as) the code: app/auth/confirm/route.ts.
     options: { emailRedirectTo: `${await getOrigin()}/auth/confirm` },
   });
 
@@ -82,14 +87,40 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   // is already registered also lands here with no session and no error, which
   // keeps signup from revealing who has an account.
   if (!data.session) {
-    return { notice: `We sent a confirmation link to ${email}. Click it to finish signing up.` };
+    return { pendingEmail: email };
   }
 
   revalidatePath('/', 'layout');
   redirect('/');
 }
 
-/** Sends the signup confirmation email again. */
+/**
+ * Checks the code from the confirmation email. On success the session is set
+ * on this response, so it redirects straight in like a normal sign-in.
+ */
+export async function verifySignupCode(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const email = String(formData.get('email') ?? '');
+  const token = String(formData.get('code') ?? '').replace(/\s+/g, '');
+
+  if (!/^\d{6,10}$/.test(token)) {
+    return { pendingEmail: email, error: 'Enter the code from the email (digits only).' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+
+  if (error) {
+    return {
+      pendingEmail: email,
+      error: 'That code is wrong or has expired. Check it, or send a new one.',
+    };
+  }
+
+  revalidatePath('/', 'layout');
+  redirect('/');
+}
+
+/** Sends the signup confirmation email (and its code) again. */
 export async function resendConfirmation(
   _prev: AuthState,
   formData: FormData,
@@ -104,8 +135,8 @@ export async function resendConfirmation(
     options: { emailRedirectTo: `${await getOrigin()}/auth/confirm` },
   });
 
-  if (error) return { error: error.message };
-  return { notice: `Sent again to ${email}. Check your spam folder too.` };
+  if (error) return { pendingEmail: email, error: error.message };
+  return { pendingEmail: email, notice: `New code sent to ${email}. Check spam too.` };
 }
 
 /**

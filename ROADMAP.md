@@ -4,7 +4,7 @@ The one place feature status is recorded. Design notes live in local
 `plans/*.md` files (not committed), and they don't carry status. What is
 built, and how, is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-**Next up:** finish the Supabase template and SMTP setup for verification (see `plans/limits-and-verification.md`). Then the translate page, the ask panel, voice V0, grammar RAG (v1 step 5), F3–F5, conversation-memory RAG.
+**Next up:** paste the confirmation email template and set up custom SMTP in Supabase (see `plans/limits-and-verification.md`), and settle the starter word-list licence before launch. Then the translate page, the ask panel, voice V0 (Groq Whisper transcription with an editable transcript), grammar RAG (v1 step 5), F3–F5, conversation-memory RAG.
 
 Status: ✅ done · 🟡 partly done · ⬜ not started
 
@@ -18,8 +18,8 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Vocab tracker (save, delete, `/vocab` grid) | ✅ | `5dc547b`, `69615a7` | Server Actions rather than REST routes |
 | Auth: email/password + Google OAuth | ✅ | `ad002cf`, `1b6352a` | |
 | Anonymous rate limit (5 messages) | ✅ | `df4ff32` | |
-| Daily message limits (anon 5, signed-in 35, global kill switch) | 🟡 | *(uncommitted)* | Code done, migration `0007` applied 2026-10-13 and checked against the live DB. `GLOBAL_DAILY_MESSAGE_CAP` still defaults to 300 until you set a number. Design: `plans/limits-and-verification.md` |
-| Email verification on signup | 🟡 | *(uncommitted)* | `/auth/confirm` route, resend link. "Confirm email" is on. Still to do: the `/auth/confirm` template change and custom SMTP in Supabase |
+| Daily message limits (anon 5, signed-in 35, global kill switch) | ✅ | `96b4d0c` | Migration `0007` applied 2026-10-13 and checked against the live DB. `GLOBAL_DAILY_MESSAGE_CAP` set to 40 on 2026-10-15 (`.env.local`, Vercel Production and Preview; a redeploy picks it up). Design: `plans/limits-and-verification.md` |
+| Email verification on signup | 🟡 | `96b4d0c`, `7d0ab39` | Code-entry screen, resend, `/auth/confirm` link fallback. "Confirm email" is on. Still to do: paste `supabase/email-templates/confirm-signup.html` into the Supabase "Confirm signup" template, and custom SMTP |
 | Conversation history (reopen, delete) | ✅ | `75083e2`, `e73d23c` | Not in the original plan |
 | Eval suites: correction, gloss, reply | ✅ | `55896e5`, `875969f`, `69615a7` | |
 | Token usage logging | ✅ | `ad002cf` | `token_usage` table |
@@ -33,7 +33,7 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 |---|---|---|---|
 | Flashcards F1: schema, FSRS wrapper, tests | ✅ | `7c5fec0` | Migration `0005` applied 2026-10-08. Design: `plans/flashcards.md` |
 | Flashcards F2: Anki-style session on `/vocab`, due badge | ✅ | `372b424`, `80e837b` | "Start session" on the vocab page, flip card, 4 graded buttons with intervals, learning steps requeue in-session. `/review` redirects. "Practice 10 more" gives on-demand rounds past what's due. Timezone is saved from the browser. Reverse (English → German) cards need migration `0006` applied |
-| Starter vocab by level, offered as new-word cards with "add to my vocab" | ✅ | *(uncommitted)* | Goethe A1–B1 lists (~2,900 words), 3 per session, translated when added. Skips remembered per browser. Source licence still to check |
+| Starter vocab by level, offered as new-word cards with "add to my vocab" | 🟡 | `fa0dac0` | Goethe A1–B1 lists (~2,900 words), 3 per session, translated when added. Skips remembered per browser. Works, but the source repo has no licence and the Goethe PDFs assert copyright, so the lists shouldn't ship publicly until that's settled (permission from the Goethe-Institut, or swap in an openly licensed list) |
 | Flashcards F3: review cards inside chat | ⬜ | | Next after the RAG work is scoped; reuses the flip card |
 | Flashcards F4: grammar cards from repeated mistakes | ⬜ | | |
 | Flashcards F5: leeches, steering the tutor toward due words | ⬜ | | |
@@ -49,8 +49,8 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 
 | Feature | Status | Notes |
 |---|---|---|
-| Voice V0: dictation (mic → STT → input box) | ⬜ | Design: `plans/voice.md` |
-| Voice V1: speak replies (TTS) | ⬜ | |
-| Voice V2: call mode (VAD → STT → chat → TTS) | ⬜ | |
+| Voice V0: dictation (mic → STT → input box) | ⬜ | Build first: Groq `whisper-large-v3-turbo`, forced German, editable transcript; measure quality with real learner recordings. Design: `plans/voice.md` |
+| Voice V1: speak replies (TTS) | ⬜ | Start with browser German `speechSynthesis`; select a server TTS only after validating the voice experience |
+| Voice V2: call mode (VAD → STT → chat → TTS) | ⬜ | Turn-based call UX, not duplex realtime. No pronunciation scoring in free conversation; surface corrections after the call |
 | Bring your own model, step 1: one `lib/llm.ts` | ⬜ | Design: `plans/byom.md` |
 | Bring your own model, step 2: per-user endpoint, calls made from the browser | ⬜ | |

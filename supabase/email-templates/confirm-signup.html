@@ -1,0 +1,184 @@
+<!--
+  Supabase → Authentication → Emails → "Confirm signup".
+
+  Paste this whole file into the template body. Subject line:
+    Dein Zauberwort ✦ starfinch
+
+  Code only, no link, on purpose: a link can be opened (and spent) by an email
+  scanner before the person sees it, and the code works from any device. The
+  login screen's "enter the code" step is app/login/page.tsx -> ConfirmCodeScreen.
+
+  The code is dressed as one of the app's own flashcards (word on the front,
+  meaning underneath), and Ramanath is the persona, so the tone matches the chat.
+
+  Colours are the tokens in app/globals.css converted to sRGB hex (email
+  clients don't do oklch or CSS variables). Fonts fall back to system ones
+  because most clients won't load Archivo / DM Mono.
+-->
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>Dein Zauberwort — starfinch</title>
+    <style>
+      /* Dark mode: Apple Mail and a few others honour this. Gmail ignores it
+         and does its own inversion, which the dark-safe colours below survive. */
+      @media (prefers-color-scheme: dark) {
+        .bg-paper { background-color: #191926 !important; }
+        .bg-panel { background-color: #252534 !important; }
+        .bg-soft { background-color: #2f2f42 !important; }
+        .bd-line { border-color: #565669 !important; }
+        .bd-hair { border-color: #3a3a4d !important; }
+        .tx-ink { color: #f4f2ea !important; }
+        .tx-ink2 { color: #a9a9b7 !important; }
+        /* Yellow and the text on it stay put, same rule as the app. */
+      }
+      @media only screen and (max-width: 480px) {
+        .card { padding: 24px 20px !important; }
+        .code { font-size: 30px !important; letter-spacing: 0.18em !important; }
+      }
+    </style>
+  </head>
+  <body
+    class="bg-paper"
+    style="margin:0;padding:0;background-color:#f7f5ea;-webkit-text-size-adjust:100%;"
+  >
+    <!-- Preheader: the inbox preview line. -->
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      Ramanath already has the Kaffee on. Your code is {{ .Token }}.
+    </div>
+
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      class="bg-paper"
+      style="background-color:#f7f5ea;"
+    >
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="max-width:480px;"
+          >
+            <!-- Brand lockup, same as the app header: yellow tile + wordmark. -->
+            <tr>
+              <td style="padding:0 4px 20px 4px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td
+                      class="bd-line"
+                      width="34"
+                      height="34"
+                      align="center"
+                      valign="middle"
+                      style="width:34px;height:34px;background-color:#f2dd5a;border:2px solid #1c1e2d;border-radius:10px;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:16px;font-weight:800;line-height:34px;color:#1c1e2d;"
+                    >
+                      s
+                    </td>
+                    <td
+                      class="tx-ink"
+                      style="padding-left:10px;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:28px;font-weight:800;letter-spacing:-0.03em;line-height:34px;color:#1c1e2d;"
+                    >
+                      starfinch
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Card: panel fill, 2px ink outline, hard offset shadow. -->
+            <tr>
+              <td
+                class="card bg-panel bd-line"
+                style="background-color:#ffffff;border:2px solid #1c1e2d;border-radius:18px;padding:32px 28px;box-shadow:4px 4px 0 #1c1e2d;"
+              >
+                <p
+                  class="tx-ink2"
+                  style="margin:0 0 10px 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;line-height:1.4;color:#65677a;"
+                >
+                  &#10022; post für dich &#10022;
+                </p>
+                <h1
+                  class="tx-ink"
+                  style="margin:0 0 12px 0;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:32px;font-weight:800;letter-spacing:-0.025em;line-height:1.08;color:#1c1e2d;"
+                >
+                  Hallo, Neuling!
+                </h1>
+                <p
+                  class="tx-ink2"
+                  style="margin:0 0 26px 0;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#65677a;"
+                >
+                  Ramanath has put the Kaffee on and saved you the good chair. One
+                  secret word and you&rsquo;re in. Whisper it to the sign-up screen:
+                </p>
+
+                <!-- The code, dressed as one of the app's own flashcards. -->
+                <table
+                  role="presentation"
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  border="0"
+                  style="margin:0 0 6px 0;"
+                >
+                  <tr>
+                    <td
+                      align="center"
+                      style="background-color:#f2dd5a;border:2px solid #1c1e2d;border-radius:14px;padding:20px 12px 18px 12px;box-shadow:4px 4px 0 #1c1e2d;"
+                    >
+                      <div
+                        style="margin:0 0 10px 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;line-height:1.4;color:#1c1e2d;"
+                      >
+                        das Zauberwort &middot; n.
+                      </div>
+                      <span
+                        class="code"
+                        style="font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:36px;font-weight:500;letter-spacing:0.25em;line-height:1;color:#1c1e2d;"
+                      >
+                        {{ .Token }}
+                      </span>
+                      <div
+                        style="margin:14px 0 0 0;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-style:italic;line-height:1.4;color:#1c1e2d;"
+                      >
+                        <em>(English: &ldquo;open sesame&rdquo;)</em>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+
+                <p
+                  class="tx-ink2"
+                  style="margin:26px 0 0 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:11px;line-height:1.7;color:#65677a;"
+                >
+                  Good for about an hour, then it turns back into a pumpkin. If the
+                  screen got closed, sign in again and we&rsquo;ll send a fresh one.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td
+                class="tx-ink2"
+                style="padding:20px 4px 0 4px;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:11px;line-height:1.7;color:#717383;"
+              >
+                Didn&rsquo;t knock? Then a finch mistyped an address. Ignore this
+                email and nothing happens without the word.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

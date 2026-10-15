@@ -1,19 +1,22 @@
 # starfinch — Technical Documentation
 
-> State of the codebase as of 2026-10-10 (the vocab-page flashcard session, on top of `372b424`). This describes
+> State of the codebase as of 2026-10-15 (daily limits and email verification, on top of `7d0ab39`). This describes
 > what is **built**. Feature status is in [ROADMAP.md](../ROADMAP.md); design
 > notes live in local `plans/*.md` files that aren't committed. For the
 > user-facing overview, see [README.md](../README.md). Where a plan and the
 > code disagree, the code is right. Section 11 lists where the build departed
 > from the original design.
 >
-> **Since the last revision of this doc (2026-10-08, F1):** flashcards F2 was
-> built as a separate `/review` page with typed fill-in-the-blank cards, then
-> reworked. Cards are now reviewed in an Anki-style flip-card session started
-> from `/vocab` ("Start session"); `/review` just redirects there and the due
-> badge sits on the `vocab` link. The scheduler, tables and RPC (migration
-> 0005) are unchanged. See §3 and §8.3. `lib/cloze.ts` is no longer used by
-> any page (§12). Reviewing inside the chat is still F3.
+> **Since the last revision of this doc (2026-10-10, F2):** two changes.
+> (1) Message limits are now daily and apply to everyone: 5 a day anonymous,
+> 35 a day signed in, plus a global cap on the whole app, all counted in
+> `daily_usage` (migration 0007) through the atomic `consume_message()`
+> function. `session_usage` is no longer written. See §4.1, §6 and §7.4.
+> (2) Signing up with an email now needs the address confirmed: the
+> confirmation email carries a numeric code that is entered on a second
+> login screen (`verifySignupCode`), with `/auth/confirm` kept as a link
+> fallback. See §7.2. Adding Supabase's confirmation template and custom
+> SMTP are dashboard settings, not code (§10).
 
 ## Contents
 
@@ -104,15 +107,18 @@ app/
   globals.css              Tailwind v4 + theme tokens, gloss-panel transitions
   api/chat/route.ts        POST /api/chat — thin controller
   api/explain/route.ts     POST /api/explain — on-demand grammar explanation, text/plain stream
-  auth/actions.ts          Server Actions: signIn, signUp, signInWithGoogle, signOut, saveLevel
+  auth/actions.ts          Server Actions: signIn, signUp, verifySignupCode, resendConfirmation,
+                           signInWithGoogle, signOut, saveLevel, saveTimezone
   auth/callback/route.ts   OAuth code → session exchange
+  auth/confirm/route.ts    Email-link fallback: token_hash → verifyOtp → session
   conversations/actions.ts deleteConversationAction
   vocab/                   /vocab page; vocab-browser (list <-> session switch + "Start session");
                            vocab-grid (tap-to-reveal word cards); flashcard-session (Anki-style
                            flip-card session); actions: saveVocabAction, deleteVocabAction,
                            startSessionAction, gradeCardAction
   review/page.tsx          redirects to /vocab (old links)
-  login/page.tsx           Email/password + Google sign-in form
+  login/page.tsx           Email/password + Google sign-in form, and the "enter the code"
+                           screen (ConfirmCodeScreen) shown after signup
   components/              PageHeader (SiteHeader plus level/theme state for /vocab),
                            SiteHeader (level, chats menu, vocab link with due badge, sign-out; now a 1080px sibling of the
                            860px content column, not nested inside it), Brand, ConfirmModal, Toaster,
@@ -164,7 +170,10 @@ scripts/docs-status.sh     `npm run docs:status`: code commits the docs haven't 
 supabase/migrations/       0001 schema + RLS, 0002 gloss endpoint, 0003 annotations + titles,
                            0004 personas + persona_id + grammar_explanation + 'explain' usage endpoint,
                            0005 flashcards (cards, review_logs, vocab-card trigger, record_review, timezone),
-                           0006 reverse cards (cards.direction, two cards per word, backfill)
+                           0006 reverse cards (cards.direction, two cards per word, backfill),
+                           0007 daily_usage + consume_message() (daily limits and the global cap)
+supabase/email-templates/  confirm-signup.html, pasted by hand into Supabase → Authentication →
+                           Emails (not deployed by anything)
 proxy.ts                   Next 16 proxy (ex-middleware): Supabase session refresh
 next.config.ts             Server Action allowedOrigins for Vercel aliases
 (no public/avatars/)        the persona has no avatar image (avatar_url is null); the placeholder
@@ -194,10 +203,13 @@ app/ (controllers, UI)  →  lib/services/*  →  lib/supabase/*  →  Postgres
    currently shown in its own UI.
 2. `getCurrentUserId()` uses `supabase.auth.getUser()`, which checks the token
    with Supabase instead of trusting the cookie.
-3. **Anonymous only:** `getSessionId()` reads or creates an httpOnly
-   `session_id` cookie, then `checkAndIncrementUsage()`. If the cap
-   (`ANON_MESSAGE_CAP = 5`) is reached, it returns a stream holding one
-   `data-rateLimited` part and **makes no Groq call**.
+3. **Daily limit, for everyone:** `consumeMessage(userId)` takes one message
+   from the caller's allowance (`user:<uuid>`, or `anon:<session cookie>`,
+   where `getSessionId()` reads or creates the httpOnly `session_id` cookie)
+   and from the app-wide `global` one, in a single `consume_message()` call
+   (§7.4). If either is spent, the route returns a stream holding one
+   `data-rateLimited` part (`{cap, reason: 'user' | 'global', signedIn}`) and
+   **makes no Groq call**.
 4. **Level resolution, and the race it fixes:** the body's `level` wins when
    present and valid; otherwise the profile level if signed in, else the
    `cefr_level` cookie (validated either way, because it ends up inside a
@@ -291,7 +303,7 @@ or gloss never breaks a reply the learner already has. Notices are sent with
 | `data-explanations` | `{reply, correction}` (stored grammar explanations) | only on reload, by `app/page.tsx`'s `toUIMessages()` — a live turn has none yet | n/a — this part *is* the persisted value |
 | `data-savedLemmas` | `string[]` (lowercased) | both branches, distinct ids | no (recomputed on load) |
 | `data-conversation` | `{id}` | start of turn | no |
-| `data-rateLimited` | `{cap}` | route, instead of everything | no |
+| `data-rateLimited` | `{cap, reason: 'user' \| 'global', signedIn}` | route, instead of everything | no |
 | `data-notice` | `{source, message}` | any failing branch | no (transient) |
 
 ## 5. LLM layer
@@ -325,8 +337,11 @@ database row (not from the request body) and, if that row already has a
 reopening an explanation is free. Otherwise it streams a new one and saves it
 onto the row via `annotateMessage`. Without a usable `messageId` (anonymous,
 or a turn whose rows failed to save), it explains the text sent in the
-request and saves nothing; anonymous requests spend one unit of the same
-free-message cap chat uses (`checkAndIncrementUsage`).
+request and saves nothing. A fresh explanation, signed in or not, spends one
+message of the same daily allowance chat uses (`consumeMessage`), checked
+before the model call; a cached one costs nothing. Over the limit it answers
+429 with `{reason, signedIn}`, and a successful response carries the new
+allowance in an `X-Messages-Remaining` header.
 
 ### 5.2 Prompts (`lib/prompts.ts`)
 
@@ -418,7 +433,8 @@ written by hand and **must be updated whenever a migration changes a table**.
 | `personas` (0004) | `slug` UNIQUE, `name`, `age`, `city`, `bio`, `avatar_url`, `is_default` (partial unique index: at most one default) | migration seed only — content, not user data | select for `anon, authenticated`; no insert/update/delete policy at all (managed only via migrations / service role) |
 | `conversations` | `title` (0003), `persona_id` (0004, FK → `personas`, **ON DELETE SET NULL**) | `createConversation` | select/insert/delete own |
 | `messages` | `role`, `content`, `correction jsonb`, `gloss jsonb` (0003), `grammar_explanation text` (0004); index `(conversation_id, created_at)`; FK **ON DELETE CASCADE** | `saveMessage`, `annotateMessage` | ownership proven via `EXISTS` on parent conversation; update policy added in 0003 |
-| `session_usage` | `session_id` PK, `message_count` | `checkAndIncrementUsage` (service role) | **RLS on, zero policies**: invisible to every client |
+| `daily_usage` (0007) | `(key, day)` PK, `message_count`. Keys: `user:<uuid>`, `anon:<session>`, `global`; days roll over at 00:00 UTC | `consume_message()` RPC (service role) | **RLS on, zero policies**: invisible to every client |
+| `session_usage` | `session_id` PK, `message_count` | nothing since 0007; left in place | **RLS on, zero policies** |
 | `cards` (0005) | `kind` (vocab_cloze/grammar_cloze), `vocab_entry_id` **or** `mistake_id` (each UNIQUE, ON DELETE CASCADE; CHECK exactly one), FSRS state (`state`, `due`, `stability`, `difficulty`, `scheduled_days`, `learning_steps`, `reps`, `lapses`, `last_review`), `suspended`; partial index `(user_id, due) where not suspended` | `create_vocab_card` trigger; `record_review` | full CRUD on own rows |
 | `review_logs` (0005) | `card_id`, `rating` 1–4, `state` **before** the review, FSRS snapshot, `reviewed_at`, `duration_ms`, `surface` (panel/review_page), `answer_given` | `record_review` | select own; insert own **and only against a card you own**; no update/delete |
 | `token_usage` | `endpoint` (CHECK chat/correction/gloss/explain/**drill**, extended in 0004 and 0005), token counts, `user_id` **ON DELETE SET NULL** | `logUsage` (service role) | **RLS on, zero policies** |
@@ -471,7 +487,7 @@ and every UPDATE policy pairs `USING` with `WITH CHECK`.
 | Browser | `lib/supabase/client.ts` | Client Components (currently unused for data) |
 | Server | `lib/supabase/server.ts` | Created per request from `cookies()`. RLS applies as the user. |
 | Proxy | `lib/supabase/proxy.ts` | Called on every matched request from `proxy.ts`. `getUser()` refreshes the session and writes the new cookies to both the request and the response. |
-| Service role | `lib/supabase/service-role.ts` | A bare `PostgrestClient` that **bypasses RLS**. Server-only, and only for `session_usage` and `token_usage`. |
+| Service role | `lib/supabase/service-role.ts` | A bare `PostgrestClient` that **bypasses RLS**. Server-only, and only for `daily_usage` and `token_usage`. |
 
 The service-role client uses `PostgrestClient` directly instead of
 supabase-js because supabase-js always builds a Realtime client, which throws
@@ -482,6 +498,25 @@ runner.
 
 - **Email/password:** `signIn` / `signUp` Server Actions set the cookies on the
   same response that redirects, so there's no flash of signed-out UI.
+- **Email confirmation (code):** the Supabase project has "Confirm email" on, so
+  `signUp` returns no session and the page switches to `ConfirmCodeScreen`.
+  The confirmation email carries a numeric code (`{{ .Token }}` in the
+  "Confirm signup" template; the project issues 8 digits, the input accepts
+  6–10). `verifySignupCode` calls `verifyOtp({ email, token, type: 'email' })`,
+  which sets the session on the response that redirects. A code is used
+  instead of a link because a link can be spent by an email scanner before the
+  person opens it, and a code works from any device. "Send a new code" is
+  `resendConfirmation`. Signing in with the right password but an unconfirmed
+  address re-sends a code and opens the same screen.
+- **Email confirmation (link, fallback):** `app/auth/confirm/route.ts` takes
+  `token_hash` and `type`, calls `verifyOtp`, and redirects to `/`, or to
+  `/login?error=confirm_failed`. It's only reached if the template still
+  carries a link. It verifies `token_hash` directly, so unlike the PKCE
+  `/auth/callback` it works in a different browser from the one that signed up.
+- **No account enumeration:** signing up with an address that already exists
+  returns no error and no session, the same as a new one, so it lands on the
+  code screen too. No new code is sent for an existing account; the screen
+  says so and points to "Already have an account? Sign in".
 - **Google OAuth:** `signInWithGoogle` builds its origin from the `Host` and
   `x-forwarded-proto` headers (the `Origin` header isn't reliable behind
   Vercel's proxy), redirects to Google, and `/auth/callback` exchanges the
@@ -501,19 +536,46 @@ runner.
 - `deleteConversation` reads back the deleted ids with `.select('id')` so it
   can tell "deleted" apart from "RLS matched 0 rows".
 
-### 7.4 Anonymous rate limit
+### 7.4 Daily message limits
 
-httpOnly cookie plus a server-side counter in a table no client can reach.
-Clearing localStorage or calling the endpoint with curl doesn't get around it.
-Clearing cookies or using incognito does, which is acceptable for a limit that
-only exists to protect a free Groq quota.
+Everyone has a daily allowance, counted in `daily_usage` (migration 0007),
+keyed by who is asking, with days rolling over at 00:00 UTC:
+
+| Key | Who | Cap |
+|---|---|---|
+| `anon:<session cookie>` | an anonymous browser | `ANON_DAILY_CAP` = 5 |
+| `user:<uuid>` | a signed-in account | `USER_DAILY_CAP` = 35 |
+| `global` | the whole app | `GLOBAL_DAILY_MESSAGE_CAP` env var, default 300 |
+
+The caps are in `lib/services/session.service.ts`. A chat message costs one, and
+so does a freshly generated grammar explanation (cached ones are free).
+
+- **Atomic:** `consume_message(p_key, p_cap, p_global_cap)` is one Postgres
+  function. It takes the global slot first, then the caller's, each with a
+  single `INSERT … ON CONFLICT DO UPDATE … WHERE count < cap`, which Postgres
+  serialises per row, so two concurrent requests can't both take the last
+  slot. If the caller is over their own cap, the global slot is handed back,
+  so a capped-out user doesn't eat the shared budget.
+- **Checked before any model call**, so a refused request costs no tokens.
+- **Fails closed:** if the counter can't be reached, the request is refused
+  rather than let through, because this is the guard on the budget.
+- **Unreachable from clients:** the table has RLS on with zero policies, and
+  `consume_message` has `EXECUTE` revoked from `public`, `anon` and
+  `authenticated`. Only the service role calls it.
+- **Anonymous identity** is the httpOnly `session_id` cookie. Clearing
+  cookies or using incognito gives a fresh bucket; the global cap is the
+  backstop for that.
+- **Showing the allowance:** `getRemainingMessages()` reads the counter
+  without writing anything (a Server Component can't set the cookie), and
+  doesn't look at the global one. The global limit only shows up as the
+  "tutor is resting" notice when someone actually sends.
 
 ## 8. Frontend
 
 ### 8.1 `app/page.tsx` (Server Component)
 
 - Loads the user, level, persona (the conversation's own, or the default —
-  `resolvePersona()`), remaining anonymous messages, conversation list, the
+  `resolvePersona()`), the remaining daily messages, conversation list, the
   requested conversation (`?c=<id>`, `?c=new`, or the latest by default), and
   its messages.
 - `toUIMessages()` rebuilds stored rows into `LangTutorUIMessage` without any
@@ -588,7 +650,8 @@ only exists to protect a free Groq quota.
 ### 8.3 Other surfaces
 
 - `SiteHeader`: level select, chats menu (open, delete with confirm modal),
-  remaining-message indicator for anonymous visitors, theme toggle, sign
+  remaining-message indicator ("free trial" when signed out, "today" when
+  signed in), theme toggle, sign
   in/out. Now rendered as a sibling of the 860px content column, in its own
   1080px-wide wrapper (`app/chat.tsx`, `app/vocab/page.tsx`, `app/login/page.tsx`
   each changed their top-level layout for this), rather than nested inside
@@ -705,7 +768,8 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
 | `GROQ_API_KEY` | server | all LLM calls, evals |
 | `NEXT_PUBLIC_SUPABASE_URL` | public | all Supabase clients |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | browser, server and proxy clients |
-| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | `session_usage`, `token_usage` |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | `daily_usage`, `token_usage` |
+| `GLOBAL_DAILY_MESSAGE_CAP` | server, optional | messages the whole app serves per UTC day (`session.service.ts`); defaults to 300. Set it in Vercel as well as `.env.local` |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | server | planned (grammar RAG embeddings), unused |
 
 ### Deployment
@@ -720,6 +784,13 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
 - **Free-tier Supabase pauses after 7 days of inactivity.** When that happens
   the app fails to reach the database until the project is resumed in the
   dashboard.
+- **Email confirmation is configured in the Supabase dashboard, not in code:**
+  Authentication → "Confirm email" on, the "Confirm signup" template pasted
+  from `supabase/email-templates/confirm-signup.html` (it must contain
+  `{{ .Token }}`), and custom SMTP. The built-in Supabase mailer is for
+  testing only, with a very low hourly cap and restricted recipients, so
+  signups beyond the team won't get their code without custom SMTP and a
+  verified sending domain.
 
 ## 11. Design vs. implementation
 
@@ -728,7 +799,7 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
 
 | Originally designed | The code does |
 |---|---|
-| Rate limit for anonymous visitors only | As designed: 5-message lifetime cap (`session.service.ts`), signed-in users uncapped. A time-windowed signed-in cap is on the roadmap for before public launch |
+| Rate limit for anonymous visitors only: a 5-message lifetime cap, signed-in users uncapped | **Daily limits for everyone** (5 anonymous, 35 signed in, plus a global cap), counted per UTC day in `daily_usage` (§7.4). Added before launch, so a public domain doesn't expose the Groq budget |
 | Vocab extraction is deterministic (tokenize → lemmatize → stopwords) | **LLM-derived lemmas** from the gloss call. The deterministic stopword path and the chips were built and are now deprecated |
 | Vocab candidates shown as chips under each reply | Replaced by **+ buttons in a per-word hover/tap menu** (`GlossedText`); the candidate-chip path (`vocab-chips.tsx`, `getVocabCandidates`) stays deprecated |
 | `/app/api/vocab/*` REST routes | **Server Actions** (`app/vocab/actions.ts`) |
@@ -742,13 +813,18 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
 
 ## 12. Known limitations and tradeoffs
 
-- **Rate-limit race:** read-then-write, not an atomic increment, so two
-  simultaneous requests from one anonymous session can go one message over
-  the cap. Accepted at this scale.
-- **Authenticated users have no rate limit at all**, by original v1 design —
-  acceptable for a low-traffic personal project, but a real gap once the app
-  has a public domain. See the §11 row above; this is the one piece of the
-  public-launch checklist still open.
+- **An anonymous bucket resets when cookies are cleared.** The limit is keyed
+  on the `session_id` cookie, so incognito or clearing cookies gives a fresh 5
+  messages. The global cap bounds the damage; per-IP buckets are the next step
+  if it gets abused.
+- **Some model spend isn't counted against the daily limit:** starter-vocab
+  translations (`lib/starter-vocab/translate.ts`) call the model but don't
+  call `consumeMessage`.
+- **Verification doesn't stop throwaway inboxes.** A code proves the person
+  controls an address, not that it's a real one. A CAPTCHA on signup is the
+  usual next step.
+- **A message-limit counter outage locks everyone out.** `consumeMessage`
+  fails closed on purpose, so a Supabase hiccup reads as "tutor is resting".
 - **The persona has no avatar image.** `avatar_url` is `null` for the seeded
   row; `PersonaAvatar` falls back to an initial badge everywhere. Several
   generated-art options were tried and rejected (see git history around
@@ -785,9 +861,12 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
   it if F4 goes another way.
 - **Starter words have no per-word translation in the source,** only a
   sentence and its translation; the word's meaning is generated when the
-  learner adds it. The source lists are Goethe-Institut material; the
-  licence for redistributing them hasn't been checked, and the parser leaves
-  some noise (a few conjugated headwords such as "packt ein").
+  learner adds it. The source lists are Goethe-Institut material,
+  reached through a third-party GitHub repo
+  (`ilkermeliksitki/goethe-institute-wordlist`) that declares no licence. The
+  Goethe PDFs assert copyright, so the right to ship these ~2,900 words and
+  example sentences hasn't been established. The parser also leaves some noise
+  (a few conjugated headwords such as "packt ein").
 - **Skipped starter words are remembered per browser only**, so another
   device can offer them again.
 - **No suspend / undo / leech handling yet** (F5). Suspending needs a way to
@@ -830,3 +909,14 @@ this is the index.
   `proxy` too). The old name still works but warns on every build. §2.
 - **supabase-js builds a Realtime client that throws on Node < 22.** That's why
   the service-role client is a bare `PostgrestClient`. §7.1.
+- **A confirmation link can be spent by an email scanner.** Corporate and
+  provider scanners open links before the person does, and `/auth/confirm`
+  verifies on a plain GET. That's why the email carries a code and the link is
+  only a fallback, and why a template carrying *both* is a trap: opening the
+  link uses up the code. §7.2.
+- **`signUp` for an existing address succeeds silently** with no session and no
+  new email, by design (no account enumeration). A user who "never got the
+  code" may simply already have an account. §7.2.
+- **`consume_message` is security definer with its execute grant revoked.**
+  The default `PUBLIC` grant would otherwise let any browser call it through
+  the REST API and burn another caller's allowance. §7.4.

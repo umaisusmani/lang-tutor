@@ -289,6 +289,10 @@ function ConfirmCodeScreen({
             >
               Use a different email
             </button>
+            <p className="text-ink-3">
+              Nothing in your inbox? If you already registered with this address, no new code is
+              sent. Use a different email, then choose &ldquo;Already have an account? Sign in&rdquo;.
+            </p>
           </div>
         </main>
       </div>

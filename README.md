@@ -13,7 +13,7 @@ German conversation practice with an AI tutor — currently a specific persona, 
 - **Vocab page** (`/vocab`). Your saved words as click-to-reveal cards, with a show-all/hide-all toggle — doubles as light self-testing. Remove the ones you no longer want.
 - **Flashcards** (`/vocab`). Every word you save becomes a flashcard. Press **Start session**: you see the German word, recall the meaning, flip the card, and say how well you knew it. The card comes back right before you'd forget it (spaced repetition, FSRS). A badge on the `vocab` link shows how many are due.
 - **Chat history.** Conversations are saved, with their corrections, translations and grammar explanations, and you can reopen or delete them from the chats menu. The logo always opens a new chat.
-- **Try before signing in.** You can send 5 messages without an account. Sign in with email/password or Google to keep going and save your progress.
+- **Try before signing in.** You can send 5 messages a day without an account. Sign in with email/password (you confirm the address with a code sent by email) or Google for 35 a day, and to save your progress.
 
 ## How a message is handled
 
@@ -70,7 +70,8 @@ npm run dev                  # http://localhost:3000
 | `GROQ_API_KEY` | Groq console → API Keys | All LLM calls |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API | Database and auth |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same page | Database and auth, as the signed-in user |
-| `SUPABASE_SERVICE_ROLE_KEY` | same page | Server-only: token-usage logs and the signed-out message cap. Never expose it to the browser. |
+| `SUPABASE_SERVICE_ROLE_KEY` | same page | Server-only: token-usage logs and the daily message counters. Never expose it to the browser. |
+| `GLOBAL_DAILY_MESSAGE_CAP` | optional | Messages the whole app serves per UTC day. Defaults to 300. |
 
 **Database:** run the migrations in [supabase/migrations/](supabase/migrations/) in order, either with `supabase db push` or by pasting each file into the Supabase SQL editor. They create every table with row-level security turned on.
 

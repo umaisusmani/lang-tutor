@@ -102,7 +102,7 @@ exposure. A free-tier Groq key has no spend surface at all.
 ```
 app/
   page.tsx                 Server Component: loads user, level, persona, conversation, saved lemmas; renders <Chat>
-  chat.tsx                 Client Component: useChat, messages, corrections, translation panels, word saving, explain-grammar
+  chat.tsx                 Client orchestrator: useChat, conversation state, word saving, explain-grammar
   layout.tsx               Root layout, fonts, <ConfirmProvider>, <AppToaster>
   globals.css              Tailwind v4 + theme tokens, gloss-panel transitions
   api/chat/route.ts        POST /api/chat — thin controller
@@ -119,7 +119,8 @@ app/
   review/page.tsx          redirects to /vocab (old links)
   login/page.tsx           Email/password + Google sign-in form, and the "enter the code"
                            screen (ConfirmCodeScreen) shown after signup
-  components/              PageHeader (SiteHeader plus level/theme state for /vocab),
+  components/              chat/ (thread, welcome state, composer and rate-limit UI),
+                           PageHeader (SiteHeader plus level/theme state for /vocab),
                            SiteHeader (level, chats menu, vocab link with due badge, sign-out; now a 1080px sibling of the
                            860px content column, not nested inside it), Brand, ConfirmModal, Toaster,
                            GlossedText (per-word hover/tap menu + save), TranslationPanel (sentence
@@ -600,7 +601,13 @@ so does a freshly generated grammar explanation (cached ones are free).
 - `<Chat key={conversation?.id ?? 'new'}>` remounts the client component when
   switching chats. `useChat` only reads `messages` as an initial value.
 
-### 8.2 `app/chat.tsx` (Client Component)
+### 8.2 Chat client (`app/chat.tsx` and `app/components/chat/`)
+
+`app/chat.tsx` owns state and side effects. The presentation layer lives in
+`app/components/chat/chat-content.tsx`: `ChatWelcome`, `ChatThread`, and
+`ChatComposer`. Keeping API streaming, optimistic persistence, and quota state
+in the orchestrator prevents leaf UI components from becoming alternate
+sources of truth while allowing them to change independently.
 
 - `useChat<LangTutorUIMessage>` with `onError` (toast) and `onData` (turns
   `data-notice` parts into toasts, using the notice source as the toast id so
@@ -624,8 +631,8 @@ so does a freshly generated grammar explanation (cached ones are free).
   anything the model returns. A card now shows for `usedEnglish` sentences
   too, labeled "in German" (a different color from a mistake-type label)
   rather than a grammar category — `hasCorrectionCard()` (`lib/correction-card.ts`)
-  decides whether a `Correction` has anything to render at all, used both here
-  and in `chat.service.ts`'s failure check (§4.3).
+  decides whether a `Correction` has anything to render at all, used both in
+  `ChatThread` and in `chat.service.ts`'s failure check (§4.3).
 - **Per-word reading is now `GlossedText`** (`app/components/glossed-text.tsx`,
   moved out of this file): hovering a word still shows a quick translation;
   clicking/tapping it pins a small menu with the dictionary form and a

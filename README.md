@@ -114,7 +114,7 @@ When you find a word the app gets wrong, add it as a case so it stays fixed.
 ```
 app/
   page.tsx               chat page: loads the conversation, persona, saved words, level
-  chat.tsx               the chat UI: messages, corrections, translation panels, saving
+  chat.tsx               chat state and side effects: streaming, saving, explanations
   api/chat/route.ts      the chat endpoint
   api/explain/route.ts   on-demand grammar explanations
   hooks/use-theme.ts     shared local theme store for client pages
@@ -122,7 +122,8 @@ app/
   conversations/         delete-chat action
   login/, auth/          sign-in pages, server actions, OAuth callback
   components/            header, logo, toasts, confirm dialog, per-word hover/tap menu,
-                         translation panel, persona avatar
+                         translation panel, persona avatar; chat/ contains the thread,
+                         welcome state and composer presentation
 lib/
   chat-request.ts        validates and bounds public chat requests before quota/model use
   prompts.ts             every system prompt, including LEMMA_RULES

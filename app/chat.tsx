@@ -1,68 +1,32 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { saveLevel } from '@/app/auth/actions';
-import { GlossedText } from '@/app/components/glossed-text';
-import { PersonaAvatar } from '@/app/components/persona-avatar';
+import {
+  ChatComposer,
+  ChatThread,
+  ChatWelcome,
+  type ExplanationRequest,
+  limitMessage,
+} from '@/app/components/chat/chat-content';
 import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
-import { TranslateButton, TranslationPanel } from '@/app/components/translation-panel';
 import { useTheme } from '@/app/hooks/use-theme';
-// DEPRECATED: import { VocabChips } from '@/app/components/vocab-chips';
 import { saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
-import { hasCorrectionCard } from '@/lib/correction-card';
-import type { ExplainKind } from '@/lib/explain';
 import type { WordGloss } from '@/lib/gloss';
-import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import type { PersonaProfile } from '@/lib/personas';
 import type { CefrLevel } from '@/lib/prompts';
-import { changedWordIndices, sentenceContaining } from '@/lib/text';
+import { sentenceContaining } from '@/lib/text';
 import type { Conversation, VocabSource } from '@/lib/types/db';
-
-const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
-  word_order: 'word order',
-  case_declension: 'case',
-  gender_article: 'gender / article',
-  verb_conjugation: 'verb conjugation',
-  auxiliary_verb: 'auxiliary verb',
-  preposition: 'preposition',
-  adjective_ending: 'adjective ending',
-  plural_form: 'plural form',
-  word_choice: 'word choice',
-  other: 'grammar',
-};
 
 const LEVEL_COOKIE = 'cefr_level';
 
 function writeLevelCookie(level: CefrLevel) {
   document.cookie = `${LEVEL_COOKIE}=${level}; path=/; max-age=31536000; SameSite=Lax`;
-}
-
-/**
- * When the daily allowance next resets (00:00 UTC), in the learner's own
- * clock. Only called from client-side events, never during the server render,
- * so the local formatting can't cause a hydration mismatch.
- */
-function resetTimeLabel(): string {
-  const now = new Date();
-  const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
-  return reset.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-/** What to tell someone the daily limit has stopped. */
-function limitMessage(reason: 'user' | 'global' | undefined, signedIn: boolean): string {
-  const resets = `Resets at ${resetTimeLabel()}.`;
-  if (reason === 'global') {
-    return `The tutor has hit its limit for today. ${resets}`;
-  }
-  return signedIn
-    ? `You've used today's messages. ${resets}`
-    : `You've used your free messages for today. ${resets} Or sign in to get more.`;
 }
 
 export default function Chat({
@@ -236,7 +200,7 @@ export default function Chat({
    */
   async function explain(
     key: string,
-    request: { kind: ExplainKind; messageId: string | null; text: string; original?: string },
+    request: ExplanationRequest,
   ) {
     if (explaining[key]) return;
     setExplaining((s) => ({ ...s, [key]: true }));
@@ -323,342 +287,44 @@ export default function Chat({
 
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
         {messages.length === 0 ? (
-          <main className="flex flex-1 flex-col justify-center gap-[26px] py-10">
-            <div className="flex flex-col gap-2.5">
-              <span className="text-ink-3 font-mono text-[10px] tracking-[0.12em] uppercase">
-                level {level}
-                {remaining !== null && ` · ${remaining} ${userEmail ? 'messages left' : 'free messages'}`}
-              </span>
-              <div className="flex items-center gap-3">
-                <PersonaAvatar persona={persona} size={48} />
-                <div className="flex flex-col">
-                  <span className="text-[17px] font-bold">{persona.name}</span>
-                  <span className="text-ink-3 font-mono text-[11px]">
-                    {[persona.age, persona.city].filter((v) => v != null).join(' · ')}
-                  </span>
-                </div>
-              </div>
-              <h1 className="text-4xl leading-[1.05] font-extrabold tracking-[-0.025em]">
-                Sag einfach etwas.
-              </h1>
-              <p className="text-ink-2 max-w-[52ch] text-base leading-relaxed">
-                Chat with {persona.name} in German, however rough. Don&apos;t know a word? Just
-                write it in English and you&apos;ll see how to say it in German. Every reply comes
-                with a translation, and a correction when something&apos;s off.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              <span className="text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase">
-                or start with
-              </span>
-              {starters.map(([de, en]) => (
-                <button
-                  key={de}
-                  type="button"
-                  onClick={() => send(de)}
-                  className="border-line bg-panel hover:shadow-[3px_3px_0_var(--line)] flex cursor-pointer flex-col gap-[3px] rounded-[14px] border-2 px-4 py-3.5 text-left transition-transform hover:-translate-x-px hover:-translate-y-px"
-                >
-                  <span className="text-ink text-[17px]">{de}</span>
-                  <span className="text-ink-3 font-mono text-[11px]">{en}</span>
-                </button>
-              ))}
-            </div>
-
-            {remaining !== null && (
-              <div className="text-ink-3 flex items-center gap-2 font-mono text-[11px]">
-                <span className="bg-yellow text-on-bright rounded-[5px] px-[7px] py-0.5 font-medium">
-                  {messageCap} {userEmail ? 'per day' : 'free'}
-                </span>
-                <span>{userEmail ? 'messages today' : 'messages a day before signing in'}</span>
-              </div>
-            )}
-          </main>
+          <ChatWelcome
+            level={level}
+            remaining={remaining}
+            messageCap={messageCap}
+            signedIn={userEmail !== null}
+            starters={starters}
+            persona={persona}
+            onSend={send}
+          />
         ) : (
-          <main className="flex flex-1 flex-col gap-[34px] pt-[22px] pb-7">
-            {messages.map((message, msgIndex) => {
-              const replyGloss = message.parts.find((p) => p.type === 'data-gloss')?.data;
-              // DEPRECATED -- the save chips this fed are gone; words are now
-              // saved from the word menus. See vocab-chips.tsx.
-              // const vocabCandidates = message.parts.find(
-              //   (p) => p.type === 'data-vocabCandidates',
-              // )?.data;
-              const rateLimited = message.parts.find((p) => p.type === 'data-rateLimited')?.data;
-              const correctionPart = message.parts.find(
-                (p): p is Extract<typeof p, { type: 'data-correction' }> =>
-                  p.type === 'data-correction',
-              );
-              const correction =
-                correctionPart && hasCorrectionCard(correctionPart.data)
-                  ? correctionPart.data
-                  : undefined;
-              const dbIds = message.parts.find((p) => p.type === 'data-messageIds')?.data;
-              const storedExplanations = message.parts.find(
-                (p) => p.type === 'data-explanations',
-              )?.data;
-
-              const text = message.parts
-                .filter((p) => p.type === 'text')
-                .map((p) => p.text)
-                .join('\n');
-
-              if (rateLimited) {
-                return (
-                  <div
-                    key={message.id}
-                    className="border-line bg-yellow text-on-bright flex flex-col items-start gap-2 rounded-[18px] border-2 p-6 shadow-[4px_4px_0_var(--line)]"
-                  >
-                    <span className="font-mono text-[10px] tracking-[0.12em] uppercase">
-                      {rateLimited.reason === 'global'
-                        ? 'tutor is resting'
-                        : `${rateLimited.cap} of ${rateLimited.cap} messages`}
-                    </span>
-                    <h2 className="text-[26px] font-extrabold tracking-[-0.02em]">
-                      Das war&apos;s für heute.
-                    </h2>
-                    <p className="max-w-[46ch] text-[15px] leading-[1.55]">
-                      {limitMessage(rateLimited.reason, rateLimited.signedIn)}
-                    </p>
-                    {!rateLimited.signedIn && (
-                      <Link
-                        href="/login"
-                        className="bg-ink text-paper mt-2 rounded-full px-5 py-2.5 text-[15px] font-bold no-underline transition-transform hover:translate-x-px hover:translate-y-px"
-                      >
-                        Sign in →
-                      </Link>
-                    )}
-                  </div>
-                );
-              }
-
-              if (message.role === 'user') {
-                return (
-                  <div key={message.id} className="flex justify-end">
-                    <div className="border-line bg-accent text-on-accent max-w-[82%] rounded-[18px_18px_5px_18px] border-2 px-4 py-[11px] text-[17px] leading-[1.45] whitespace-pre-wrap shadow-[3px_3px_0_var(--line)]">
-                      {text}
-                    </div>
-                  </div>
-                );
-              }
-
-              const priorUserText =
-                msgIndex > 0
-                  ? messages[msgIndex - 1].parts
-                      .filter((p) => p.type === 'text')
-                      .map((p) => p.text)
-                      .join(' ')
-                  : '';
-
-              const replyKey = `${message.id}-reply`;
-              const corrKey = `${message.id}-corr`;
-              const replyOpen = openPanel[replyKey] ?? false;
-              const corrOpen = openPanel[corrKey] ?? false;
-              // `busy` stays true after the reply text finishes: the response
-              // is held open until the gloss and correction have been written,
-              // so this also means "its attachments may still be coming".
-              const inFlight = busy && msgIndex === messages.length - 1;
-              // The reply text itself still arriving -- narrower than inFlight.
-              const textStreaming = message.parts.some(
-                (p) => p.type === 'text' && p.state === 'streaming',
-              );
-
-              // The correction check's state, made visible either way so a
-              // missing card can't be mistaken for "no mistake" (QA's
-              // "correction came missing" report): pending while in flight,
-              // then a card or "✓ no corrections". A failed check writes no
-              // part and toasts instead.
-              const checking = inFlight && !correctionPart && priorUserText.trim() !== '';
-              const checkedClean =
-                !!correctionPart &&
-                !correctionPart.data.hasMistake &&
-                !correctionPart.data.usedEnglish;
-
-              return (
-                <div key={message.id} className="flex max-w-[92%] items-start gap-3">
-                  <PersonaAvatar persona={persona} size={32} className="mt-[3px]" />
-
-                  <div className="flex min-w-0 flex-1 flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1 text-[19px] leading-[1.6]">
-                          <GlossedText
-                            text={text}
-                            words={replyGloss?.words}
-                            canSave={canSave}
-                            isSaved={isSaved}
-                            onSave={(entry) => saveWord(entry, 'new_word', text)}
-                          />
-                          {textStreaming && (
-                            <span className="bg-accent ml-[3px] inline-block h-[18px] w-[9px] animate-[blink_1s_step-end_infinite] align-[-3px]" />
-                          )}
-                        </div>
-                        {replyGloss ? (
-                          <TranslateButton
-                            open={replyOpen}
-                            onToggle={() => setOpenPanel((s) => ({ ...s, [replyKey]: !replyOpen }))}
-                            className="mt-[5px]"
-                          />
-                        ) : (
-                          inFlight && (
-                            <TranslateButton
-                              open={false}
-                              pending
-                              onToggle={() => {}}
-                              className="mt-[5px]"
-                            />
-                          )
-                        )}
-                      </div>
-
-                      {replyGloss && (
-                        <TranslationPanel
-                          open={replyOpen}
-                          translation={replyGloss.translation}
-                          explanation={explanations[replyKey] ?? storedExplanations?.reply ?? undefined}
-                          explaining={explaining[replyKey] ?? false}
-                          onExplain={() =>
-                            explain(replyKey, {
-                              kind: 'reply',
-                              messageId: dbIds?.assistant ?? null,
-                              text,
-                            })
-                          }
-                        />
-                      )}
-                    </div>
-
-                    {checking && (
-                      <span className="text-ink-3 animate-[fade-rise_240ms_ease-out] font-mono text-[10px] tracking-[0.06em]">
-                        checking your German…
-                      </span>
-                    )}
-                    {checkedClean && (
-                      <span className="text-ink-3 animate-[fade-rise_240ms_ease-out] font-mono text-[10px] tracking-[0.06em]">
-                        ✓ no corrections
-                      </span>
-                    )}
-
-                    {correction && correction.correction && (
-                      <div className="border-line bg-panel relative animate-[fade-rise_240ms_ease-out] rounded-[14px] border-2 px-4 pt-[18px] pb-3.5 shadow-[3px_3px_0_var(--line)]">
-                        {/* A mistake gets its type; English-only gets "in
-                            German" in yellow, so it doesn't read as an error --
-                            using English was invited. */}
-                        <span
-                          className={`border-line text-on-bright absolute -top-[11px] left-3.5 rounded-md border-2 px-2 py-px font-mono text-[10px] tracking-[0.08em] uppercase ${
-                            correction.hasMistake ? 'bg-orange' : 'bg-yellow'
-                          }`}
-                        >
-                          {correction.hasMistake
-                            ? correction.mistakeType
-                              ? MISTAKE_TYPE_LABELS[correction.mistakeType]
-                              : 'grammar'
-                            : 'in German'}
-                        </span>
-
-                        <div className="flex items-start gap-3">
-                          {/* 'mistake', not 'new_word': a word met in a
-                              correction is one the learner got wrong (or
-                              didn't know), and /vocab can treat those
-                              differently. */}
-                          <GlossedText
-                            className="flex-1 text-[18px] leading-[1.6]"
-                            text={correction.correction}
-                            words={correction.correctionGloss ?? undefined}
-                            highlight={changedWordIndices(priorUserText, correction.correction)}
-                            canSave={canSave}
-                            isSaved={isSaved}
-                            onSave={(entry) =>
-                              saveWord(entry, 'mistake', correction.correction ?? '')
-                            }
-                          />
-                          <TranslateButton
-                            open={corrOpen}
-                            onToggle={() => setOpenPanel((s) => ({ ...s, [corrKey]: !corrOpen }))}
-                            className="mt-[3px]"
-                          />
-                        </div>
-
-                        <div className="mt-3">
-                          <TranslationPanel
-                            open={corrOpen}
-                            translation={correction.correctionTranslation ?? null}
-                            explanation={
-                              explanations[corrKey] ?? storedExplanations?.correction ?? undefined
-                            }
-                            explaining={explaining[corrKey] ?? false}
-                            onExplain={() =>
-                              explain(corrKey, {
-                                kind: 'correction',
-                                messageId: dbIds?.user ?? null,
-                                text: correction.correction ?? '',
-                                original: priorUserText,
-                              })
-                            }
-                          />
-                        </div>
-
-                        <p className="text-ink-2 mt-3 font-mono text-[12.5px] leading-[1.6]">
-                          {correction.explanation}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* DEPRECATED: {vocabCandidates && <VocabChips candidates={vocabCandidates} />} */}
-                  </div>
-                </div>
-              );
-            })}
-
-            {status === 'submitted' && (
-              <div className="flex max-w-[92%] items-start gap-3">
-                <PersonaAvatar persona={persona} size={32} className="mt-[3px]" />
-                <div className="text-[19px] leading-[1.6]">
-                  <span className="bg-accent inline-block h-[18px] w-[9px] animate-[blink_1s_step-end_infinite] align-[-3px]" />
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <p className="font-mono text-[12.5px] text-red-600 dark:text-red-400">
-                Etwas ist schiefgelaufen. Bitte versuch es noch einmal.
-              </p>
-            )}
-          </main>
+          <ChatThread
+            messages={messages}
+            status={status}
+            error={error}
+            persona={persona}
+            openPanels={openPanel}
+            explanations={explanations}
+            explaining={explaining}
+            canSave={canSave}
+            isSaved={isSaved}
+            onTogglePanel={(key) =>
+              setOpenPanel((current) => ({ ...current, [key]: !current[key] }))
+            }
+            onSaveWord={saveWord}
+            onExplain={explain}
+          />
         )}
 
         <div ref={bottomRef} />
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(input);
-          }}
-          className="bg-paper sticky bottom-0 flex flex-col gap-3 pt-3 pb-6"
-        >
-          <div className="bg-line h-0.5 opacity-50" />
-          <div className="flex items-center gap-2.5">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.currentTarget.value)}
-              disabled={capped}
-              placeholder={
-                capped
-                  ? userEmail
-                    ? 'Back tomorrow'
-                    : 'Sign in to keep going'
-                  : 'Schreib auf Deutsch… English words are fine too'
-              }
-              className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
-            />
-            <button
-              type="submit"
-              disabled={busy || capped || !input.trim()}
-              className="border-line bg-ink text-paper hover:bg-accent hover:text-on-accent flex-none cursor-pointer rounded-full border-2 px-[22px] py-3 text-[15px] font-bold transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:opacity-40"
-            >
-              Senden
-            </button>
-          </div>
-        </form>
+        <ChatComposer
+          input={input}
+          busy={busy}
+          capped={capped}
+          signedIn={userEmail !== null}
+          onInputChange={setInput}
+          onSend={send}
+        />
       </div>
     </div>
   );

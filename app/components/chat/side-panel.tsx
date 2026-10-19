@@ -198,20 +198,24 @@ export function ChatSidePanel({
     }
   }
 
-  if (!open) return null;
-
   return (
     <>
-      <button
-        type="button"
-        aria-label="Close tools panel"
-        onClick={onClose}
-        className="fixed inset-0 z-30 cursor-default bg-black/30 lg:hidden"
-      />
+      {open && (
+        <button
+          type="button"
+          aria-label="Close learning panel"
+          onClick={onClose}
+          className="fixed inset-0 z-30 cursor-default bg-black/30 transition-opacity duration-300 motion-reduce:transition-none"
+        />
+      )}
       <aside
         id="chat-side-panel"
         aria-label="German learning tools"
-        className="border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,390px)] flex-col border-l-2 shadow-[-5px_0_18px_rgb(0_0_0/0.12)] lg:w-[360px]"
+        aria-hidden={!open}
+        inert={!open}
+        className={`border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,390px)] flex-col border-l-2 shadow-[-5px_0_18px_rgb(0_0_0/0.12)] transition-transform duration-300 ease-out motion-reduce:transition-none lg:w-[360px] ${
+          open ? 'translate-x-0' : 'translate-x-full'
+        }`}
       >
         <div className="border-hair flex items-center gap-3 border-b-2 px-4 py-3">
           <div className="min-w-0 flex-1">

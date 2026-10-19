@@ -350,6 +350,7 @@ export default function Chat({
             signedIn={userEmail !== null}
             onInputChange={setInput}
             onSend={send}
+            onOpenHelp={() => setSidePanelOpen(true)}
           />
         </div>
 

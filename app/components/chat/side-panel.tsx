@@ -211,7 +211,7 @@ export function ChatSidePanel({
       <aside
         id="chat-side-panel"
         aria-label="German learning tools"
-        className="border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,390px)] flex-col border-l-2 shadow-[-5px_0_18px_rgb(0_0_0/0.12)] lg:sticky lg:top-[112px] lg:z-auto lg:my-3 lg:h-[calc(100dvh-128px)] lg:w-[360px] lg:flex-none lg:rounded-[16px] lg:border-2 lg:shadow-[3px_3px_0_var(--line)]"
+        className="border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,390px)] flex-col border-l-2 shadow-[-5px_0_18px_rgb(0_0_0/0.12)] lg:w-[360px]"
       >
         <div className="border-hair flex items-center gap-3 border-b-2 px-4 py-3">
           <div className="min-w-0 flex-1">
@@ -221,10 +221,10 @@ export function ChatSidePanel({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close tools panel"
-            className="text-ink-2 hover:bg-soft rounded-lg px-2 py-1 font-mono text-xs lg:hidden"
+            aria-label="Close learning panel"
+            className="border-hair text-ink-2 hover:bg-yellow hover:text-on-bright flex h-8 w-8 items-center justify-center rounded-lg border-2 font-mono text-lg leading-none"
           >
-            close
+            ›
           </button>
         </div>
 

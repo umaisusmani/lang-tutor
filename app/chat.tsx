@@ -296,19 +296,18 @@ export default function Chat({
       />
 
       <div
-        className={`relative flex w-full flex-1 gap-4 ${
-          sidePanelOpen ? 'max-w-[1240px] justify-start' : 'max-w-[1240px] justify-center'
-        }`}
+        className="relative flex w-full max-w-[1240px] flex-1 justify-center"
       >
         {!sidePanelOpen && (
           <button
             type="button"
+            aria-label="Open learning panel"
             aria-controls="chat-side-panel"
             aria-expanded={false}
             onClick={() => setSidePanelOpen(true)}
-            className="border-line bg-yellow text-on-bright fixed top-1/2 right-3 z-20 -translate-y-1/2 rounded-full border-2 px-3 py-2 font-mono text-xs font-bold shadow-[2px_2px_0_var(--line)] transition-transform hover:translate-x-[-2px] lg:absolute lg:top-[34%] lg:right-0 lg:translate-y-0"
+            className="border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 w-8 -translate-y-1/2 items-center justify-center rounded-l-xl border-2 border-r-0 text-lg shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright"
           >
-            ask for help
+            ‹
           </button>
         )}
         <div className="flex min-w-0 max-w-[860px] flex-1 flex-col">

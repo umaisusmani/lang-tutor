@@ -57,7 +57,7 @@ Next.js 16 (App Router) · TypeScript · Tailwind CSS · Vercel AI SDK · Groq �
 
 ## Run locally
 
-You need Node 20+, a [Groq](https://console.groq.com) API key (the free tier works), and a [Supabase](https://supabase.com) project.
+You need Node 22+, a [Groq](https://console.groq.com) API key (the free tier works), and a [Supabase](https://supabase.com) project.
 
 ```bash
 npm install
@@ -105,7 +105,7 @@ npm run eval -- reply        # just the reply prompt (level limits, question rat
 
 Each case prints ✓ or ✗ with the wrong lemmas listed, and the runner exits with an error if any case fails. The gloss suite takes a few minutes on Groq's free tier because it waits out the per-minute token limit instead of failing.
 
-**Nothing runs this automatically.** The only CI workflow checks whether the docs are behind the code, and there's no git hook — run it yourself after any change to `lib/prompts.ts`, `lib/gloss.ts` or `lib/tutor.ts`, before you commit.
+**The model evals do not run automatically** because they make real Groq calls. CI does run the deterministic unit tests, lint, and production build, plus the documentation-status check. Run the relevant eval suite yourself after any change to `lib/prompts.ts`, `lib/gloss.ts` or `lib/tutor.ts`.
 
 When you find a word the app gets wrong, add it as a case so it stays fixed.
 
@@ -117,12 +117,14 @@ app/
   chat.tsx               the chat UI: messages, corrections, translation panels, saving
   api/chat/route.ts      the chat endpoint
   api/explain/route.ts   on-demand grammar explanations
+  hooks/use-theme.ts     shared local theme store for client pages
   vocab/                 the saved-words page (click-to-reveal cards) and its server actions
   conversations/         delete-chat action
   login/, auth/          sign-in pages, server actions, OAuth callback
   components/            header, logo, toasts, confirm dialog, per-word hover/tap menu,
                          translation panel, persona avatar
 lib/
+  chat-request.ts        validates and bounds public chat requests before quota/model use
   prompts.ts             every system prompt, including LEMMA_RULES
   reply.ts               the reply call's shared model/prompt settings
   explain.ts             the on-demand grammar-explanation call

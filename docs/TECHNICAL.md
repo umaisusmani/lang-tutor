@@ -124,7 +124,9 @@ app/
                            860px content column, not nested inside it), Brand, ConfirmModal, Toaster,
                            GlossedText (per-word hover/tap menu + save), TranslationPanel (sentence
                            translation + explain-grammar), PersonaAvatar, vocab-chips (DEPRECATED)
+  hooks/use-theme.ts       Shared localStorage-backed theme store for chat and non-chat headers
 lib/
+  chat-request.ts          Runtime validation, request limits, and text-only model-history sanitizer
   prompts.ts               Every system prompt: persona + level + turn-by-turn question guidance for
                            the reply, STRICTNESS_BY_LEVEL + English-stand-in rules for the correction,
                            buildGlossSystemPrompt, buildGrammarExplanationPrompt, LEMMA_RULES
@@ -151,7 +153,7 @@ lib/
                            Currently unused by the UI; kept for typed/grammar cards (F4)
   text.ts                  stripPunctuation, changedWordIndices, sentenceContaining (moved out of
                            chat.tsx / glossed-text.tsx so the server can use them)
-  *.test.ts                Unit tests for srs, cloze and text (`npm test`)
+  *.test.ts                Unit tests for request validation, srs, cloze and text (`npm test`)
   stopwords.ts             DEPRECATED (only used by the deprecated chips)
   services/                One module per table, plus chat.service (orchestration), persona.service,
                            card.service (review queue, due count, recordReview over cards + review_logs)
@@ -166,7 +168,7 @@ evals/                     cases.ts (24 correction cases, now incl. English-stan
                            and tense limits, helper-phrasing check, question-share over a scripted chat)
 scripts/run-evals.ts       Eval runner — correction | gloss | reply
 scripts/docs-status.sh     `npm run docs:status`: code commits the docs haven't caught up with
-.github/workflows/         docs-sync.yml runs docs-status.sh on every push (warning only)
+.github/workflows/         docs-sync.yml warns on stale docs; quality.yml requires test/lint/build
 supabase/migrations/       0001 schema + RLS, 0002 gloss endpoint, 0003 annotations + titles,
                            0004 personas + persona_id + grammar_explanation + 'explain' usage endpoint,
                            0005 flashcards (cards, review_logs, vocab-card trigger, record_review, timezone),
@@ -198,9 +200,14 @@ app/ (controllers, UI)  →  lib/services/*  →  lib/supabase/*  →  Postgres
 
 ### 4.1 `app/api/chat/route.ts` (controller)
 
-1. Parse `{ messages, conversationId, level }` from the body. The client sends
-   the whole message list, as `useChat` does by default, plus the level
-   currently shown in its own UI.
+1. Read a body of at most 128,000 characters, then validate
+   `{ messages, conversationId, level }` with `lib/chat-request.ts`. The client
+   sends the whole message list, as `useChat` does by default, plus the level
+   currently shown in its own UI. Validation caps the transcript at 40
+   messages / 48,000 text characters, requires a final non-empty user message,
+   validates the optional conversation UUID and CEFR level, and discards all
+   UI-only data parts before the history reaches the model. Invalid requests
+   return 400/413 before authentication, quota use, persistence, or Groq.
 2. `getCurrentUserId()` uses `supabase.auth.getUser()`, which checks the token
    with Supabase instead of trusting the cookie.
 3. **Daily limit, for everyone:** `consumeMessage(userId)` takes one message
@@ -755,9 +762,11 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
 - Gloss cases run one at a time and take a few minutes. The reply suite's
   question-share check runs its 8 turns sequentially (each depends on the
   previous reply, for `buildTurnGuidance`), so it's not parallelizable either.
-- **Nothing runs evals automatically.** CI (`.github/workflows/docs-sync.yml`)
-  only checks whether this doc is behind the code, and no git hook runs evals.
-  Run them after any change to `lib/prompts.ts`, `lib/tutor.ts` or `lib/gloss.ts`.
+- **Nothing runs model evals automatically.** They make real Groq calls. CI
+  runs deterministic unit tests, lint, and a production build in
+  `quality.yml`, while `docs-sync.yml` checks whether this doc is behind the
+  code. Run the relevant eval suite after any change to `lib/prompts.ts`,
+  `lib/tutor.ts` or `lib/gloss.ts`.
 
 ## 10. Configuration and deployment
 

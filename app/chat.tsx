@@ -10,6 +10,7 @@ import { PersonaAvatar } from '@/app/components/persona-avatar';
 import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
 import { TranslateButton, TranslationPanel } from '@/app/components/translation-panel';
+import { useTheme } from '@/app/hooks/use-theme';
 // DEPRECATED: import { VocabChips } from '@/app/components/vocab-chips';
 import { saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
@@ -37,9 +38,6 @@ const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
 };
 
 const LEVEL_COOKIE = 'cefr_level';
-const THEME_KEY = 'starfinch_theme';
-/** Pre-rename key, still read so a theme chosen before the rename survives it. */
-const LEGACY_THEME_KEY = 'starprache_theme';
 
 function writeLevelCookie(level: CefrLevel) {
   document.cookie = `${LEVEL_COOKIE}=${level}; path=/; max-age=31536000; SameSite=Lax`;
@@ -96,7 +94,7 @@ export default function Chat({
 }) {
   const [input, setInput] = useState('');
   const [level, setLevel] = useState<CefrLevel>(initialLevel);
-  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
+  const { theme, toggleTheme } = useTheme();
   const [remaining, setRemaining] = useState(initialRemaining);
   // Which translation panels are open, keyed `${message.id}-reply` / `-corr`.
   const [openPanel, setOpenPanel] = useState<Record<string, boolean>>({});
@@ -160,19 +158,6 @@ export default function Chat({
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY);
-      if (stored === 'light' || stored === 'dark') setTheme(stored);
-    } catch {
-      // Private mode or blocked storage -- stay on the system preference.
-    }
-  }, []);
-
-  useEffect(() => {
-    if (theme) document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, status]);
 
@@ -182,23 +167,6 @@ export default function Chat({
   // panels stay exactly as they were: words and translations, no buttons.
   const canSave = userEmail !== null;
   const isSaved = (lemma: string) => savedLemmas.has(lemma.toLowerCase());
-
-  function toggleTheme() {
-    const next =
-      theme === 'dark'
-        ? 'light'
-        : theme === 'light'
-          ? 'dark'
-          : window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'light'
-            : 'dark';
-    setTheme(next);
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      // Not persisting is survivable; the toggle still works for this session.
-    }
-  }
 
   function handleLevelChange(next: CefrLevel) {
     setLevel(next);

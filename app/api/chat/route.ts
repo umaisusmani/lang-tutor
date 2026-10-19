@@ -2,8 +2,8 @@ import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
 import { cookies } from 'next/headers';
 
 import type { LangTutorUIMessage } from '@/lib/chat-types';
+import { MAX_CHAT_BODY_CHARS, parseChatRequest } from '@/lib/chat-request';
 import { runChatTurn, startChatTurn } from '@/lib/services/chat.service';
-import { isCefrLevel } from '@/lib/prompts';
 import {
   getCurrentUserId,
   resolveCefrLevel,
@@ -18,15 +18,27 @@ import { consumeMessage } from '@/lib/services/session.service';
  * lib/services/chat.service.ts.
  */
 export async function POST(req: Request) {
-  const {
-    messages,
-    conversationId,
-    level: requestedLevel,
-  }: {
-    messages: LangTutorUIMessage[];
-    conversationId?: string | null;
-    level?: string;
-  } = await req.json();
+  const declaredLength = Number(req.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_CHAT_BODY_CHARS) {
+    return Response.json({ error: 'Request is too large.' }, { status: 413 });
+  }
+
+  const raw = await req.text();
+  if (raw.length > MAX_CHAT_BODY_CHARS) {
+    return Response.json({ error: 'Request is too large.' }, { status: 413 });
+  }
+
+  let input: unknown;
+  try {
+    input = JSON.parse(raw);
+  } catch {
+    return Response.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  const parsed = parseChatRequest(input);
+  if (!parsed) return Response.json({ error: 'Invalid request.' }, { status: 400 });
+
+  const { messages, conversationId, level: requestedLevel } = parsed;
 
   const userId = await getCurrentUserId();
 
@@ -57,7 +69,7 @@ export async function POST(req: Request) {
   // validated like the cookie is, since it ends up in a system prompt.
   const levelCookie = (await cookies()).get('cefr_level')?.value;
   const storedLevel = await resolveCefrLevel(userId, levelCookie);
-  const level = isCefrLevel(requestedLevel) ? requestedLevel : storedLevel;
+  const level = requestedLevel ?? storedLevel;
 
   // Keep the profile in step, so the next page load opens at this level even
   // if the dropdown's own save was the one that got lost.

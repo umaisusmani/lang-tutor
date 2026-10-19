@@ -1,15 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { saveLevel } from '@/app/auth/actions';
 import { SiteHeader } from '@/app/components/site-header';
+import { useTheme } from '@/app/hooks/use-theme';
 import type { CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
-
-const THEME_KEY = 'starfinch_theme';
-/** Pre-rename key, still read so a theme chosen before the rename survives it. */
-const LEGACY_THEME_KEY = 'starprache_theme';
 
 /** The header for the pages that aren't the chat (/vocab): the same
  * SiteHeader, with the level and theme state the chat page keeps for itself. */
@@ -29,38 +26,7 @@ export function PageHeader({
   dueCount: number;
 }) {
   const [level, setLevel] = useState<CefrLevel>(initialLevel);
-  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY);
-      if (stored === 'light' || stored === 'dark') setTheme(stored);
-    } catch {
-      // Ignore storage errors and keep the browser/system preference.
-    }
-  }, []);
-
-  useEffect(() => {
-    if (theme) document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  function toggleTheme() {
-    const next =
-      theme === 'dark'
-        ? 'light'
-        : theme === 'light'
-          ? 'dark'
-          : window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'light'
-            : 'dark';
-
-    setTheme(next);
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      // Storage can be unavailable; the toggle still works for the session.
-    }
-  }
+  const { theme, toggleTheme } = useTheme();
 
   function handleLevelChange(next: CefrLevel) {
     setLevel(next);

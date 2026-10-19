@@ -293,15 +293,24 @@ export default function Chat({
         onThemeToggle={toggleTheme}
         activePage="chat"
         dueCount={dueCount}
-        sidePanelOpen={sidePanelOpen}
-        onSidePanelToggle={() => setSidePanelOpen((open) => !open)}
       />
 
       <div
-        className={`flex w-full flex-1 gap-4 ${
-          sidePanelOpen ? 'max-w-[1240px]' : 'max-w-[860px]'
+        className={`relative flex w-full flex-1 gap-4 ${
+          sidePanelOpen ? 'max-w-[1240px] justify-start' : 'max-w-[1240px] justify-center'
         }`}
       >
+        {!sidePanelOpen && (
+          <button
+            type="button"
+            aria-controls="chat-side-panel"
+            aria-expanded={false}
+            onClick={() => setSidePanelOpen(true)}
+            className="border-line bg-yellow text-on-bright fixed top-1/2 right-3 z-20 -translate-y-1/2 rounded-full border-2 px-3 py-2 font-mono text-xs font-bold shadow-[2px_2px_0_var(--line)] transition-transform hover:translate-x-[-2px] lg:absolute lg:top-[34%] lg:right-0 lg:translate-y-0"
+          >
+            ask for help
+          </button>
+        )}
         <div className="flex min-w-0 max-w-[860px] flex-1 flex-col">
           {messages.length === 0 ? (
             <ChatWelcome

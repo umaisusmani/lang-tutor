@@ -25,8 +25,6 @@ export function SiteHeader({
   onThemeToggle,
   activePage = 'chat',
   dueCount = 0,
-  sidePanelOpen = false,
-  onSidePanelToggle,
 }: {
   level: CefrLevel;
   onLevelChange: (next: CefrLevel) => void;
@@ -41,8 +39,6 @@ export function SiteHeader({
   activePage?: 'chat' | 'vocab';
   /** Cards waiting in the review queue; the badge on the vocab link. */
   dueCount?: number;
-  sidePanelOpen?: boolean;
-  onSidePanelToggle?: () => void;
 }) {
   const [chatsOpen, setChatsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -148,22 +144,6 @@ export function SiteHeader({
               ▾
             </span>
           </label>
-
-          {activePage === 'chat' && onSidePanelToggle && (
-            <button
-              type="button"
-              aria-expanded={sidePanelOpen}
-              aria-controls="chat-side-panel"
-              onClick={onSidePanelToggle}
-              className={`border-line rounded-full border-2 px-3 py-1 font-mono text-xs transition-colors duration-150 ${
-                sidePanelOpen
-                  ? 'bg-yellow text-on-bright'
-                  : 'text-ink-2 hover:bg-yellow hover:text-on-bright'
-              }`}
-            >
-              {sidePanelOpen ? 'close tools' : 'tools'}
-            </button>
-          )}
 
           {userEmail && (
             <div className="flex items-center gap-2.5">

@@ -1,4 +1,4 @@
-# starfinch — Roadmap
+# Starvogel — Roadmap
 
 The one place feature status is recorded. Design notes live in local
 `plans/*.md` files (not committed), and they don't carry status. What is

@@ -1,4 +1,4 @@
-# starfinch — Technical Documentation
+# Starvogel — Technical Documentation
 
 > State of the codebase as of 2026-10-15 (daily limits and email verification, on top of `7d0ab39`). This describes
 > what is **built**. Feature status is in [ROADMAP.md](../ROADMAP.md); design
@@ -38,7 +38,7 @@
 
 ## 1. System overview
 
-starfinch is a German conversation tutor: a specific persona (currently
+Starvogel is a German conversation tutor: a specific persona (currently
 "Ramanath", 24, Düsseldorf — see §6's `personas` table) the learner chats
 with in German at a chosen CEFR level (A1–C1). For every message the app
 makes **three LLM calls**:

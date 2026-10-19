@@ -1,4 +1,4 @@
-# starfinch
+# Starvogel
 
 German conversation practice with an AI tutor — currently a specific persona, Ramanath, 24, Düsseldorf. You chat in German at your CEFR level. Every reply comes with a whole-sentence and word-by-word translation, every mistake you make gets a correction with a plain-English explanation, and any word you tap can be saved to your own vocabulary list.
 

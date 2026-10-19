@@ -20,7 +20,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "starfinch",
+  title: "Starvogel",
   description: "Practice German conversation with an AI tutor that explains your mistakes.",
 };
 

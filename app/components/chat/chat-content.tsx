@@ -146,6 +146,7 @@ type ChatThreadProps = {
   onTogglePanel: (key: string) => void;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
   onExplain: (key: string, request: ExplanationRequest) => void;
+  onAskAboutText: (question: string) => void;
 };
 
 export function ChatThread({
@@ -161,6 +162,7 @@ export function ChatThread({
   onTogglePanel,
   onSaveWord,
   onExplain,
+  onAskAboutText,
 }: ChatThreadProps) {
   const busy = status === 'submitted' || status === 'streaming';
 
@@ -256,22 +258,35 @@ export function ChatThread({
                       <span className="bg-accent ml-[3px] inline-block h-[18px] w-[9px] animate-[blink_1s_step-end_infinite] align-[-3px]" />
                     )}
                   </div>
-                  {replyGloss ? (
-                    <TranslateButton
-                      open={replyOpen}
-                      onToggle={() => onTogglePanel(replyKey)}
-                      className="mt-[5px]"
-                    />
-                  ) : (
-                    inFlight && (
+                  <div className="flex flex-none items-start gap-1.5">
+                    {!textStreaming && text && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAskAboutText(`Can you explain this sentence: “${text.slice(0, 220)}”`)
+                        }
+                        className="text-ink-3 hover:bg-soft mt-[5px] rounded-lg px-1.5 py-1 font-mono text-[10px]"
+                      >
+                        ask
+                      </button>
+                    )}
+                    {replyGloss ? (
                       <TranslateButton
-                        open={false}
-                        pending
-                        onToggle={() => {}}
+                        open={replyOpen}
+                        onToggle={() => onTogglePanel(replyKey)}
                         className="mt-[5px]"
                       />
-                    )
-                  )}
+                    ) : (
+                      inFlight && (
+                        <TranslateButton
+                          open={false}
+                          pending
+                          onToggle={() => {}}
+                          className="mt-[5px]"
+                        />
+                      )
+                    )}
+                  </div>
                 </div>
 
                 {replyGloss && (
@@ -328,11 +343,24 @@ export function ChatThread({
                       isSaved={isSaved}
                       onSave={(entry) => onSaveWord(entry, 'mistake', correction.correction ?? '')}
                     />
-                    <TranslateButton
-                      open={correctionOpen}
-                      onToggle={() => onTogglePanel(correctionKey)}
-                      className="mt-[3px]"
-                    />
+                    <div className="flex flex-none items-start gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAskAboutText(
+                            `Why is “${correction.correction?.slice(0, 220)}” correct here?`,
+                          )
+                        }
+                        className="text-ink-3 hover:bg-soft mt-[3px] rounded-lg px-1.5 py-1 font-mono text-[10px]"
+                      >
+                        ask
+                      </button>
+                      <TranslateButton
+                        open={correctionOpen}
+                        onToggle={() => onTogglePanel(correctionKey)}
+                        className="mt-[3px]"
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-3">

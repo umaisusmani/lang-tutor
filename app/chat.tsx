@@ -11,6 +11,7 @@ import {
   type ExplanationRequest,
   limitMessage,
 } from '@/app/components/chat/chat-content';
+import { ChatSidePanel } from '@/app/components/chat/side-panel';
 import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
 import { useTheme } from '@/app/hooks/use-theme';
@@ -60,6 +61,9 @@ export default function Chat({
   const [level, setLevel] = useState<CefrLevel>(initialLevel);
   const { theme, toggleTheme } = useTheme();
   const [remaining, setRemaining] = useState(initialRemaining);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [askPrefill, setAskPrefill] = useState<{ id: number; text: string } | null>(null);
+  const askPrefillId = useRef(0);
   // Which translation panels are open, keyed `${message.id}-reply` / `-corr`.
   const [openPanel, setOpenPanel] = useState<Record<string, boolean>>({});
   // Grammar explanations fetched this session (same keys), and which are
@@ -266,6 +270,12 @@ export default function Chat({
     setRemaining((r) => (r === null ? null : Math.max(0, r - 1)));
   }
 
+  function askAboutText(text: string) {
+    askPrefillId.current += 1;
+    setAskPrefill({ id: askPrefillId.current, text });
+    setSidePanelOpen(true);
+  }
+
   return (
     // The header sits outside the 860px column, on its own 1080px track (see
     // SiteHeader) -- wider chrome, same readable line length for replies.
@@ -283,47 +293,69 @@ export default function Chat({
         onThemeToggle={toggleTheme}
         activePage="chat"
         dueCount={dueCount}
+        sidePanelOpen={sidePanelOpen}
+        onSidePanelToggle={() => setSidePanelOpen((open) => !open)}
       />
 
-      <div className="flex w-full max-w-[860px] flex-1 flex-col">
-        {messages.length === 0 ? (
-          <ChatWelcome
-            level={level}
-            remaining={remaining}
-            messageCap={messageCap}
+      <div
+        className={`flex w-full flex-1 gap-4 ${
+          sidePanelOpen ? 'max-w-[1240px]' : 'max-w-[860px]'
+        }`}
+      >
+        <div className="flex min-w-0 max-w-[860px] flex-1 flex-col">
+          {messages.length === 0 ? (
+            <ChatWelcome
+              level={level}
+              remaining={remaining}
+              messageCap={messageCap}
+              signedIn={userEmail !== null}
+              starters={starters}
+              persona={persona}
+              onSend={send}
+            />
+          ) : (
+            <ChatThread
+              messages={messages}
+              status={status}
+              error={error}
+              persona={persona}
+              openPanels={openPanel}
+              explanations={explanations}
+              explaining={explaining}
+              canSave={canSave}
+              isSaved={isSaved}
+              onTogglePanel={(key) =>
+                setOpenPanel((current) => ({ ...current, [key]: !current[key] }))
+              }
+              onSaveWord={saveWord}
+              onExplain={explain}
+              onAskAboutText={askAboutText}
+            />
+          )}
+
+          <div ref={bottomRef} />
+
+          <ChatComposer
+            input={input}
+            busy={busy}
+            capped={capped}
             signedIn={userEmail !== null}
-            starters={starters}
-            persona={persona}
+            onInputChange={setInput}
             onSend={send}
           />
-        ) : (
-          <ChatThread
-            messages={messages}
-            status={status}
-            error={error}
-            persona={persona}
-            openPanels={openPanel}
-            explanations={explanations}
-            explaining={explaining}
-            canSave={canSave}
-            isSaved={isSaved}
-            onTogglePanel={(key) =>
-              setOpenPanel((current) => ({ ...current, [key]: !current[key] }))
-            }
-            onSaveWord={saveWord}
-            onExplain={explain}
-          />
-        )}
+        </div>
 
-        <div ref={bottomRef} />
-
-        <ChatComposer
-          input={input}
-          busy={busy}
-          capped={capped}
-          signedIn={userEmail !== null}
-          onInputChange={setInput}
-          onSend={send}
+        <ChatSidePanel
+          open={sidePanelOpen}
+          messages={messages}
+          level={level}
+          remaining={remaining}
+          canSave={canSave}
+          isSaved={isSaved}
+          onSaveWord={saveWord}
+          onRemainingChange={setRemaining}
+          prefillQuestion={askPrefill}
+          onClose={() => setSidePanelOpen(false)}
         />
       </div>
     </div>

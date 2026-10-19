@@ -4,7 +4,7 @@ The one place feature status is recorded. Design notes live in local
 `plans/*.md` files (not committed), and they don't carry status. What is
 built, and how, is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-**Next up:** paste the confirmation email template and set up custom SMTP in Supabase (see `plans/limits-and-verification.md`), and settle the starter word-list licence before launch. Then the translate page, the ask panel, voice V0 (Groq Whisper transcription with an editable transcript), grammar RAG (v1 step 5), F3–F5, conversation-memory RAG.
+**Next up:** build the chat side panel. Start with contextual Ask and a Words view using glosses already present in the conversation; validate demand for a Topics view before adding it. The user reports launch prep is complete. Translate is lower priority and deferred. After the panel, improve tutor personalization from existing structured learner data, then evaluate semantic retrieval only if simpler methods miss relevant context. Voice features remain parked.
 
 Status: ✅ done · 🟡 partly done · ⬜ not started
 
@@ -23,9 +23,9 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Conversation history (reopen, delete) | ✅ | `75083e2`, `e73d23c` | Not in the original plan |
 | Eval suites: correction, gloss, reply | ✅ | `55896e5`, `875969f`, `69615a7` | |
 | Token usage logging | ✅ | `ad002cf` | `token_usage` table |
-| Grammar RAG (step 5) | ⬜ | | Pinecone + Gemini embeddings. Design: `plans/v1.md` |
-| Conversation memory RAG (step 6) | ⬜ | | Design: `plans/v1.md` |
-| UI pass + launch (step 7) | 🟡 | `5dc547b`, `69615a7` | Most UI shipped piecemeal. Launch checklist still open |
+| Tutor personalization, SQL-first | ⬜ | | Use existing mistake, vocab, review, and recent-conversation data to adapt prompts; define evals before changing behavior. Design: `plans/v1.md` |
+| Semantic retrieval (RAG) decision | ⬜ | | Optional follow-up only if SQL-first personalization misses relevant history in evals/user tests; compare simpler SQL/summary selection against vector search first. Design: `plans/v1.md` |
+| UI pass + launch (step 7) | ✅ | `5dc547b`, `69615a7` | User reports launch prep complete; continue polish from tester feedback |
 
 ## Phase 2 — practice beyond chat
 
@@ -34,15 +34,15 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Flashcards F1: schema, FSRS wrapper, tests | ✅ | `7c5fec0` | Migration `0005` applied 2026-10-08. Design: `plans/flashcards.md` |
 | Flashcards F2: Anki-style session on `/vocab`, due badge | ✅ | `372b424`, `80e837b` | "Start session" on the vocab page, flip card, 4 graded buttons with intervals, learning steps requeue in-session. `/review` redirects. "Practice 10 more" gives on-demand rounds past what's due. Timezone is saved from the browser. Reverse (English → German) cards need migration `0006` applied |
 | Starter vocab by level, offered as new-word cards with "add to my vocab" | 🟡 | `fa0dac0` | Goethe A1–B1 lists (~2,900 words), 3 per session, translated when added. Skips remembered per browser. Works, but the source repo has no licence and the Goethe PDFs assert copyright, so the lists shouldn't ship publicly until that's settled (permission from the Goethe-Institut, or swap in an openly licensed list) |
-| Flashcards F3: review cards inside chat | ⬜ | | Next after the RAG work is scoped; reuses the flip card |
+| Flashcards F3: review cards inside chat | ⬜ | | Reuses the flip card; sequence after initial learner feedback and personalization priorities are clearer |
 | Flashcards F4: grammar cards from repeated mistakes | ⬜ | | |
 | Flashcards F5: leeches, steering the tutor toward due words | ⬜ | | |
 | Personas | 🟡 | `69615a7` | One persona (Ramanath), pinned per conversation. No selector, no scenario personas, no avatar art. Design: `plans/phase2.md` |
 | Tutor-initiated topics | 🟡 | `69615a7` | Prompt only: brings up new topics, asks a question in about half of replies |
 | Recasting | 🟡 | `69615a7` | Only English stand-ins come back in German. Grammar mistakes aren't recast |
 | Level-gated glossing (B1+ tap to reveal) | ⬜ | | |
-| Ask side panel (questions about German, separate from the roleplay) | ⬜ | | Design: `plans/ask-panel.md` |
-| Translate page (`/translate`) | ⬜ | | Design: `plans/translate.md` |
+| Ask side panel (German-learning utilities, separate from roleplay) | 🟡 | | Compact Ask chat and Words view implemented; Topics deferred pending feedback. No RAG dependency. Design: `plans/ask-panel.md` |
+| Translate page (`/translate`) | ⬜ | | Deferred; lower priority than the in-chat utility panel per user |
 | On-demand grammar explanations | ✅ | `69615a7` | Not in the original plan. Saved to the message |
 
 ## Later

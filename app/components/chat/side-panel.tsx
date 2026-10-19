@@ -62,7 +62,6 @@ export function ChatSidePanel({
   isSaved,
   onSaveWord,
   onRemainingChange,
-  prefillQuestion,
   onClose,
 }: {
   open: boolean;
@@ -73,25 +72,15 @@ export function ChatSidePanel({
   isSaved: (lemma: string) => boolean;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
   onRemainingChange: (remaining: number) => void;
-  prefillQuestion: { id: number; text: string } | null;
   onClose: () => void;
 }) {
-  const [viewState, setViewState] = useState<{ prefillId: number; value: ToolView }>({
-    prefillId: 0,
-    value: 'ask',
-  });
-  const [draftState, setDraftState] = useState<{ prefillId: number; value: string }>({
-    prefillId: 0,
-    value: '',
-  });
+  const [view, setView] = useState<ToolView>('ask');
+  const [draft, setDraft] = useState('');
   const [turns, setTurns] = useState<PanelTurn[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [wordFilter, setWordFilter] = useState('');
   const transcriptRef = useRef<HTMLDivElement>(null);
-  const hasNewPrefill = !!prefillQuestion && viewState.prefillId !== prefillQuestion.id;
-  const view = hasNewPrefill ? 'ask' : viewState.value;
-  const draft = hasNewPrefill ? prefillQuestion.text.slice(0, 500) : draftState.value;
   const words = useMemo(() => collectWords(messages), [messages]);
   const visibleWords = useMemo(() => {
     const query = wordFilter.trim().toLocaleLowerCase();
@@ -117,11 +106,11 @@ export function ChatSidePanel({
   }, [turns, sending, view]);
 
   function changeView(next: ToolView) {
-    setViewState({ prefillId: prefillQuestion?.id ?? 0, value: next });
+    setView(next);
   }
 
   function changeDraft(value: string) {
-    setDraftState({ prefillId: prefillQuestion?.id ?? 0, value });
+    setDraft(value);
   }
 
   async function ask(question = draft) {

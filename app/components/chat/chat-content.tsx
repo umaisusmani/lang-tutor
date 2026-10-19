@@ -146,7 +146,6 @@ type ChatThreadProps = {
   onTogglePanel: (key: string) => void;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
   onExplain: (key: string, request: ExplanationRequest) => void;
-  onAskAboutText: (question: string) => void;
 };
 
 export function ChatThread({
@@ -162,7 +161,6 @@ export function ChatThread({
   onTogglePanel,
   onSaveWord,
   onExplain,
-  onAskAboutText,
 }: ChatThreadProps) {
   const busy = status === 'submitted' || status === 'streaming';
 
@@ -259,17 +257,6 @@ export function ChatThread({
                     )}
                   </div>
                   <div className="flex flex-none items-start gap-1.5">
-                    {!textStreaming && text && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onAskAboutText(`Can you explain this sentence: “${text.slice(0, 220)}”`)
-                        }
-                        className="text-ink-3 hover:bg-soft mt-[5px] rounded-lg px-1.5 py-1 font-mono text-[10px]"
-                      >
-                        ask
-                      </button>
-                    )}
                     {replyGloss ? (
                       <TranslateButton
                         open={replyOpen}
@@ -344,17 +331,6 @@ export function ChatThread({
                       onSave={(entry) => onSaveWord(entry, 'mistake', correction.correction ?? '')}
                     />
                     <div className="flex flex-none items-start gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onAskAboutText(
-                            `Why is “${correction.correction?.slice(0, 220)}” correct here?`,
-                          )
-                        }
-                        className="text-ink-3 hover:bg-soft mt-[3px] rounded-lg px-1.5 py-1 font-mono text-[10px]"
-                      >
-                        ask
-                      </button>
                       <TranslateButton
                         open={correctionOpen}
                         onToggle={() => onTogglePanel(correctionKey)}
@@ -419,7 +395,6 @@ export function ChatComposer({
   signedIn,
   onInputChange,
   onSend,
-  onOpenHelp,
 }: {
   input: string;
   busy: boolean;
@@ -427,7 +402,6 @@ export function ChatComposer({
   signedIn: boolean;
   onInputChange: (value: string) => void;
   onSend: (text: string) => void;
-  onOpenHelp: () => void;
 }) {
   return (
     <form
@@ -452,16 +426,6 @@ export function ChatComposer({
           }
           className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
         />
-        <button
-          type="button"
-          onClick={onOpenHelp}
-          aria-label="Ask for help with German"
-          title="Ask about German"
-          className="border-hair text-ink-2 hover:border-line hover:bg-yellow hover:text-on-bright flex h-10 w-10 flex-none items-center justify-center rounded-full border-2 font-mono text-xs font-bold transition-colors sm:h-auto sm:w-auto sm:px-3 sm:py-2.5"
-        >
-          <span className="sm:hidden">?</span>
-          <span className="hidden sm:inline">ask</span>
-        </button>
         <button
           type="submit"
           disabled={busy || capped || !input.trim()}

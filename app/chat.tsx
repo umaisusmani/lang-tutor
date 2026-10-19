@@ -62,8 +62,6 @@ export default function Chat({
   const { theme, toggleTheme } = useTheme();
   const [remaining, setRemaining] = useState(initialRemaining);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
-  const [askPrefill, setAskPrefill] = useState<{ id: number; text: string } | null>(null);
-  const askPrefillId = useRef(0);
   // Which translation panels are open, keyed `${message.id}-reply` / `-corr`.
   const [openPanel, setOpenPanel] = useState<Record<string, boolean>>({});
   // Grammar explanations fetched this session (same keys), and which are
@@ -270,12 +268,6 @@ export default function Chat({
     setRemaining((r) => (r === null ? null : Math.max(0, r - 1)));
   }
 
-  function askAboutText(text: string) {
-    askPrefillId.current += 1;
-    setAskPrefill({ id: askPrefillId.current, text });
-    setSidePanelOpen(true);
-  }
-
   return (
     // The header sits outside the 860px column, on its own 1080px track (see
     // SiteHeader) -- wider chrome, same readable line length for replies.
@@ -301,13 +293,13 @@ export default function Chat({
         {!sidePanelOpen && (
           <button
             type="button"
-            aria-label="Open learning panel"
+            aria-label="Open Ask learning panel"
             aria-controls="chat-side-panel"
             aria-expanded={false}
             onClick={() => setSidePanelOpen(true)}
-            className="border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 w-8 -translate-y-1/2 items-center justify-center rounded-l-xl border-2 border-r-0 text-lg shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright"
+            className="border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 -translate-y-1/2 items-center gap-1.5 rounded-l-xl border-2 border-r-0 py-2 pr-1 pl-2 font-mono text-[11px] shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright"
           >
-            ‹
+            <span>Ask</span><span aria-hidden="true" className="text-base leading-none">‹</span>
           </button>
         )}
         <div className="flex min-w-0 max-w-[860px] flex-1 flex-col">
@@ -337,7 +329,6 @@ export default function Chat({
               }
               onSaveWord={saveWord}
               onExplain={explain}
-              onAskAboutText={askAboutText}
             />
           )}
 
@@ -350,7 +341,6 @@ export default function Chat({
             signedIn={userEmail !== null}
             onInputChange={setInput}
             onSend={send}
-            onOpenHelp={() => setSidePanelOpen(true)}
           />
         </div>
 
@@ -363,7 +353,6 @@ export default function Chat({
           isSaved={isSaved}
           onSaveWord={saveWord}
           onRemainingChange={setRemaining}
-          prefillQuestion={askPrefill}
           onClose={() => setSidePanelOpen(false)}
         />
       </div>

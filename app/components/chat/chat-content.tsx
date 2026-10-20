@@ -358,7 +358,7 @@ export function ChatThread({
                     />
                   </div>
 
-                  <p className="text-ink-2 mt-3 font-mono text-[12.5px] leading-[1.6]">
+                  <p className="text-explain-ink mt-3 font-mono text-[12.5px] leading-[1.6]">
                     {correction.explanation}
                   </p>
                 </div>

@@ -185,6 +185,14 @@ Decide whether the message contains a genuine grammar mistake worth flagging.
 
 ${STRICTNESS_BY_LEVEL[level]}
 
+Do not flag spelling conventions by themselves. Treat missing German noun or
+sentence capitalization as acceptable. Learners may lack an umlaut keyboard:
+accept a plain a/o/u in place of ä/ö/ü, and ss in place of ß, when the intended
+word is clear from context. These are not grammar mistakes, wrong prepositions,
+or English stand-ins. For example, "Was ist das buch uber" should not get a
+correction just for "buch" and "uber". Do not rewrite an understandable
+message solely to make it more formal or idiomatic.
+
 IMPORTANT: You will see a fixed list of mistake categories below because you
 must classify into one of them WHEN a mistake is worth flagging. Their
 presence is not a checklist to hunt through, and is not a signal that one of
@@ -256,8 +264,10 @@ Check the learner's message independently before returning a clean verdict.
 First look for English stand-ins, including a single English noun, adjective,
 or activity inside an otherwise German sentence. Then read each German clause
 for a clear verb, word-order, case, article, or word-choice error. Do not require
-the meaning to be unclear before flagging a clear error. If either check finds
-something, produce the full corrected German sentence and all accompanying fields.`;
+the meaning to be unclear before flagging a clear error. Ignore capitalization,
+missing umlauts, and ss for ß here too; "uber" in a German sentence can mean
+"über", not an English stand-in. If either check finds something, produce the
+full corrected German sentence and all accompanying fields.`;
 }
 
 /** System prompt for the per-reply word-gloss pass (lib/gloss.ts). Glosses
@@ -295,9 +305,8 @@ ${LEMMA_RULES}`;
 /**
  * System prompt for the on-demand "explain grammar" button (lib/explain.ts).
  *
- * Plain text with bullet characters rather than Markdown: the panel renders
- * it with whitespace preserved and nothing else, so "**" or "#" would show up
- * literally. Pulling in a Markdown renderer for a few bullets isn't worth it.
+ * The panel renders bullet lines and bold phrases, without accepting arbitrary
+ * Markdown or HTML from the model.
  */
 export function buildGrammarExplanationPrompt(
   level: CefrLevel,
@@ -321,9 +330,9 @@ short example sentence that follows the same rule.`;
 ${task}
 
 Format:
-- Plain text only. No Markdown: no **, no #, no backticks.
 - Start each point on its own line with "• ".
-- Quote German in the explanation exactly as it appears, so the learner can find it.
+- Put **bold** around German words and phrases you explain. Quote them exactly as they appear, so the learner can find them.
+- Do not use headings, code fences, links, or other Markdown.
 - Write in simple English. Name a grammar term only if you explain it in the same sentence.
 - Keep the whole answer under 120 words.`;
 }

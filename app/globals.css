@@ -21,6 +21,7 @@
   --ink: #2c1a0e;
   --ink-2: #a0826a;
   --ink-3: #7a6a58;
+  --explain-ink: #7d5f4a;
   --line: #2c1a0e;
   --hair: #e0c9b0;
   --accent: #c4451a;
@@ -40,6 +41,7 @@
     --ink: #e8e8e8;
     --ink-2: #888888;
     --ink-3: #606060;
+    --explain-ink: #9a9a9a;
     --line: #303030;
     --hair: #242424;
     --accent: #d4552a;
@@ -56,6 +58,7 @@
   --ink: #e8e8e8;
   --ink-2: #888888;
   --ink-3: #606060;
+  --explain-ink: #9a9a9a;
   --line: #303030;
   --hair: #242424;
   --accent: #d4552a;
@@ -71,6 +74,7 @@
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
+  --color-explain-ink: var(--explain-ink);
   --color-line: var(--line);
   --color-hair: var(--hair);
   --color-accent: var(--accent);

@@ -36,6 +36,38 @@ const CorrectionSchema = z.object({
 
 export type Correction = z.infer<typeof CorrectionSchema>;
 
+/** A model can still flag keyboard spelling after being asked to ignore it.
+ * If its full correction changes no words beyond case, diacritics, ß, or
+ * punctuation, there is no mistake card or English stand-in to show. */
+export function suppressOrthographicOnlyCorrection(
+  userMessage: string,
+  result: Correction,
+): Correction {
+  if (!result.correction || (!result.hasMistake && !result.usedEnglish)) return result;
+
+  const words = (text: string) =>
+    text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .replace(/ß/g, 'ss')
+      .match(/[\p{L}\p{N}]+/gu)
+      ?.join(' ') ?? '';
+
+  const original = words(userMessage);
+  if (!original || original !== words(result.correction)) return result;
+
+  return {
+    hasMistake: false,
+    usedEnglish: false,
+    mistakeType: null,
+    correction: null,
+    correctionTranslation: null,
+    explanation: null,
+    correctionGloss: null,
+  };
+}
+
 /** A clean first verdict gets an independent second look. A positive verdict
  * without a sentence is retried too, then treated as a failed check if the
  * second pass cannot produce a usable correction. */
@@ -86,9 +118,10 @@ export async function detectCorrection(
     });
 
     await logUsage('correction', CORRECTION_MODEL, usage, usageContext);
-    if (secondLook && hasCorrectionCard(object)) {
+    const verdict = suppressOrthographicOnlyCorrection(userMessage, object);
+    if (secondLook && hasCorrectionCard(verdict)) {
       console.info('[correction] second look recovered a missed correction');
     }
-    return object;
+    return verdict;
   });
 }

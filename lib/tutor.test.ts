@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkWithSecondLook, type Correction } from '@/lib/tutor';
+import { checkWithSecondLook, suppressOrthographicOnlyCorrection, type Correction } from '@/lib/tutor';
 
 const clean: Correction = {
   hasMistake: false,
@@ -58,4 +58,32 @@ test('a corrected sentence without a positive verdict is not shown as clean', as
     () => checkWithSecondLook(async () => ({ ...clean, correction: 'Er geht zur Arbeit.' })),
     /corrected sentence without a correction verdict/,
   );
+});
+
+test('capitalization and missing umlauts alone do not create a mistake card', () => {
+  const result = suppressOrthographicOnlyCorrection('Was ist das buch uber', {
+    ...flagged,
+    mistakeType: 'preposition',
+    correction: 'Was ist das Buch über?',
+  });
+  assert.deepEqual(result, clean);
+});
+
+test('a keyboard substitution is not treated as an English stand-in', () => {
+  const result = suppressOrthographicOnlyCorrection('Wir gehen uber die Straße.', {
+    ...clean,
+    usedEnglish: true,
+    correction: 'Wir gehen über die Straße.',
+  });
+  assert.deepEqual(result, clean);
+});
+
+test('a real grammar change still produces a correction', () => {
+  const result = { ...flagged, correction: 'Ich sehe den Mann.' };
+  assert.equal(suppressOrthographicOnlyCorrection('ich sehe der mann', result), result);
+});
+
+test('an English word replaced with German still gets its language card', () => {
+  const result = { ...clean, usedEnglish: true, correction: 'Ich habe einen Hund.' };
+  assert.equal(suppressOrthographicOnlyCorrection('Ich habe einen dog.', result), result);
 });

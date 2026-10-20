@@ -153,6 +153,30 @@ export const EVAL_CASES: EvalCase[] = [
     expectHasMistake: false,
     note: 'Correct, idiomatic, complex C1-level construction.',
   },
+  {
+    id: 'keyboard-and-capitalization-a1',
+    level: 'A1',
+    input: 'Was ist das buch uber',
+    expectHasMistake: false,
+    expectUsedEnglish: false,
+    note: 'Missing noun capitalization and an umlaut are typing conventions, not grammar mistakes or English stand-ins.',
+  },
+  {
+    id: 'keyboard-and-capitalization-b2',
+    level: 'B2',
+    input: 'Was ist das buch uber',
+    expectHasMistake: false,
+    expectUsedEnglish: false,
+    note: 'The same relaxed spelling rule applies even at a higher level.',
+  },
+  {
+    id: 'capitalization-only',
+    level: 'A2',
+    input: 'ich lese das buch.',
+    expectHasMistake: false,
+    expectUsedEnglish: false,
+    note: 'Sentence-initial and noun capitalization alone should not produce a correction.',
+  },
 
   // --- Clear case errors should be corrected at every level ---
   {

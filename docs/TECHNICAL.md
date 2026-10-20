@@ -400,7 +400,7 @@ allowance in an `X-Messages-Remaining` header.
   question rate down (the model can't count across turns within one call);
   this makes the one-questions-every-other-turn rule a per-call decision in
   code instead of a hope in the prompt text.
-- **`buildCorrectionSystemPrompt(level)`**: unchanged leniency/category logic
+- **`buildCorrectionSystemPrompt(level)`**: level-based leniency/category logic
   (`STRICTNESS_BY_LEVEL[level]`, the "decide hasMistake as if the category
   list didn't exist" instruction, category tie-break rules), plus a new
   English-stand-in block: when the learner substitutes English words for ones
@@ -408,14 +408,17 @@ allowance in an `X-Messages-Remaining` header.
   `hasMistake` — an English stand-in is never itself a mistake — but
   `correction`/`correctionTranslation`/`correctionGloss`/`explanation` are
   still filled in (the all-German version of the sentence), so the UI has
-  something to show even when there's no grammar mistake to flag. Plus
-  `LEMMA_RULES`.
+  something to show even when there's no grammar mistake to flag. Capitalization
+  and missing keyboard characters (umlauts and ß) alone do not trigger a
+  correction; a final check in `lib/tutor.ts` suppresses orthographic-only
+  verdicts that the model still returns. Plus `LEMMA_RULES`.
 - **`buildGlossSystemPrompt()`**: now asks for the whole-text translation
   first, then one entry per word as before (punctuation stripped, meaning in
   this sentence), plus `LEMMA_RULES`.
-- **`buildGrammarExplanationPrompt(level, kind)`**: plain-text, bullet-only
-  output (`• ` lines, no Markdown) explaining either a reply's notable grammar
-  points or the rule behind a correction, capped around 120 words.
+- **`buildGrammarExplanationPrompt(level, kind)`**: short `• ` bullet lines with
+  bold German phrases explaining either a reply's notable grammar points or
+  the rule behind a correction, capped around 120 words. The panel renders
+  bullets and bold text without accepting arbitrary Markdown or HTML.
 
 **Why the "as if the category list didn't exist" instruction exists:** putting
 `z.enum(MISTAKE_TYPES)` in the schema changed what the model decided, not just
@@ -792,7 +795,7 @@ prompt and generation parameters without logging eval usage to `token_usage`.
 
 | Suite | Cases | Pass rule | Expected |
 |---|---|---|---|
-| correction (`evals/cases.ts`) | 24 | `hasMistake` matches, `mistakeType` matches when specified, and `usedEnglish` matches when specified. Includes clean sentences, A1-vs-C1 pairs, and English-stand-in cases (clean, with a mistake layered on, and a German loanword that must *not* be flagged as English). | 19–20/20 of the original 20 (`auxiliary-verb-1` flips between runs because of Groq non-determinism); the 4 newer English cases pass steadily |
+| correction (`evals/cases.ts`) | 27 | `hasMistake` matches, `mistakeType` matches when specified, and `usedEnglish` matches when specified. Includes clean sentences, A1-vs-C1 pairs, English stand-ins, and capitalization/keyboard-spelling controls. | Earlier 24-case baseline: 19–20/20 of the original 20 (`auxiliary-verb-1` flips between runs); the 4 English cases passed steadily. The 3 new spelling cases await a live run. |
 | gloss (`evals/gloss-cases.ts`) | 17 | Each listed word gets an accepted lemma (case- and whitespace-insensitive) in **all 3 runs**; every run's sentence `translation` must be non-empty | all pass |
 | reply (`evals/reply-level-cases.ts`) | 12 reply cases + 1 scripted 8-turn conversation | Per case: A1/A2 replies stay within their sentence-count/length/tense limits (`REPLY_LIMITS`), no helper phrasing (`HELPER_PHRASES`), and an English stand-in comes back used in German (`expectContains`). Across the scripted conversation: at most half the replies end in a question (`MAX_QUESTION_SHARE`), checked turn-by-turn against the real `buildTurnGuidance()` behavior, not just a static sample. | all pass as of the prompt in `lib/prompts.ts` as of 2026-09-30 |
 | ask (`evals/ask-cases.ts`) | 8 sentence/question cases | Two-line format for bare phrases, direct-answer format for questions, required translation/rule fragments, and rejection of known wrong case/tense claims. Prints every answer for manual German review; one run is not a reliability estimate. | 20B repeatedly failed the `auf das Wochenende` case; 120B scored 7–8/8 across two runs but once called mixed adjective inflection "weak" |

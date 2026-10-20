@@ -210,7 +210,7 @@ export function ChatSidePanel({
         aria-label="German learning tools"
         aria-hidden={!open}
         inert={!open}
-        className={`border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,390px)] flex-col border-l-2 transition-transform duration-300 ease-out motion-reduce:transition-none lg:w-[360px] ${
+        className={`border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,420px)] flex-col border-l-2 transition-transform duration-300 ease-out motion-reduce:transition-none ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

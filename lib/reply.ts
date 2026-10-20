@@ -25,10 +25,9 @@ export function replySettings(
       ? `${buildConversationSystemPrompt(level, persona)}\n\nThis turn:\n${turnGuidance}`
       : buildConversationSystemPrompt(level, persona),
     providerOptions: {
-      // A conversational reply doesn't need deep multi-step reasoning;
-      // keeping effort low cuts wasted reasoning tokens against Groq's
-      // per-minute cap.
-      groq: { reasoningEffort: 'low' as const },
+      // Groq defaults to raw reasoning, which can put the model's planning
+      // into the same text stream as the German reply.
+      groq: { reasoningEffort: 'low' as const, reasoningFormat: 'hidden' as const },
     },
   };
 }

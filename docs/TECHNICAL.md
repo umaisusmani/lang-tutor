@@ -784,16 +784,18 @@ sources of truth while allowing them to change independently.
 
 ## 9. Evals
 
-`npm run eval [correction|gloss|reply]` runs `scripts/run-evals.ts` through
-`tsx` with `.env.local`, calling `detectCorrection`, `glossText` and the
-reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
-`chat.service.ts` streams with) directly.
+`npm run eval [correction|gloss|reply|ask]` runs `scripts/run-evals.ts` through
+`tsx` with `.env.local`, calling `detectCorrection`, `glossText`, the reply
+model (via `lib/reply.ts`'s `replySettings()`) and Ask (via `lib/ask.ts`'s
+`askSettings()`) directly. The shared Ask settings let evals use the same
+prompt and generation parameters without logging eval usage to `token_usage`.
 
 | Suite | Cases | Pass rule | Expected |
 |---|---|---|---|
 | correction (`evals/cases.ts`) | 24 | `hasMistake` matches, `mistakeType` matches when specified, and `usedEnglish` matches when specified. Includes clean sentences, A1-vs-C1 pairs, and English-stand-in cases (clean, with a mistake layered on, and a German loanword that must *not* be flagged as English). | 19–20/20 of the original 20 (`auxiliary-verb-1` flips between runs because of Groq non-determinism); the 4 newer English cases pass steadily |
 | gloss (`evals/gloss-cases.ts`) | 17 | Each listed word gets an accepted lemma (case- and whitespace-insensitive) in **all 3 runs**; every run's sentence `translation` must be non-empty | all pass |
-| reply (`evals/reply-level-cases.ts`) | 13 single-turn cases + 1 scripted 8-turn conversation | Per case: A1/A2 replies stay within their sentence-count/length/tense limits (`REPLY_LIMITS`), no helper phrasing (`HELPER_PHRASES`), and an English stand-in comes back used in German (`expectContains`). Across the scripted conversation: at most half the replies end in a question (`MAX_QUESTION_SHARE`), checked turn-by-turn against the real `buildTurnGuidance()` behavior, not just a static sample. | all pass as of the prompt in `lib/prompts.ts` as of 2026-09-30 |
+| reply (`evals/reply-level-cases.ts`) | 12 reply cases + 1 scripted 8-turn conversation | Per case: A1/A2 replies stay within their sentence-count/length/tense limits (`REPLY_LIMITS`), no helper phrasing (`HELPER_PHRASES`), and an English stand-in comes back used in German (`expectContains`). Across the scripted conversation: at most half the replies end in a question (`MAX_QUESTION_SHARE`), checked turn-by-turn against the real `buildTurnGuidance()` behavior, not just a static sample. | all pass as of the prompt in `lib/prompts.ts` as of 2026-09-30 |
+| ask (`evals/ask-cases.ts`) | 8 sentence/question cases | Two-line format for bare phrases, direct-answer format for questions, required translation/rule fragments, and rejection of known wrong case/tense claims. Prints every answer for manual German review; one run is not a reliability estimate. | 20B repeatedly failed the `auf das Wochenende` case; 120B scored 7–8/8 across two runs but once called mixed adjective inflection "weak" |
 
 - `withRateLimitRetry` waits as long as Groq's 429 message asks, so hitting
   the free tier's 8k tokens/min limit doesn't count as a failed case. It also
@@ -804,11 +806,14 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
 - Gloss cases run one at a time and take a few minutes. The reply suite's
   question-share check runs its 8 turns sequentially (each depends on the
   previous reply, for `buildTurnGuidance`), so it's not parallelizable either.
+- Ask defaults to `openai/gpt-oss-20b`. Run
+  `ASK_EVAL_MODEL=openai/gpt-oss-120b npm run eval -- ask` to compare with the
+  main-chat model. The runner reports token totals, not current dollar cost.
 - **Nothing runs model evals automatically.** They make real Groq calls. CI
   runs deterministic unit tests, lint, and a production build in
   `quality.yml`, while `docs-sync.yml` checks whether this doc is behind the
   code. Run the relevant eval suite after any change to `lib/prompts.ts`,
-  `lib/tutor.ts` or `lib/gloss.ts`.
+  `lib/tutor.ts`, `lib/gloss.ts` or `lib/ask.ts`.
 
 ## 10. Configuration and deployment
 

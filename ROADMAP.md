@@ -4,7 +4,7 @@ The one place feature status is recorded. Design notes live in local
 `plans/*.md` files (not committed), and they don't carry status. What is
 built, and how, is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-**Next up:** fix and evaluate Ask's German grammar accuracy before launch: Groq 20B is accessible, but live samples still mislabeled some case and tense forms. Test with real learner questions and compare a stronger model or narrower grammar output if needed. Validate demand for a Topics view before adding it. Translate is lower priority and deferred. Then improve tutor personalization from existing structured learner data; evaluate semantic retrieval only if simpler methods miss relevant context. Voice features remain parked.
+**Next up:** fix and evaluate Ask's German grammar accuracy before launch. An eight-case eval now compares Groq 20B and 120B with the same prompt; 20B repeatedly mislabeled `auf das Wochenende` as dative, and even 120B sometimes mislabels adjective inflection. Repeat with more learner questions and manually review every answer before choosing the cheapest reliable model. Validate demand for a Topics view before adding it. Translate is lower priority and deferred. Then improve tutor personalization from existing structured learner data; evaluate semantic retrieval only if simpler methods miss relevant context. Voice features remain parked.
 
 Status: ✅ done · 🟡 partly done · ⬜ not started
 
@@ -41,7 +41,7 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Tutor-initiated topics | 🟡 | `69615a7` | Prompt only: brings up new topics, asks a question in about half of replies |
 | Recasting | 🟡 | `69615a7` | Only English stand-ins come back in German. Grammar mistakes aren't recast |
 | Level-gated glossing (B1+ tap to reveal) | ⬜ | | |
-| Ask side panel (German-learning utilities, separate from roleplay) | 🟡 | | Code uses signed-in-only Ask on Groq 20B, short answers or sentence translation with grammar notes; Words reuses glosses. Anonymous visitors see a sign-up modal. Groq project permission is enabled, but live samples found wrong case/tense explanations; validate or change model before launch. Topics deferred; no RAG. Design: `plans/ask-panel.md` |
+| Ask side panel (German-learning utilities, separate from roleplay) | 🟡 | | Code uses signed-in-only Ask on Groq 20B, short answers or sentence translation with grammar notes; Words reuses glosses. Anonymous visitors see a sign-up modal. Groq permission works, but the new `ask` eval exposes recurring 20B grammar errors; compare 120B and expand/repeat cases before launch. Topics deferred; no RAG. Design: `plans/ask-panel.md` |
 | Translate page (`/translate`) | ⬜ | | Deferred; lower priority than the in-chat utility panel per user |
 | On-demand grammar explanations | ✅ | `69615a7` | Not in the original plan. Saved to the message |
 

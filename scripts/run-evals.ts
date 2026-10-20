@@ -5,11 +5,13 @@
  * real functions, not a copy of them.
  *
  * Run with `npm run eval` (every suite), or name one or more:
- * `npm run eval -- correction`, `-- gloss`, `-- reply`. Makes real Groq calls, so it needs
+ * `npm run eval -- correction`, `-- gloss`, `-- reply`, `-- ask`. Makes real Groq calls, so it needs
  * GROQ_API_KEY in .env.local and uses a little of the quota.
  */
 import { generateText } from 'ai';
 
+import { ASK_EVAL_CASES } from '@/evals/ask-cases';
+import type { AskEvalCase } from '@/evals/ask-cases';
 import { EVAL_CASES } from '@/evals/cases';
 import { GLOSS_EVAL_CASES } from '@/evals/gloss-cases';
 import {
@@ -20,6 +22,7 @@ import {
   REPLY_LIMITS,
 } from '@/evals/reply-level-cases';
 import { glossText } from '@/lib/gloss';
+import { ASK_MODEL, askSettings } from '@/lib/ask';
 import { FALLBACK_PERSONA } from '@/lib/personas';
 import { replySettings } from '@/lib/reply';
 import { detectCorrection } from '@/lib/tutor';
@@ -265,10 +268,81 @@ async function runReplySuite(): Promise<SuiteResult> {
   return { passed, total: REPLY_EVAL_CASES.length + 1, failures };
 }
 
+/** Cheap, deterministic checks plus visible answers for manual grammar review. */
+async function runAskSuite(): Promise<SuiteResult> {
+  const model = process.env.ASK_EVAL_MODEL || ASK_MODEL;
+  if (!['openai/gpt-oss-20b', 'openai/gpt-oss-120b'].includes(model)) {
+    throw new Error(`Unsupported ASK_EVAL_MODEL: ${model}`);
+  }
+
+  let passed = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  const failures: string[] = [];
+  console.log(`Model: ${model}. Answers are printed for manual accuracy review.`);
+
+  for (const testCase of ASK_EVAL_CASES) {
+    let answer: string;
+    try {
+      const result = await withRateLimitRetry(() =>
+        generateText(
+          askSettings({
+            question: testCase.question,
+            level: testCase.level,
+            chatContext: testCase.chatContext ?? '',
+            panelContext: testCase.panelContext ?? '',
+          }, model),
+        ),
+      );
+      answer = result.text;
+      inputTokens += result.totalUsage.inputTokens ?? 0;
+      outputTokens += result.totalUsage.outputTokens ?? 0;
+    } catch (err) {
+      failures.push(`${testCase.id}: threw an error -- ${err instanceof Error ? err.message : err}`);
+      console.log(`✗ ${testCase.id} (ERROR)`);
+      continue;
+    }
+
+    const lines = answer.trim().split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const parts: Record<AskEvalCase['checks'][number]['part'], string> = {
+      whole: answer,
+      first: lines[0] ?? '',
+      grammar: lines[1] ?? '',
+    };
+    const problems: string[] = [];
+
+    if ((answer.match(/\S+/g) ?? []).length > 50) problems.push('over 50 words');
+    if (testCase.kind === 'question') {
+      if (/^(?:Translation|German|Grammar):/im.test(answer)) problems.push('sentence labels on a question');
+    } else {
+      const firstLabel = testCase.kind === 'german-phrase' ? 'Translation' : 'German';
+      if (lines.length !== 2) problems.push(`expected two lines, got ${lines.length}`);
+      if (!lines[0]?.startsWith(`${firstLabel}:`)) problems.push(`missing ${firstLabel}: line`);
+      if (!lines[1]?.startsWith('Grammar:')) problems.push('missing Grammar: line');
+    }
+
+    for (const check of testCase.checks) {
+      if (!check.pattern.test(parts[check.part])) problems.push(`missing: ${check.why}`);
+    }
+    for (const reject of testCase.rejects ?? []) {
+      if (reject.pattern.test(parts[reject.part])) problems.push(`wrong: ${reject.why}`);
+    }
+
+    console.log(`${problems.length ? '✗' : '✓'} ${testCase.id}`);
+    console.log(`    ${answer.trim().replace(/\r?\n/g, '\n    ')}`);
+    if (problems.length) failures.push(`${testCase.id}: ${problems.join('; ')} -- ${testCase.note}`);
+    else passed++;
+  }
+
+  console.log(`Token totals (${model}): ${inputTokens} input, ${outputTokens} output. Compare quality manually, not just these counts.`);
+  return { passed, total: ASK_EVAL_CASES.length, failures };
+}
+
 const SUITES: Record<string, () => Promise<SuiteResult>> = {
   correction: runCorrectionSuite,
   gloss: runGlossSuite,
   reply: runReplySuite,
+  ask: runAskSuite,
 };
 
 async function main() {

@@ -101,15 +101,18 @@ npm run eval                 # every suite
 npm run eval -- correction   # just the correction check
 npm run eval -- gloss        # just the lemma rules
 npm run eval -- reply        # just the reply prompt (level limits, question rate)
+npm run eval -- ask          # Ask panel: format and known German grammar traps
+ASK_EVAL_MODEL=openai/gpt-oss-120b npm run eval -- ask  # compare with main-chat model
 ```
 
 - **Correction** ([evals/cases.ts](evals/cases.ts)): 24 cases. Each one says whether a sentence has a mistake and what type. The set includes correct sentences, so over-correction is caught too, pairs where the same sentence should pass at A1 but be flagged at C1, and cases where the learner used English words that should be recognized as that, not as a mistake.
 - **Reply** ([evals/reply-level-cases.ts](evals/reply-level-cases.ts)): checks the tutor's own replies, not just the correction check — that A1/A2 stay within hard sentence-length and tense limits, that it never talks like a helper, that an English word the learner used comes back in German, and that it doesn't ask a question in every single reply.
 - **Gloss** ([evals/gloss-cases.ts](evals/gloss-cases.ts)): each case lists the words that matter in a sentence and the lemma each one should get. Each case runs 3 times and passes only if all 3 runs are right, because a lemma that changes between runs is a word that ends up in your vocab twice. Some of the cases are controls, which check that ordinary words are *not* merged into a phrase.
+- **Ask** ([evals/ask-cases.ts](evals/ask-cases.ts)): eight short sentence and question cases check output format, translations, and specific grammar regressions. It prints every answer for manual review and totals input/output tokens. Use `ASK_EVAL_MODEL` to compare 20B with 120B using the same prompt; passing the automated checks does not prove every grammar claim is correct.
 
 Each case prints ✓ or ✗ with the wrong lemmas listed, and the runner exits with an error if any case fails. The gloss suite takes a few minutes on Groq's free tier because it waits out the per-minute token limit instead of failing.
 
-**The model evals do not run automatically** because they make real Groq calls. CI does run the deterministic unit tests, lint, and production build, plus the documentation-status check. Run the relevant eval suite yourself after any change to `lib/prompts.ts`, `lib/gloss.ts` or `lib/tutor.ts`.
+**The model evals do not run automatically** because they make real Groq calls. CI does run the deterministic unit tests, lint, and production build, plus the documentation-status check. Run the relevant eval suite yourself after any change to `lib/prompts.ts`, `lib/gloss.ts`, `lib/tutor.ts` or `lib/ask.ts`.
 
 When you find a word the app gets wrong, add it as a case so it stays fixed.
 

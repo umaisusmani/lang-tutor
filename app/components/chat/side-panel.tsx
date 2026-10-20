@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { QuotaBanner } from '@/app/components/quota-banner';
+import { isQuotaStatus, quotaFromResponse, type QuotaStatus } from '@/lib/quota';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { WordGloss } from '@/lib/gloss';
 import type { CefrLevel } from '@/lib/prompts';
@@ -61,7 +63,9 @@ export function ChatSidePanel({
   canSave,
   isSaved,
   onSaveWord,
-  onRemainingChange,
+  quota,
+  onQuotaChange,
+  onQuotaRefresh,
   onAuthRequired,
   onClose,
 }: {
@@ -72,7 +76,9 @@ export function ChatSidePanel({
   canSave: boolean;
   isSaved: (lemma: string) => boolean;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
-  onRemainingChange: (remaining: number) => void;
+  quota: QuotaStatus;
+  onQuotaChange: (quota: QuotaStatus) => void;
+  onQuotaRefresh: () => Promise<void>;
   onAuthRequired: () => void;
   onClose: () => void;
 }) {
@@ -82,6 +88,8 @@ export function ChatSidePanel({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [wordFilter, setWordFilter] = useState('');
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const blocked = quota.reason !== null || remaining === 0;
   const transcriptRef = useRef<HTMLDivElement>(null);
   const words = useMemo(() => collectWords(messages), [messages]);
   const visibleWords = useMemo(() => {
@@ -95,13 +103,11 @@ export function ChatSidePanel({
   }, [wordFilter, words]);
 
   useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, open]);
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight });
@@ -117,7 +123,7 @@ export function ChatSidePanel({
 
   async function ask(question = draft) {
     const text = question.trim();
-    if (!text || sending || remaining === 0) return;
+    if (!text || sending || blocked) return;
 
     setError('');
     changeDraft('');
@@ -148,22 +154,15 @@ export function ChatSidePanel({
           return;
         }
         const payload = await response.json().catch(() => null);
-        if (response.status === 429) onRemainingChange(0);
-        const message =
-          payload?.error ?? "Couldn't get an answer. Please try again in a moment.";
-        setTurns((current) => {
-          const next = [...current];
-          const last = next.at(-1);
-          if (last?.role === 'assistant' && !last.content) last.content = message;
-          return next;
-        });
+        if (isQuotaStatus(payload?.quota)) onQuotaChange(payload.quota);
+        setError(payload?.error ?? "Couldn't get an answer. Please try again in a moment.");
+        setTurns((current) => current.slice(0, -2));
+        changeDraft(text);
         return;
       }
 
-      const left = Number(response.headers.get('X-Messages-Remaining'));
-      if (response.headers.has('X-Messages-Remaining') && Number.isFinite(left)) {
-        onRemainingChange(left);
-      }
+      const updatedQuota = quotaFromResponse(response);
+      if (updatedQuota) onQuotaChange(updatedQuota);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -192,28 +191,20 @@ export function ChatSidePanel({
       });
     } finally {
       setSending(false);
+      void onQuotaRefresh();
     }
   }
 
   return (
-    <>
-      {open && (
-        <button
-          type="button"
-          aria-label="Close learning panel"
-          onClick={onClose}
-          className="fixed inset-0 z-30 cursor-default bg-black/30 transition-opacity duration-300 motion-reduce:transition-none"
-        />
-      )}
-      <aside
+      <dialog
+        ref={dialogRef}
         id="chat-side-panel"
         aria-label="German learning tools"
-        aria-hidden={!open}
-        inert={!open}
-        className={`border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,420px)] flex-col border-l-2 transition-transform duration-300 ease-out motion-reduce:transition-none ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        onCancel={(event) => { event.preventDefault(); onClose(); }}
+        onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+        className="border-line bg-paper text-ink fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-[min(94vw,420px)] max-w-none border-0 border-l-2 p-0 backdrop:bg-black/40"
       >
+        <div className="flex h-full min-h-0 flex-col">
         <div className="border-hair flex items-center gap-3 border-b-2 px-4 py-3">
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-ink text-xl tracking-[0.04em]">Learning tools</h2>
@@ -237,6 +228,14 @@ export function ChatSidePanel({
               type="button"
               role="tab"
               aria-selected={view === tab}
+              tabIndex={view === tab ? 0 : -1}
+              onKeyDown={(event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const next: ToolView = event.key === 'Home' ? 'ask' : event.key === 'End' ? 'words' : view === 'ask' ? 'words' : 'ask';
+                setView(next);
+                document.getElementById(`tools-tab-${next}`)?.focus();
+              }}
               aria-controls={`tools-view-${tab}`}
               onClick={() => changeView(tab)}
               className={`flex-1 cursor-pointer rounded-[9px] px-3 py-[7px] font-mono text-[11px] capitalize transition-colors ${
@@ -267,7 +266,7 @@ export function ChatSidePanel({
                     </p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {['Why did she say “dem” here?', 'Ich freue mich auf das Wochenende.', 'How would I say this more naturally?'].map((example) => (
+                    {['How do I say “See you tomorrow” in German?', 'What does “Guten Appetit” mean?', 'How do I greet a friend in German?'].map((example) => (
                       <button
                         key={example}
                         type="button"
@@ -293,9 +292,10 @@ export function ChatSidePanel({
                   </div>
                 ))
               )}
-              {error && <p className="text-ink-3 font-mono text-[11px]">{error}</p>}
+              {error && <p role="alert" className="text-ink text-sm">{error}</p>}
             </div>
 
+            <p className="sr-only" role="status">{sending ? 'Asking…' : turns.length > 0 ? 'Answer ready.' : ''}</p>
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -303,6 +303,7 @@ export function ChatSidePanel({
               }}
               className="border-hair flex flex-col gap-2 border-t-2 p-3"
             >
+              <QuotaBanner quota={quota} signedIn={canSave} onRetry={() => void onQuotaRefresh()} />
               <textarea
                 value={draft}
                 onChange={(event) => changeDraft(event.target.value.slice(0, 500))}
@@ -320,11 +321,11 @@ export function ChatSidePanel({
               />
               <div className="flex items-center justify-between gap-2">
                 <span className="text-ink-3 font-mono text-[10px]">
-                  {remaining === 0 ? 'daily limit reached' : `${level} · ${remaining ?? '—'} left`}
+                  {blocked ? 'messages paused' : `${level} · ${remaining ?? '—'} left`}
                 </span>
                 <button
                   type="submit"
-                  disabled={!draft.trim() || sending || remaining === 0}
+                  disabled={!draft.trim() || sending || blocked}
                   className="border-line bg-ink text-paper font-display cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] transition-opacity disabled:cursor-default disabled:opacity-40"
                 >
                   {sending ? 'asking…' : 'ask ↗'}
@@ -386,7 +387,7 @@ export function ChatSidePanel({
             </div>
           </section>
         )}
-      </aside>
-    </>
+        </div>
+      </dialog>
   );
 }

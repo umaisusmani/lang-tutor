@@ -1,4 +1,5 @@
 import type { UIMessage } from 'ai';
+import type { QuotaReason, QuotaStatus } from '@/lib/quota';
 
 import type { ReplyGloss } from '@/lib/gloss';
 // DEPRECATED: import type { VocabCandidate } from '@/lib/services/vocab.service';
@@ -43,7 +44,8 @@ export type LangTutorUIMessage = UIMessage<
     // a thread is reloaded (app/page.tsx). A live turn has none yet; they're
     // fetched on demand and held in client state.
     explanations: { reply: string | null; correction: string | null };
-    rateLimited: { cap: number; reason: 'user' | 'global'; signedIn: boolean };
+    quota: QuotaStatus;
+    rateLimited: { cap: number; reason: QuotaReason; signedIn: boolean };
     // Which conversation the turn was stored in. Written on every persisted
     // turn so a brand-new chat's second message appends to the conversation
     // the first one created, rather than forking a new one each turn.

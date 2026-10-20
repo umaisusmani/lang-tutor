@@ -1,22 +1,24 @@
 # Starvogel — Technical Documentation
 
-> State of the codebase as of 2026-10-15 (daily limits and email verification, on top of `7d0ab39`). This describes
+> State of the codebase as of 2026-10-21 (`804f84d` plus local, uncommitted UI changes). This describes
 > what is **built**. Feature status is in [ROADMAP.md](../ROADMAP.md); design
 > notes live in local `plans/*.md` files that aren't committed. For the
 > user-facing overview, see [README.md](../README.md). Where a plan and the
 > code disagree, the code is right. Section 11 lists where the build departed
 > from the original design.
+> The original UX findings and current verification gaps are recorded in [UI_AUDIT.md](UI_AUDIT.md).
 >
-> **Since the last revision of this doc (2026-10-10, F2):** two changes.
-> (1) Message limits are now daily and apply to everyone: 5 a day anonymous,
+> **Recent changes since the F2 baseline (2026-10-10):** Message limits are now daily and apply to everyone: 5 a day anonymous,
 > 35 a day signed in, plus a global cap on the whole app, all counted in
 > `daily_usage` (migration 0007) through the atomic `consume_message()`
 > function. `session_usage` is no longer written. See §4.1, §6 and §7.4.
-> (2) Signing up with an email now needs the address confirmed: the
+> Signing up with an email now needs the address confirmed: the
 > confirmation email carries a numeric code that is entered on a second
 > login screen (`verifySignupCode`), with `/auth/confirm` kept as a link
 > fallback. See §7.2. Adding Supabase's confirmation template and custom
 > SMTP are dashboard settings, not code (§10).
+> Ask, its eval suite, the refreshed UI/theme, and formatted grammar explanations
+> are also present in this revision (§1, §8, §9).
 
 ## Contents
 
@@ -556,6 +558,10 @@ runner.
   returns no error and no session, the same as a new one, so it lands on the
   code screen too. No new code is sent for an existing account; the screen
   says so and points to "Already have an account? Sign in".
+- **Password recovery:** `/login/reset` requests a recovery email through
+  Supabase Auth. The recovery link returns through `/auth/callback` to the
+  reset form, where `updateUser` sets the new password. Redirect destinations
+  are restricted to local app paths.
 - **Google OAuth:** `signInWithGoogle` builds its origin from the `Host` and
   `x-forwarded-proto` headers (the `Origin` header isn't reliable behind
   Vercel's proxy), redirects to Google, and `/auth/callback` exchanges the
@@ -642,7 +648,15 @@ sources of truth while allowing them to change independently.
 
 - `useChat<LangTutorUIMessage>` with `onError` (toast) and `onData` (turns
   `data-notice` parts into toasts, using the notice source as the toast id so
-  repeats replace each other instead of stacking).
+  repeats replace each other instead of stacking). A transient `data-quota`
+  part updates the allowance after a chat request; `useQuota` also refreshes
+  it after errors, on focus, and at UTC rollover.
+- `QuotaBanner` sits directly above the composer for personal limits, the
+  shared app cap, or a counter outage. `/api/quota` and the initial page load
+  read both counters without spending a message. Ask and fresh explanations
+  report quota changes to the same client state.
+- The chat column fills the viewport and scrolls its welcome or message area
+  inside it, keeping the composer visible on a phone-sized screen.
 - `conversationId` is kept in a ref, updated from `data-conversation`, and
   sent in the `body` of each `sendMessage`, **alongside `level`** (§4.1's race
   fix). That's how a new chat's second message goes to the same conversation,
@@ -682,7 +696,7 @@ sources of truth while allowing them to change independently.
   position rather than a separate "gloss…" line, so there's no layout jump
   when it becomes clickable.
 - **Ask side panel:** a small fixed "Ask ‹" edge tab opens a full-height,
-  animated overlay; its chevron closes it. For anonymous visitors, the tab
+  native modal dialog; its chevron closes it. For anonymous visitors, the tab
   opens the shared native confirmation dialog and "Create account" navigates
   to `/login?mode=signup`. The Ask route enforces the same boundary server-side.
   The panel has Ask and Words views. Ask reads the `/api/ask` text stream using
@@ -710,8 +724,9 @@ sources of truth while allowing them to change independently.
   that column — wider chrome without widening the reply text's line length.
 - `/vocab`: `VocabGrid` (`app/vocab/vocab-grid.tsx`) renders saved words as a
   responsive grid of click-to-reveal cards (lemma always visible; translation
-  and example sentence hidden until tapped), plus a page-level "show all /
-  hide all" toggle. A card's own flip state and the toggle combine with XOR,
+  and example sentence hidden until tapped), with search, sort, filters,
+  ready status, and a page-level "show all / hide all" toggle. A card's own
+  flip state and the toggle combine with XOR,
   so toggling "show all" clears individual flips rather than fighting them.
   Resets to all-hidden on every page load/navigation by design — it's meant
   to double as light self-testing, not a persistent reading view. Replaced
@@ -719,70 +734,56 @@ sources of truth while allowing them to change independently.
   `--accent-ink` (`bg-accent-ink/[0.08]`), not `bg-soft`: `--soft` is too
   close to `--panel` in both themes for the two states to read as different.
 - **Flashcard session** (`app/vocab/vocab-browser.tsx`, `flashcard-session.tsx`):
-  `/vocab` shows a **Start session** button with the due count. Clicking it
-  calls `startSessionAction()`, which runs `getReviewQueue()` on demand (so
-  browsing the list costs nothing extra) and returns plain card data; the
-  session replaces the grid in place and ends back on the list.
+  `/vocab` shows **Review due words** and **Extra practice** separately.
+  `startSessionAction()` loads the chosen queue on click and returns plain
+  card data. The session replaces the grid, then automatically returns to it
+  with a completion summary when its available cards are done.
   - Anki-style flip card: the German lemma shows, **Show answer** (Space /
     Enter) reveals the meaning and the saved example sentence, then four
     buttons (Again / Hard / Good / Easy, keys 1-4), each labelled with when
     the card returns (`previewIntervals` + `formatInterval`).
-  - Grading awaits `gradeCardAction` (not optimistic), because a failed or
-    still-learning card has to be requeued on the schedule the server just
-    set. A card in learning comes back this session after its step (1m, then
-    10m); with only waiting cards left, a countdown shows and advances on its
-    own. A graduated card leaves until its due date.
-  - A `stale` result (another tab graded the card first) or an error drops
-    the card from this session with a toast; it stays due.
+  - Grading awaits `gradeCardAction`. Each card appears once per round;
+    learning steps scheduled for later stay for another round. A failed save
+    keeps the card on screen for retry. A stale card asks the learner to
+    reload the queue.
   - Every grade is logged with `surface = 'review_page'` (the only surface
     value besides `panel`, kept as is) and the time taken. `answer_given` is
     null, since nothing is typed.
-  - A card with no translation still shows (the back says "no translation
-    saved"), so the due badge and the session agree.
-- **Practice more** (on-demand sessions): when nothing is due, **Start
-  session** goes straight to extra practice (`SessionPayload.extra`); when a
-  session ends, "Practice 10 more" does the same via
-  `startSessionAction('practice')` → `getPracticeQueue()`: cards still waiting
-  out a learning step, then review cards not due until tomorrow or later
-  (lowest retrievability first), then new cards past today's allowance. They're graded
-  like any card; FSRS accounts for the shorter elapsed time, so an early review
-  stretches the interval less. This is Anki's "review ahead", and means the
-  due schedule is never a wall.
+  - Words missing a meaning are marked on the grid and excluded from review.
+- **Extra practice** (`getPracticeQueue()`): an explicit on-demand round of
+  review cards due tomorrow or later, followed by new cards past today's
+  allowance. Waiting cards and words already reviewed today are excluded.
+  These are graded with the same FSRS scheduler.
 - **Two directions per word (migration 0006):** `cards.direction` is
   `forward` (German → meaning) or `reverse` (meaning → German, production).
   The trigger creates both when a word is saved, and 0006 backfills reverse
   cards for existing words. `UNIQUE (vocab_entry_id)` became `UNIQUE
   (vocab_entry_id, direction)`. A session holds at most one card per word
   (siblings are buried until the next session, so one answer doesn't give
-  away the other); a reverse card is skipped when the word has no saved
+  away the other); the other direction is buried for that day. A reverse card is skipped when the word has no saved
   translation. Code treats a missing `direction` as `forward`, so it runs
   before 0006 is applied, just without reverse cards.
-- **Front sentence toggle:** `sentence: on/off` in the session header shows
+- **Front sentence toggle:** a checkbox on the card shows
   the saved example on a forward card's front (remembered in
   `localStorage`).
 - **Timezone:** `SiteHeader` calls `saveTimezone` once per browser session,
   writing the browser's IANA zone to `profiles.timezone`, so the 4am day start
   is the learner's, not UTC's.
-- **New-word cards (starter vocab):** `startSessionAction` also returns up to
-  3 words from `lib/starter-vocab/{a1,a2,b1}.json` the learner hasn't saved,
-  about two thirds from their CEFR level and the rest from the level below
-  (B2/C1 use B1). The session shows one after every 4 reviewed cards, and
-  whenever the queue is empty or waiting out a learning step. A new-word card
-  shows the lemma, then the German example and its English translation, with
-  **Add to my vocab** / **Skip**. Add calls `addStarterWordAction`, which looks
-  the lemma up in the shipped list (the client sends only the lemma), asks the
-  model for the word's English meaning (`lib/starter-vocab/translate.ts`, one
-  small call per added word, logged as `gloss`), and saves it as a normal
-  `new_word` entry; the trigger makes its cards. Skipped words are kept in
-  the browser's `localStorage` and sent with each session request.
+- **New-word discovery (starter vocab):** `discoverWordsAction` separately
+  offers up to 3 words from `lib/starter-vocab/{a1,a2,b1}.json` the learner
+  hasn't saved. The meaning is generated and shown before the learner can
+  choose **Add to my vocabulary**; the add action saves a normal `new_word`
+  entry and the trigger makes its cards. Skips are kept in browser
+  `localStorage`. The source-list licence remains unresolved (§12), so this
+  entry point must not be published until permission or replacement is secured.
 - **Starter data:** `scripts/import-wordlist.ts` parses the Goethe-Institut
   TSV lists (github.com/ilkermeliksitki/goethe-institute-wordlist) into the
   JSON files: cleaned lemma ("die Adresse,-en" → "die Adresse"), one entry
   per lemma at its lowest level. About 640 A1, 540 A2 and 1,700 B1 words.
 - `/review` is a one-line redirect to `/vocab`.
-- **Due badge:** `SiteHeader` shows the number of cards in the queue on the
-  `vocab` link. `app/page.tsx` and `/vocab` compute it with `getDueCount()` on
-  each load; `gradeCardAction` revalidates the layout so it updates.
+- **Due badge:** `SiteHeader` shows the number of reviewable words in the
+  queue on the `vocab` link. `app/page.tsx` and `/vocab` compute it with
+  `getDueCount()` on each load; `gradeCardAction` revalidates the layout.
 - `ConfirmProvider` / `useConfirm()`: a confirm dialog returned as a promise.
 
 ## 9. Evals
@@ -913,19 +914,20 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
 - **Old JSONB rows** can lack newer gloss fields (`lemma`, `lemmaTranslation`,
   and now the whole-sentence `translation` on `messages.gloss`). Readers must
   keep their fallbacks (`normalizeReplyGloss`, `lemmaTranslation || translation`).
-- **Unit tests cover pure functions only** (`lib/srs.ts`, `lib/cloze.ts`,
-  `lib/text.ts`). Services, routes and UI have none, and evals are run by hand.
+- **Unit tests cover pure functions** including scheduling, review selection,
+  quota parsing, and safe auth redirects. Services, routes and UI have no
+  automated integration tests; evals are run by hand.
 - **Reviewing only works from `/vocab`** until F3 puts cards in the chat
   panel. `profiles.timezone` is set from the browser on the first page load of a
   session, and stays `UTC` until then.
-- **The session has no automated tests** beyond the pure helpers
-  (`lib/srs.ts`).
+- **Review selection has pure-function tests,** but saving a grade and
+  returning to the grid have not had a live browser/database test.
 - **`lib/cloze.ts` is dead weight for now.** The flip-card session doesn't
   use it. It has tests and is the intended basis for grammar cards (F4); delete
   it if F4 goes another way.
 - **Starter words have no per-word translation in the source,** only a
   sentence and its translation; the word's meaning is generated when the
-  learner adds it. The source lists are Goethe-Institut material,
+  learner reveals it in discovery. The source lists are Goethe-Institut material,
   reached through a third-party GitHub repo
   (`ilkermeliksitki/goethe-institute-wordlist`) that declares no licence. The
   Goethe PDFs assert copyright, so the right to ship these ~2,900 words and

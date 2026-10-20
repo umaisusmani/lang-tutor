@@ -10,11 +10,13 @@ German conversation practice with an AI tutor — currently a specific persona, 
 - **English is fine when you don't know a word.** Write the English word if you're stuck — the tutor understands it and uses the German word naturally in her reply. If what you wrote otherwise has no grammar mistake, you still get an "in German" card showing how to say it.
 - **Corrections.** When your message has a mistake, you get the corrected sentence with the changed words highlighted, a short explanation, and the mistake type (word order, case, gender/article, verb conjugation, and so on).
 - **Translation and word lookup.** Hover a word for a quick translation, or tap it for its dictionary form and a **+** to save it. The **translate** button opens the whole-sentence translation, plus an **explain grammar** button for a short plain-English breakdown — saved to history once generated, so reopening it is free.
-- **Vocab page** (`/vocab`). Your saved words as click-to-reveal cards, with a show-all/hide-all toggle — doubles as light self-testing. Remove the ones you no longer want.
-- **Flashcards** (`/vocab`). Every word you save becomes a flashcard. Press **Start session**: you see the German word, recall the meaning, flip the card, and say how well you knew it. The card comes back right before you'd forget it (spaced repetition, FSRS). A badge on the `vocab` link shows how many are due.
+- **Vocab page** (`/vocab`). Search, sort, and filter saved words, then tap a card to reveal its meaning. The page marks words ready to review and words missing a meaning.
+- **Flashcards** (`/vocab`). Review due words or choose extra practice. Each review round ends after its available cards, returns to the word list, and shows a completion summary. A badge on the `vocab` link shows how many words are ready.
 - **Chat history.** Conversations are saved, with their corrections, translations and grammar explanations, and you can reopen or delete them from the chats menu. The logo always opens a new chat.
 - **Ask side panel.** Signed-in learners can ask short German questions or paste a sentence for a translation and brief grammar note. The Words tab reuses the conversation's existing glosses. Ask uses `openai/gpt-oss-20b` on Groq and keeps its short thread in browser memory for the current page visit.
 - **Try before signing in.** You can send 5 messages a day without an account. Sign in with email/password (you confirm the address with a code sent by email) or Google for 35 a day, and to save your progress.
+
+Daily limits reset at 00:00 UTC. Ask submissions and fresh grammar explanations use the same allowance as chat messages. A banner above the chat box shows when your limit or the shared app-wide cap is reached and when it resets. See the [roadmap](ROADMAP.md) for Translate and remaining work.
 
 ## How a message is handled
 
@@ -80,6 +82,8 @@ npm run dev                  # http://localhost:3000
 **Database:** run the migrations in [supabase/migrations/](supabase/migrations/) in order, either with `supabase db push` or by pasting each file into the Supabase SQL editor. They create every table with row-level security turned on.
 
 **Google sign-in** (optional): enable the Google provider under Supabase → Authentication → Providers, and add `http://localhost:3000/auth/callback` to the allowed redirect URLs. Email/password sign-in works without this.
+
+**Password recovery:** add your production `/auth/callback` URL and `http://localhost:3000/auth/callback` to Supabase Auth's allowed redirect URLs, then test a recovery email end to end. The reset form is at `/login/reset`.
 
 ## Scripts
 

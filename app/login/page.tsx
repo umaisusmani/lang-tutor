@@ -73,7 +73,7 @@ function LoginForm() {
             <p className="text-ink-2 text-[15px] leading-relaxed">
               {mode === 'signin'
                 ? 'Sign in to keep your vocab list and conversation history.'
-                : 'Create an account to save your progress and chat without limits.'}
+                : 'Create an account to save your progress and get 35 messages a day.'}
             </p>
           </div>
 
@@ -168,6 +168,7 @@ function LoginForm() {
           </form>
 
           <div className="text-ink-3 flex flex-col gap-1.5 font-mono text-[11px] leading-[1.7]">
+            {mode === 'signin' && <Link href="/login/reset" className="py-1 text-sm underline">Forgot your password?</Link>}
             <button
               type="button"
               onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}

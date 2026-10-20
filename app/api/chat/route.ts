@@ -9,7 +9,7 @@ import {
   resolveCefrLevel,
   updateCefrLevel,
 } from '@/lib/services/profile.service';
-import { consumeMessage } from '@/lib/services/session.service';
+import { consumeMessage, getQuotaStatus } from '@/lib/services/session.service';
 
 /**
  * Controller for the chat endpoint: parse the request, work out who is asking,
@@ -47,10 +47,13 @@ export async function POST(req: Request) {
   // *visible* reply. Applies to everyone: signed-in users have their own,
   // larger daily cap, and all traffic shares the global budget cap.
   const usage = await consumeMessage(userId);
+  const quota = await getQuotaStatus(userId);
+  if (!usage.allowed) quota.reason = usage.reason;
 
   if (!usage.allowed) {
     const stream = createUIMessageStream<LangTutorUIMessage>({
       execute: async ({ writer }) => {
+        writer.write({ type: 'data-quota', data: quota, transient: true });
         writer.write({
           type: 'data-rateLimited',
           id: 'rate-limit-1',
@@ -81,7 +84,10 @@ export async function POST(req: Request) {
     // Returned, not fired-and-forgotten: the response stays open until this
     // promise settles, which is how the service's late writes (correction,
     // gloss, vocab) make it to the client at all.
-    execute: ({ writer }) => runChatTurn(turn, writer),
+    execute: ({ writer }) => {
+      writer.write({ type: 'data-quota', data: quota, transient: true });
+      return runChatTurn(turn, writer);
+    },
   });
 
   return createUIMessageStreamResponse({ stream });

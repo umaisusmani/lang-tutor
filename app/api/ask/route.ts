@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { streamAskAnswer } from '@/lib/ask';
 import { isCefrLevel } from '@/lib/prompts';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
-import { consumeMessage } from '@/lib/services/session.service';
+import { consumeMessage, getQuotaStatus } from '@/lib/services/session.service';
 
 const MAX_BODY_CHARS = 9000;
 const MAX_QUESTION_CHARS = 500;
@@ -67,10 +67,12 @@ export async function POST(req: Request) {
   // Signed-in learners pay from the same daily allowance as chat and explanations.
   // This check happens before the model call so capped requests cost no tokens.
   const usage = await consumeMessage(userId);
+  const quota = await getQuotaStatus(userId);
+  if (!usage.allowed) quota.reason = usage.reason;
   if (!usage.allowed) {
     return Response.json(
-      { error: 'Daily message limit reached.', reason: usage.reason, signedIn: true },
-      { status: 429 },
+      { quota, error: usage.reason === 'unavailable' ? 'Could not check your message allowance.' : 'Daily message limit reached.', reason: usage.reason, signedIn: true },
+      { status: usage.reason === 'unavailable' ? 503 : 429 },
     );
   }
 
@@ -85,6 +87,6 @@ export async function POST(req: Request) {
   });
 
   return result.toTextStreamResponse({
-    headers: { 'X-Messages-Remaining': String(usage.remaining) },
+    headers: { 'X-Messages-Remaining': String(usage.remaining), 'X-Quota-Status': JSON.stringify(quota) },
   });
 }

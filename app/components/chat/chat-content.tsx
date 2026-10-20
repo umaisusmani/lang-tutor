@@ -1,7 +1,8 @@
 'use client';
 
 import type { ChatStatus } from 'ai';
-import Link from 'next/link';
+import type { ReactNode } from 'react';
+import type { QuotaReason } from '@/lib/quota';
 
 import { GlossedText } from '@/app/components/glossed-text';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
@@ -44,9 +45,10 @@ function resetTimeLabel(): string {
 }
 
 export function limitMessage(
-  reason: 'user' | 'global' | undefined,
+  reason: QuotaReason | undefined,
   signedIn: boolean,
 ): string {
+  if (reason === 'unavailable') return 'Could not check your message allowance. Please try again.';
   const resets = `Resets at ${resetTimeLabel()}.`;
   if (reason === 'global') return `The tutor has hit its limit for today. ${resets}`;
   return signedIn
@@ -66,6 +68,7 @@ export function ChatWelcome({
   remaining,
   signedIn,
   starters,
+  disabled,
   persona,
   onSend,
 }: {
@@ -73,11 +76,12 @@ export function ChatWelcome({
   remaining: number | null;
   signedIn: boolean;
   starters: Starter[];
+  disabled: boolean;
   persona: PersonaProfile;
   onSend: (text: string) => void;
 }) {
   return (
-    <main className="flex flex-1 flex-col justify-center gap-[26px] py-10">
+    <main className="flex min-h-full flex-col justify-start gap-[26px] py-6 md:justify-center md:py-10">
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center gap-2.5">
           <PersonaAvatar persona={persona} size={48} />
@@ -110,6 +114,7 @@ export function ChatWelcome({
           <button
             key={de}
             type="button"
+            disabled={disabled}
             onClick={() => onSend(de)}
             className="border-line bg-panel hover:shadow-[3px_3px_0_var(--line)] flex cursor-pointer flex-col gap-[3px] rounded-[14px] border-2 px-4 py-3.5 text-left transition-transform hover:-translate-x-px hover:-translate-y-px"
           >
@@ -154,38 +159,16 @@ export function ChatThread({
   const busy = status === 'submitted' || status === 'streaming';
 
   return (
-    <main className="flex flex-1 flex-col gap-[34px] pt-[22px] pb-7">
+    <main className="flex min-h-full flex-col gap-[34px] pt-[22px] pb-7">
+      <p className="sr-only" role="status">
+        {busy ? 'The tutor is replying.' : messages.length > 0 ? 'Reply complete.' : ''}
+      </p>
       {messages.map((message, messageIndex) => {
         const text = messageText(message);
         const rateLimited = message.parts.find((part) => part.type === 'data-rateLimited')?.data;
 
         if (rateLimited) {
-          return (
-            <div
-              key={message.id}
-              className="border-line bg-yellow text-on-bright flex flex-col items-start gap-2 rounded-[18px] border-2 p-6 shadow-[4px_4px_0_var(--line)]"
-            >
-              <span className="font-display text-[15px] tracking-[0.1em] uppercase">
-                {rateLimited.reason === 'global'
-                  ? 'tutor is resting'
-                  : `${rateLimited.cap} of ${rateLimited.cap} messages`}
-              </span>
-              <h2 className="font-display text-[38px] font-black tracking-[0.02em]">
-                Das war&apos;s für heute.
-              </h2>
-              <p className="max-w-[46ch] text-[15px] leading-[1.55]">
-                {limitMessage(rateLimited.reason, rateLimited.signedIn)}
-              </p>
-              {!rateLimited.signedIn && (
-                <Link
-                  href="/login"
-                  className="bg-ink text-paper font-display mt-2 rounded-full px-5 py-[9px] text-[19px] tracking-[0.04em] no-underline transition-transform hover:translate-x-px hover:translate-y-px"
-                >
-                  Sign in →
-                </Link>
-              )}
-            </div>
-          );
+          return <p key={message.id} className="text-ink-3 text-sm" role="status">This message was not sent.</p>;
         }
 
         if (message.role === 'user') {
@@ -378,7 +361,7 @@ export function ChatThread({
       )}
 
       {error && (
-        <p className="font-mono text-[12.5px] text-red-600 dark:text-red-400">
+        <p role="alert" className="font-mono text-[12.5px] text-red-600 dark:text-red-400">
           Etwas ist schiefgelaufen. Bitte versuch es noch einmal.
         </p>
       )}
@@ -390,14 +373,14 @@ export function ChatComposer({
   input,
   busy,
   capped,
-  signedIn,
+  quotaNotice,
   onInputChange,
   onSend,
 }: {
   input: string;
   busy: boolean;
   capped: boolean;
-  signedIn: boolean;
+  quotaNotice: ReactNode;
   onInputChange: (value: string) => void;
   onSend: (text: string) => void;
 }) {
@@ -409,19 +392,14 @@ export function ChatComposer({
       }}
       className="bg-paper sticky bottom-0 flex flex-col gap-3 pt-3 pb-6"
     >
+      {quotaNotice}
       <div className="bg-line h-0.5 opacity-50" />
       <div className="flex items-center gap-2.5">
         <input
           value={input}
           onChange={(event) => onInputChange(event.currentTarget.value)}
-          disabled={capped}
-          placeholder={
-            capped
-              ? signedIn
-                ? 'Back tomorrow'
-                : 'Sign in to keep going'
-              : 'Schreib auf Deutsch… English words are fine too'
-          }
+          aria-label="Message in German"
+          placeholder="Schreib auf Deutsch… English words are fine too"
           className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
         />
         <button

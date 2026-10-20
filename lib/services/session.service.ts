@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
+import { nextUtcReset, type QuotaReason, type QuotaStatus } from '@/lib/quota';
 
 const SESSION_COOKIE = 'session_id';
 
@@ -16,7 +17,7 @@ export const USER_DAILY_CAP = 35;
  */
 export const GLOBAL_DAILY_CAP = Number(process.env.GLOBAL_DAILY_MESSAGE_CAP) || 300;
 
-export type LimitReason = 'user' | 'global';
+export type LimitReason = QuotaReason;
 
 export type UsageResult =
   | { allowed: true; remaining: number; cap: number }
@@ -64,26 +65,26 @@ function utcDay(): string {
  * up as the "resting" notice when someone actually sends.
  */
 export async function getRemainingMessages(userId: string | null): Promise<number> {
+  return (await getQuotaStatus(userId)).remaining;
+}
+
+/** Read both limits without spending a message or creating an anonymous cookie. */
+export async function getQuotaStatus(userId: string | null): Promise<QuotaStatus> {
   const cap = dailyCapFor(userId);
-
-  let key: string;
-  if (userId) {
-    key = `user:${userId}`;
-  } else {
-    const sessionId = (await cookies()).get(SESSION_COOKIE)?.value;
-    if (!sessionId) return cap;
-    key = `anon:${sessionId}`;
+  const resetsAt = nextUtcReset();
+  try {
+    const sessionId = userId ? null : (await cookies()).get(SESSION_COOKIE)?.value;
+    const key = userId ? `user:${userId}` : sessionId ? `anon:${sessionId}` : null;
+    const { data, error } = await createServiceRoleClient().from('daily_usage')
+      .select('key,message_count').in('key', key ? [key, 'global'] : ['global']).eq('day', utcDay());
+    if (error) throw error;
+    const remaining = Math.max(0, cap - (data?.find((row) => row.key === key)?.message_count ?? 0));
+    const globalCount = data?.find((row) => row.key === 'global')?.message_count ?? 0;
+    return { remaining, cap, resetsAt, reason: globalCount >= GLOBAL_DAILY_CAP ? 'global' : remaining === 0 ? 'user' : null };
+  } catch (error) {
+    console.error('[session.service] could not read allowance:', error);
+    return { remaining: 0, cap, resetsAt, reason: 'unavailable' };
   }
-
-  const supabase = createServiceRoleClient();
-  const { data } = await supabase
-    .from('daily_usage')
-    .select('message_count')
-    .eq('key', key)
-    .eq('day', utcDay())
-    .maybeSingle();
-
-  return Math.max(0, cap - (data?.message_count ?? 0));
 }
 
 /**
@@ -113,7 +114,7 @@ export async function consumeMessage(userId: string | null): Promise<UsageResult
   const row = Array.isArray(data) ? data[0] : data;
   if (error || !row) {
     console.error('[session.service] consume_message failed:', error?.message);
-    return { allowed: false, reason: 'global', remaining: 0, cap };
+    return { allowed: false, reason: 'unavailable', remaining: 0, cap };
   }
 
   if (!row.allowed) {

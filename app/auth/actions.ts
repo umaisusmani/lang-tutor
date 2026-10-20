@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/server';
  * is set when the account exists but its email isn't confirmed yet, which
  * switches the login page to the "enter the code" screen for that address.
  */
-export type AuthState = { error?: string; notice?: string; pendingEmail?: string } | null;
+export type AuthState = { error?: string; notice?: string; pendingEmail?: string; success?: boolean } | null;
 
 /**
  * This request's own origin, for links that email or OAuth providers send the
@@ -166,6 +166,33 @@ export async function signOut() {
   await supabase.auth.signOut();
   revalidatePath('/', 'layout');
   redirect('/');
+}
+
+export async function requestPasswordReset(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const email = String(formData.get('email') ?? '').trim();
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'Enter a valid email address.' };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${await getOrigin()}/auth/callback?next=${encodeURIComponent('/login/reset?mode=update')}`,
+  });
+  if (error) return { error: 'Could not send the reset email. Please try again in a few minutes.' };
+  return { notice: 'If an account uses that address, a password reset link is on its way. Check your inbox and spam folder.' };
+}
+
+export async function updatePassword(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const password = String(formData.get('password') ?? '');
+  const confirmation = String(formData.get('confirmation') ?? '');
+  if (password.length < 6 || password.length > 128) return { error: 'Use a password between 6 and 128 characters.' };
+  if (password !== confirmation) return { error: 'The passwords do not match.' };
+  const supabase = await createClient();
+  const { data, error: authError } = await supabase.auth.getUser();
+  if (authError || !data.user) return { error: 'This reset link has expired. Request a new link.' };
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
+  revalidatePath('/', 'layout');
+  return { success: true, notice: 'Your password has been updated.' };
 }
 
 /**

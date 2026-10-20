@@ -4,7 +4,7 @@ import { streamGrammarExplanation, type ExplainKind } from '@/lib/explain';
 import { isCefrLevel } from '@/lib/prompts';
 import { annotateMessage, getMessage } from '@/lib/services/conversation.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
-import { consumeMessage } from '@/lib/services/session.service';
+import { consumeMessage, getQuotaStatus } from '@/lib/services/session.service';
 
 /** Longest text an unpersisted request may ask about. Replies are a few
  * sentences; this only stops the endpoint being used as a free model proxy. */
@@ -79,10 +79,12 @@ export async function POST(req: Request) {
   // A fresh explanation spends a message from the same daily allowance as
   // chat, signed in or not. Cached ones returned above and cost nothing.
   const usage = await consumeMessage(userId);
+  const quota = await getQuotaStatus(userId);
+  if (!usage.allowed) quota.reason = usage.reason;
   if (!usage.allowed) {
     return Response.json(
-      { error: 'Daily message limit reached.', reason: usage.reason, signedIn: userId !== null },
-      { status: 429 },
+      { quota, error: usage.reason === 'unavailable' ? 'Could not check your message allowance.' : 'Daily message limit reached.', reason: usage.reason, signedIn: userId !== null },
+      { status: usage.reason === 'unavailable' ? 503 : 429 },
     );
   }
 
@@ -98,6 +100,6 @@ export async function POST(req: Request) {
   // Lets the client show the new allowance without guessing whether this
   // request was a cached (free) one -- cached answers return early, above.
   return result.toTextStreamResponse({
-    headers: { 'X-Messages-Remaining': String(usage.remaining) },
+    headers: { 'X-Messages-Remaining': String(usage.remaining), 'X-Quota-Status': JSON.stringify(quota) },
   });
 }

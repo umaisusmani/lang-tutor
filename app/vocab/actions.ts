@@ -69,7 +69,6 @@ export type DiscoverCard = { lemma: string; example: string; exampleTranslation:
 
 export type SessionPayload = {
   cards: SessionCard[];
-  discover: DiscoverCard[];
   /** True when these are extra cards that aren't due yet. */
   extra: boolean;
 };
@@ -84,20 +83,12 @@ const DISCOVER_PER_SESSION = 3;
  */
 export async function startSessionAction(
   mode: 'due' | 'practice' = 'due',
-  /** Starter words the learner skipped before (kept in their browser). */
-  skippedLemmas: string[] = [],
 ): Promise<SessionPayload | null> {
   const userId = await getCurrentUserId();
   if (!userId) return null;
 
-  let queue = mode === 'practice' ? await getPracticeQueue(userId) : await getReviewQueue(userId);
-  // Nothing due: start on extra practice instead of an empty screen. The
-  // schedule is a guide to what's most useful, not a gate on practising.
-  let extra = mode === 'practice';
-  if (queue.length === 0 && !extra) {
-    queue = await getPracticeQueue(userId);
-    extra = true;
-  }
+  const queue = mode === 'practice' ? await getPracticeQueue(userId) : await getReviewQueue(userId);
+  const extra = mode === 'practice';
   const cards: SessionCard[] = [];
   // A word has a card per direction. Only one of them goes into a session, so
   // answering one doesn't hand over the answer to its sibling (Anki calls this
@@ -133,14 +124,25 @@ export async function startSessionAction(
     });
   }
 
-  // New words from the starter list, for the learner's level, skipping
-  // anything already saved. Not scheduled: they only become cards if added.
+  return { cards, extra };
+}
+
+/** Discovery is optional and separate from a completed review. */
+export async function discoverWordsAction(skippedLemmas: string[] = []): Promise<DiscoverCard[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Sign in to discover words.');
   const level = await resolveCefrLevel(userId, (await cookies()).get('cefr_level')?.value);
   const saved = new Set((await listVocab(userId)).map((e) => e.lemma.toLowerCase()));
   for (const lemma of skippedLemmas.slice(0, 1000)) saved.add(String(lemma).toLowerCase());
-  const discover = pickStarterWords(level, saved, DISCOVER_PER_SESSION);
+  return pickStarterWords(level, saved, DISCOVER_PER_SESSION);
+}
 
-  return { cards, discover, extra };
+export async function previewStarterWordAction(lemma: string): Promise<{ translation: string } | null> {
+  const userId = await getCurrentUserId();
+  const word = findStarterWord(lemma);
+  if (!userId || !word) return null;
+  const translation = await translateStarterWord(word, { userId });
+  return translation?.trim() ? { translation } : null;
 }
 
 /**
@@ -148,7 +150,7 @@ export async function startSessionAction(
  * database trigger). The example and level come from the shipped list, looked
  * up by lemma -- the client only says which word.
  */
-export async function addStarterWordAction(lemma: string): Promise<{ ok: boolean }> {
+export async function addStarterWordAction(lemma: string, meaning: string): Promise<{ ok: boolean }> {
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
 
@@ -156,7 +158,10 @@ export async function addStarterWordAction(lemma: string): Promise<{ ok: boolean
   if (!word) return { ok: false };
 
   try {
-    const translation = await translateStarterWord(word, { userId });
+    // The learner has already seen this meaning. As with saveVocabAction, it is
+    // their own editable vocabulary data; canonical example text stays server-side.
+    if (typeof meaning !== 'string' || !meaning.trim() || meaning.length > 500) return { ok: false };
+    const translation = meaning.trim();
     const ok = await saveVocabEntry(userId, {
       term: word.lemma,
       lemma: word.lemma,
@@ -183,12 +188,13 @@ export async function addStarterWordAction(lemma: string): Promise<{ ok: boolean
 export async function gradeCardAction(
   cardId: string,
   rating: number,
-  meta: { surface: ReviewSurface; durationMs?: number; answerGiven?: string },
+  meta: { surface: ReviewSurface; durationMs?: number; answerGiven?: string; expectedReps?: number },
 ): Promise<RecordReviewResult | { status: 'unauthenticated' }> {
   const userId = await getCurrentUserId();
   if (!userId) return { status: 'unauthenticated' };
 
   if (!Number.isInteger(rating) || rating < 1 || rating > 4) return { status: 'error' };
+  if (meta.expectedReps !== undefined && (!Number.isInteger(meta.expectedReps) || meta.expectedReps < 0)) return { status: 'error' };
   if (meta.surface !== 'panel' && meta.surface !== 'review_page') return { status: 'error' };
 
   const result = await recordReview(userId, cardId, rating as Grade, meta);

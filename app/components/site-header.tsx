@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { saveTimezone, signOut } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
@@ -45,6 +45,10 @@ export function SiteHeader({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const confirm = useConfirm();
   const router = useRouter();
+  const chatsTrigger = useRef<HTMLButtonElement>(null);
+  const accountTrigger = useRef<HTMLButtonElement>(null);
+  const chatsPanel = useRef<HTMLDivElement>(null);
+  const accountPanel = useRef<HTMLDivElement>(null);
 
   // Tell the server the learner's timezone once per browser session, so the
   // flashcard day rolls over at 4am where they are, not at 4am UTC.
@@ -64,12 +68,19 @@ export function SiteHeader({
     if (!chatsOpen && !accountOpen) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        (chatsOpen ? chatsTrigger : accountTrigger).current?.focus();
         setChatsOpen(false);
         setAccountOpen(false);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [chatsOpen, accountOpen]);
+
+  useEffect(() => {
+    const panel = chatsOpen ? chatsPanel.current : accountOpen ? accountPanel.current : null;
+    panel?.querySelector<HTMLElement>('a[href], button:not([disabled])')?.focus();
   }, [chatsOpen, accountOpen]);
 
   function handleLevelChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -163,7 +174,7 @@ export function SiteHeader({
                 {dueCount > 0 && (
                   <span
                     className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
-                    aria-label={`${dueCount} cards due`}
+                    aria-label={`${dueCount} words ready to review`}
                   >
                     {dueCount > 99 ? '99+' : dueCount}
                   </span>
@@ -173,9 +184,14 @@ export function SiteHeader({
           )}
 
           {userEmail && (
-            <div className="relative">
+            <div className="relative" onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setChatsOpen(false);
+            }}>
               <button
+                ref={chatsTrigger}
                 type="button"
+                aria-expanded={chatsOpen}
+                aria-controls="conversation-panel"
                 onClick={() => {
                   setAccountOpen(false);
                   setChatsOpen((v) => !v);
@@ -190,13 +206,14 @@ export function SiteHeader({
                   <button
                     type="button"
                     aria-label="Close menu"
-                    onClick={() => setChatsOpen(false)}
+                    tabIndex={-1}
+                    onClick={() => { setChatsOpen(false); chatsTrigger.current?.focus(); }}
                     className="fixed inset-0 z-10 cursor-default"
                   />
-                  <div className="border-line bg-panel absolute right-0 z-20 mt-2 flex w-[260px] animate-[fade-rise_160ms_ease-out] flex-col rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)]">
+                  <div id="conversation-panel" ref={chatsPanel} role="region" aria-label="Conversations" className="border-line bg-panel absolute right-0 z-20 mt-2 flex w-[260px] animate-[fade-rise_160ms_ease-out] flex-col rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)]">
                     <Link
                       href="/?c=new"
-                      onClick={() => setChatsOpen(true)}
+                      onClick={() => setChatsOpen(false)}
                       className={`rounded-lg px-2.5 py-2 font-mono text-[11px] no-underline ${
                         conversationId === null
                           ? 'bg-yellow text-on-bright'
@@ -220,7 +237,7 @@ export function SiteHeader({
                           >
                             <Link
                               href={`/?c=${c.id}`}
-                              onClick={() => setChatsOpen(true)}
+                              onClick={() => setChatsOpen(false)}
                               className={`min-w-0 flex-1 truncate px-2.5 py-2 text-[13px] no-underline ${
                                 current ? 'font-semibold' : 'text-ink-2 group-hover:text-ink'
                               }`}
@@ -252,10 +269,14 @@ export function SiteHeader({
           )}
 
           {userEmail ? (
-            <div className="relative">
+            <div className="relative" onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setAccountOpen(false);
+            }}>
               <button
+                ref={accountTrigger}
                 type="button"
-                aria-haspopup="menu"
+                aria-label="Account options"
+                aria-controls="account-panel"
                 aria-expanded={accountOpen}
                 onClick={() => {
                   setChatsOpen(false);
@@ -282,11 +303,15 @@ export function SiteHeader({
                   <button
                     type="button"
                     aria-label="Close menu"
-                    onClick={() => setAccountOpen(false)}
+                    tabIndex={-1}
+                    onClick={() => { setAccountOpen(false); accountTrigger.current?.focus(); }}
                     className="fixed inset-0 z-10 cursor-default"
                   />
                   <div
-                    role="menu"
+                    id="account-panel"
+                    ref={accountPanel}
+                    role="region"
+                    aria-label="Account options"
                     className="border-line bg-panel absolute right-0 z-20 mt-2 flex w-[220px] animate-[fade-rise_160ms_ease-out] flex-col rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)]"
                   >
                     <div className="flex flex-col gap-0.5 px-2.5 py-2">
@@ -297,7 +322,6 @@ export function SiteHeader({
 
                     <button
                       type="button"
-                      role="menuitem"
                       aria-label="Toggle color theme"
                       onClick={() => onThemeToggle?.()}
                       className="text-ink hover:bg-soft flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium"
@@ -326,8 +350,7 @@ export function SiteHeader({
                     <form action={signOut}>
                       <button
                         type="submit"
-                        role="menuitem"
-                        className="text-ink hover:bg-yellow hover:text-on-bright w-full cursor-pointer rounded-lg px-2.5 py-2 text-left font-mono text-[11px]"
+                          className="text-ink hover:bg-yellow hover:text-on-bright w-full cursor-pointer rounded-lg px-2.5 py-2 text-left font-mono text-[11px]"
                       >
                         sign out
                       </button>

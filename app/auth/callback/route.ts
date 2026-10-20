@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { createClient } from '@/lib/supabase/server';
+import { authRedirectPath } from '@/lib/auth-redirect';
 
 /**
  * OAuth callback. Google (step 5) redirects here with a `code` that has to be
@@ -11,7 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/';
+  const next = authRedirectPath(searchParams.get('next'));
 
   if (code) {
     const supabase = await createClient();
@@ -28,5 +29,5 @@ export async function GET(request: NextRequest) {
     console.error('[auth/callback] no code param on callback request');
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+  return NextResponse.redirect(`${origin}${next.startsWith('/login/reset') ? '/login/reset?error=recovery_failed' : '/login?error=auth_callback_failed'}`);
 }

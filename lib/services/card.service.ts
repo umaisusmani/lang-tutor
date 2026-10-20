@@ -7,6 +7,7 @@ import {
   type Grade,
 } from '@/lib/srs';
 import { createClient } from '@/lib/supabase/server';
+import { selectReviewWords } from '@/lib/review-session';
 import type { Card, CardSchedule, ReviewSurface, VocabEntry } from '@/lib/types/db';
 
 /**
@@ -69,6 +70,15 @@ async function today(userId: string, now: Date) {
   return { start, end, newLeft: Math.max(0, NEW_PER_DAY - (count ?? 0)) };
 }
 
+/** Bury a word's other direction for today; due learning steps remain eligible. */
+async function reviewedWordsSince(userId: string, start: Date): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('cards')
+    .select('vocab_entry_id').eq('user_id', userId).gte('last_review', start.toISOString());
+  if (error) throw new Error('Could not load review progress.');
+  return new Set((data ?? []).flatMap((card) => card.vocab_entry_id ? [card.vocab_entry_id as string] : []));
+}
+
 /**
  * The cards to review now, in the order plans/flashcards.md §7.3 sets:
  *
@@ -84,7 +94,8 @@ async function today(userId: string, now: Date) {
  */
 export async function getReviewQueue(userId: string, now = new Date()): Promise<ReviewItem[]> {
   const supabase = await createClient();
-  const { end, newLeft } = await today(userId, now);
+  const { start, end, newLeft } = await today(userId, now);
+  const reviewedWords = await reviewedWordsSince(userId, start);
 
   const base = () =>
     supabase.from('cards').select(REVIEW_ITEM_COLUMNS).eq('user_id', userId).eq('suspended', false);
@@ -100,7 +111,7 @@ export async function getReviewQueue(userId: string, now = new Date()): Promise<
   for (const result of [learning, review, fresh]) {
     if (result.error) {
       console.error('[card.service] getReviewQueue failed:', result.error.message);
-      return [];
+      throw new Error('Could not load your review cards.');
     }
   }
 
@@ -109,11 +120,11 @@ export async function getReviewQueue(userId: string, now = new Date()): Promise<
     .sort((a, b) => a.r - b.r)
     .map(({ card }) => card);
 
-  const queue = [
+  const queue = selectReviewWords([
     ...((learning.data ?? []) as ReviewItem[]),
-    ...byRecall,
-    ...((fresh.data ?? []) as ReviewItem[]),
-  ].slice(0, REVIEWS_PER_DAY);
+    ...byRecall.filter((card) => !reviewedWords.has(card.vocab_entry_id ?? '')),
+    ...((fresh.data ?? []) as ReviewItem[]).filter((card) => !reviewedWords.has(card.vocab_entry_id ?? '')),
+  ]).slice(0, REVIEWS_PER_DAY);
 
   return shuffle(queue);
 }
@@ -124,10 +135,9 @@ export const PRACTICE_SIZE = 10;
 /**
  * Cards to practice when nothing (more) is due -- Anki's "review ahead".
  *
- * Takes cards the normal queue wouldn't show right now: cards still waiting
- * out a learning step (failed a minute ago), then review cards not due until
- * tomorrow or later, lowest retrievability first (the ones closest to being
- * forgotten), then new cards past today's allowance. Graded exactly like a
+ * Takes review cards not due until tomorrow or later, then new cards past
+ * today's allowance. Words reviewed today and waiting learning steps are
+ * excluded, so extra practice doesn't immediately repeat the completed round. Graded like a
  * due card; FSRS accounts for the shorter elapsed time, so an early "Good"
  * simply stretches the interval less than an on-time one would.
  */
@@ -137,13 +147,13 @@ export async function getPracticeQueue(
   limit = PRACTICE_SIZE,
 ): Promise<ReviewItem[]> {
   const supabase = await createClient();
-  const { end, newLeft } = await today(userId, now);
+  const { start, end, newLeft } = await today(userId, now);
+  const reviewedWords = await reviewedWordsSince(userId, start);
 
   const base = () =>
     supabase.from('cards').select(REVIEW_ITEM_COLUMNS).eq('user_id', userId).eq('suspended', false);
 
-  const [waiting, ahead, fresh] = await Promise.all([
-    base().in('state', [1, 3]).gt('due', now.toISOString()).order('due').limit(limit),
+  const [ahead, fresh] = await Promise.all([
     base().eq('state', 2).gte('due', end.toISOString()).limit(500),
     // Skip the first `newLeft` new cards: the regular queue already offers them.
     base()
@@ -152,10 +162,10 @@ export async function getPracticeQueue(
       .range(newLeft, newLeft + limit - 1),
   ]);
 
-  for (const result of [waiting, ahead, fresh]) {
+  for (const result of [ahead, fresh]) {
     if (result.error) {
       console.error('[card.service] getPracticeQueue failed:', result.error.message);
-      return [];
+      throw new Error('Could not load extra practice.');
     }
   }
 
@@ -165,43 +175,23 @@ export async function getPracticeQueue(
     .map(({ card }) => card);
 
   return shuffle(
-    [
-      ...((waiting.data ?? []) as ReviewItem[]),
+    selectReviewWords([
       ...byRecall,
       ...((fresh.data ?? []) as ReviewItem[]),
-    ].slice(0, limit),
+    ].filter((card) => !reviewedWords.has(card.vocab_entry_id ?? ''))).slice(0, limit),
   );
 }
 
 /**
- * How many cards the queue would hold right now -- the header badge. Counts
- * only, no rows, so it's cheap enough to run on every page load.
+ * Count the same usable words and directions that a session will actually show.
  */
 export async function getDueCount(userId: string, now = new Date()): Promise<number> {
-  const supabase = await createClient();
-  const { end, newLeft } = await today(userId, now);
-
-  const count = () =>
-    supabase
-      .from('cards')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('suspended', false);
-
-  const [learning, review, fresh] = await Promise.all([
-    count().in('state', [1, 3]).lte('due', now.toISOString()),
-    count().eq('state', 2).lt('due', end.toISOString()),
-    count().eq('state', 0),
-  ]);
-
-  const failed = [learning, review, fresh].find((r) => r.error);
-  if (failed) {
-    console.error('[card.service] getDueCount failed:', failed.error!.message);
+  try {
+    return (await getReviewQueue(userId, now)).length;
+  } catch (error) {
+    console.error('[card.service] getDueCount failed:', error);
     return 0;
   }
-
-  const total = (learning.count ?? 0) + (review.count ?? 0) + Math.min(fresh.count ?? 0, newLeft);
-  return Math.min(total, REVIEWS_PER_DAY);
 }
 
 export type RecordReviewResult =
@@ -225,7 +215,7 @@ export async function recordReview(
   userId: string,
   cardId: string,
   rating: Grade,
-  meta: { surface: ReviewSurface; durationMs?: number; answerGiven?: string },
+  meta: { surface: ReviewSurface; durationMs?: number; answerGiven?: string; expectedReps?: number },
   now = new Date(),
 ): Promise<RecordReviewResult> {
   if (![1, 2, 3, 4].includes(rating)) return { status: 'error' };
@@ -245,6 +235,8 @@ export async function recordReview(
   if (!row) return { status: 'not_found' };
 
   const card = row as Card;
+  // Retrying after a lost response must not apply a successful grade twice.
+  if (meta.expectedReps !== undefined && meta.expectedReps !== card.reps) return { status: 'stale' };
   const { next, log } = gradeCard(card, rating, now);
 
   const durationMs =

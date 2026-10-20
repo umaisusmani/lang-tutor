@@ -16,6 +16,9 @@ import { ChatSidePanel } from '@/app/components/chat/side-panel';
 import { useConfirm } from '@/app/components/confirm-modal';
 import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
+import { QuotaBanner } from '@/app/components/quota-banner';
+import { useQuota } from '@/app/hooks/use-quota';
+import { isQuotaStatus, quotaFromResponse, type QuotaStatus } from '@/lib/quota';
 import { useTheme } from '@/app/hooks/use-theme';
 import { saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
@@ -36,7 +39,7 @@ export default function Chat({
   initialLevel,
   userEmail,
   userName,
-  initialRemaining,
+  initialQuota,
   messageCap,
   dueCount,
   initialMessages,
@@ -49,7 +52,7 @@ export default function Chat({
   initialLevel: CefrLevel;
   userEmail: string | null;
   userName: string | null;
-  initialRemaining: number | null;
+  initialQuota: QuotaStatus;
   messageCap: number;
   dueCount: number;
   initialMessages: LangTutorUIMessage[];
@@ -64,7 +67,8 @@ export default function Chat({
   const router = useRouter();
   const confirm = useConfirm();
   const { theme, toggleTheme } = useTheme();
-  const [remaining, setRemaining] = useState(initialRemaining);
+  const { quota, accept: acceptQuota, refresh: refreshQuota } = useQuota(initialQuota);
+  const remaining = quota.remaining;
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   // Which translation panels are open, keyed `${message.id}-reply` / `-corr`.
   const [openPanel, setOpenPanel] = useState<Record<string, boolean>>({});
@@ -83,11 +87,16 @@ export default function Chat({
     // startChatTurn). The inline message under the thread stays -- a reply
     // that never arrived should leave a mark in the conversation -- and this
     // adds the transient heads-up for a learner not looking at the bottom.
-    onError: () => notifyError("Couldn't reach the tutor. Please try again.", 'chat'),
+    onError: () => {
+      notifyError("Couldn't reach the tutor. Please try again.", 'chat');
+      void refreshQuota();
+    },
+    onFinish: () => { void refreshQuota(); },
     // Background steps (correction, gloss, history) report failures as
     // transient `notice` parts. They arrive here once and never enter
     // message.parts, so there's nothing to dedupe against on re-render.
     onData: (part) => {
+      if (part.type === 'data-quota') acceptQuota(part.data);
       if (part.type === 'data-notice') notifyError(part.data.message, part.data.source);
     },
   });
@@ -128,11 +137,11 @@ export default function Chat({
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, status]);
 
   const busy = status === 'submitted' || status === 'streaming';
-  const capped = remaining !== null && remaining <= 0;
+  const capped = quota.reason !== null || remaining <= 0;
   // Anonymous visitors have no vocab_entries to save into, so their gloss
   // panels stay exactly as they were: words and translations, no buttons.
   const canSave = userEmail !== null;
@@ -227,10 +236,10 @@ export default function Chat({
 
       if (!res.ok || !res.body) {
         let message = "Couldn't explain this one. Please try again.";
-        if (res.status === 429) {
+        if (res.status === 429 || res.status === 503) {
           const body = await res.json().catch(() => null);
           message = limitMessage(body?.reason, body?.signedIn === true);
-          setRemaining(0);
+          if (isQuotaStatus(body?.quota)) acceptQuota(body.quota);
         }
         notifyError(message, `explain-${key}`);
         return;
@@ -238,8 +247,8 @@ export default function Chat({
 
       // A fresh explanation spends a message server-side; a cached one doesn't.
       // The server says where the allowance stands either way.
-      const left = Number(res.headers.get('X-Messages-Remaining'));
-      if (res.headers.has('X-Messages-Remaining') && Number.isFinite(left)) setRemaining(left);
+      const updatedQuota = quotaFromResponse(res);
+      if (updatedQuota) acceptQuota(updatedQuota);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -259,6 +268,7 @@ export default function Chat({
       notifyError("Couldn't explain this one. Please try again.", `explain-${key}`);
     } finally {
       setExplaining((s) => ({ ...s, [key]: false }));
+      void refreshQuota();
     }
   }
 
@@ -269,7 +279,7 @@ export default function Chat({
     // the profile holds -- see the route for the race this closes.
     sendMessage({ text: trimmed }, { body: { conversationId: conversationId.current, level } });
     setInput('');
-    setRemaining((r) => (r === null ? null : Math.max(0, r - 1)));
+
   }
 
   async function promptAskSignUp() {
@@ -293,7 +303,7 @@ export default function Chat({
   return (
     // The header sits outside the 860px column, on its own 1080px track (see
     // SiteHeader) -- wider chrome, same readable line length for replies.
-    <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
+    <div className="bg-paper text-ink flex h-dvh min-h-[400px] flex-col items-center overflow-hidden px-[18px]">
       <SiteHeader
         level={level}
         onLevelChange={handleLevelChange}
@@ -309,26 +319,26 @@ export default function Chat({
         dueCount={dueCount}
       />
 
-      <div className="relative flex w-full max-w-[1240px] flex-1 justify-center">
-        {!sidePanelOpen && (
+      <div className="relative flex min-h-0 w-full max-w-[1240px] flex-1 justify-center">
           <button
             type="button"
             aria-label="Open Ask learning panel"
             aria-controls="chat-side-panel"
-            aria-expanded={false}
+            aria-expanded={sidePanelOpen}
             onClick={openAskPanel}
-            className="border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 -translate-y-1/2 items-center gap-1.5 rounded-l-xl border-2 border-r-0 py-2 pr-1 pl-2 font-mono text-[11px] shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright"
+            className={`${sidePanelOpen ? 'invisible' : ''} border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 -translate-y-1/2 items-center gap-1.5 rounded-l-xl border-2 border-r-0 py-2 pr-1 pl-2 font-mono text-[11px] shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright`}
           >
             <span>Ask</span><span aria-hidden="true" className="text-base leading-none">‹</span>
           </button>
-        )}
-        <div className="flex min-w-0 max-w-[860px] flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 max-w-[860px] flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           {messages.length === 0 ? (
             <ChatWelcome
               level={level}
               remaining={remaining}
               signedIn={userEmail !== null}
               starters={starters}
+              disabled={capped || busy}
               persona={persona}
               onSend={send}
             />
@@ -352,12 +362,13 @@ export default function Chat({
           )}
 
           <div ref={bottomRef} />
+          </div>
 
           <ChatComposer
             input={input}
             busy={busy}
             capped={capped}
-            signedIn={userEmail !== null}
+            quotaNotice={<QuotaBanner quota={quota} signedIn={userEmail !== null} onRetry={() => void refreshQuota()} />}
             onInputChange={setInput}
             onSend={send}
           />
@@ -371,7 +382,9 @@ export default function Chat({
           canSave={canSave}
           isSaved={isSaved}
           onSaveWord={saveWord}
-          onRemainingChange={setRemaining}
+          quota={quota}
+          onQuotaChange={acceptQuota}
+          onQuotaRefresh={refreshQuota}
           onAuthRequired={() => {
             setSidePanelOpen(false);
             void promptAskSignUp();

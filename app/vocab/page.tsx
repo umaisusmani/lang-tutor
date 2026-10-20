@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { PageHeader } from '@/app/components/page-header';
 import { VocabBrowser } from '@/app/vocab/vocab-browser';
-import { getDueCount } from '@/lib/services/card.service';
+import { getReviewQueue } from '@/lib/services/card.service';
 import { listConversations } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
 import { listVocab } from '@/lib/services/vocab.service';
@@ -14,7 +14,9 @@ export default async function VocabPage() {
 
   const entries = await listVocab(user.id);
   const conversations = await listConversations(user.id);
-  const dueCount = await getDueCount(user.id);
+  const dueCards = await getReviewQueue(user.id);
+  const dueCount = dueCards.length;
+  const dueWordIds = dueCards.flatMap((card) => card.vocab_entry_id ? [card.vocab_entry_id] : []);
   const levelCookie = (await cookies()).get('cefr_level')?.value;
   const level = await resolveCefrLevel(user.id, levelCookie);
 
@@ -41,16 +43,7 @@ export default async function VocabPage() {
       />
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
         <main className="flex flex-1 flex-col gap-[22px] pt-6 pb-7">
-          {entries.length === 0 ? (
-            <>
-              {heading}
-              <p className="text-ink-2 text-[15px] leading-relaxed">
-                Nothing saved yet. Words you save from the chat will show up here.
-              </p>
-            </>
-          ) : (
-            <VocabBrowser entries={entries} dueCount={dueCount} heading={heading} />
-          )}
+          <VocabBrowser entries={entries} dueCount={dueCount} dueWordIds={dueWordIds} heading={heading} />
         </main>
       </div>
     </div>

@@ -19,12 +19,12 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) {
-      return NextResponse.redirect(`${origin}/`);
+      return NextResponse.redirect(`${origin}${type === 'recovery' ? '/login/reset?mode=update' : '/'}`);
     }
     console.error('[auth/confirm] verifyOtp failed:', error.message);
   } else {
     console.error('[auth/confirm] missing token_hash or type');
   }
 
-  return NextResponse.redirect(`${origin}/login?error=confirm_failed`);
+  return NextResponse.redirect(`${origin}${type === 'recovery' ? '/login/reset?error=recovery_failed' : '/login?error=confirm_failed'}`);
 }

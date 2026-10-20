@@ -15,9 +15,22 @@ import type { VocabEntry } from '@/lib/types/db';
  * toggle always leaves every card in the state it names. Not remembered
  * between visits on purpose: the page opens hidden, ready to test.
  */
-export function VocabGrid({ entries }: { entries: VocabEntry[] }) {
+export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueWordIds: string[] }) {
   const [revealAll, setRevealAll] = useState(false);
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState('newest');
+  const due = new Set(dueWordIds);
+  const search = query.trim().toLocaleLowerCase();
+  const visible = entries.filter((entry) => (
+    `${entry.lemma} ${entry.translation ?? ''} ${entry.example_sentence ?? ''}`.toLocaleLowerCase().includes(search)
+    && (filter === 'all' || (filter === 'due' && due.has(entry.id))
+      || (filter === 'missing' && !entry.translation?.trim())
+      || (filter === 'mistakes' && entry.source === 'mistake'))
+  )).sort((a, b) => sort === 'az'
+    ? a.lemma.localeCompare(b.lemma, 'de')
+    : sort === 'oldest' ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at));
 
   function toggleCard(id: string) {
     setFlipped((prev) => {
@@ -35,6 +48,27 @@ export function VocabGrid({ entries }: { entries: VocabEntry[] }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+        <label className="flex flex-col gap-1 text-sm">
+          Find a word
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}
+            placeholder="German, English, or an example…" className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Show
+          <select value={filter} onChange={(event) => setFilter(event.target.value)} className="border-line bg-panel rounded-xl border-2 px-3 py-2">
+            <option value="all">All words</option><option value="due">Ready to review</option>
+            <option value="mistakes">From corrections</option><option value="missing">Missing meaning</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Sort
+          <select value={sort} onChange={(event) => setSort(event.target.value)} className="border-line bg-panel rounded-xl border-2 px-3 py-2">
+            <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="az">A–Z</option>
+          </select>
+        </label>
+      </div>
+      <p className="text-ink-3 text-sm" role="status">{visible.length} of {entries.length} words shown</p>
       <button
         type="button"
         onClick={toggleAll}
@@ -45,7 +79,7 @@ export function VocabGrid({ entries }: { entries: VocabEntry[] }) {
       </button>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-        {entries.map((entry) => {
+        {visible.map((entry) => {
           const revealed = revealAll !== flipped.has(entry.id);
           return (
             // The card is a div holding two buttons side by side, not one big
@@ -77,7 +111,7 @@ export function VocabGrid({ entries }: { entries: VocabEntry[] }) {
                 <span className="pr-12 text-[17px] font-semibold break-words">{entry.lemma}</span>
                 {revealed ? (
                   <span className="flex animate-[fade-rise_160ms_ease-out] flex-col gap-1">
-                    <span className="text-ink-2 font-mono text-[11px]">
+                    <span className="text-ink-2 text-sm">
                       {entry.translation ?? 'no translation saved'}
                     </span>
                     {/* Where the learner met the word. Words saved before
@@ -91,8 +125,8 @@ export function VocabGrid({ entries }: { entries: VocabEntry[] }) {
                 )}
               </button>
 
-              <span className="text-ink-3 pointer-events-none absolute bottom-2.5 left-4 font-mono text-[10px]">
-                {new Date(entry.created_at).toLocaleDateString()}
+              <span className="text-ink-3 pointer-events-none absolute bottom-2.5 left-4 text-xs">
+                {!entry.translation?.trim() ? 'Missing meaning · excluded from review' : due.has(entry.id) ? 'Ready to review' : 'Saved for later'}
               </span>
               <div className="absolute top-3 right-3.5">
                 <RemoveWordButton entryId={entry.id} lemma={entry.lemma} />
@@ -101,6 +135,10 @@ export function VocabGrid({ entries }: { entries: VocabEntry[] }) {
           );
         })}
       </div>
+      {visible.length === 0 && <div className="border-hair bg-panel rounded-xl border-2 p-5">
+        <p>No words match these filters.</p>
+        <button onClick={() => { setQuery(''); setFilter('all'); }} className="mt-2 underline">Clear search and filters</button>
+      </div>}
     </div>
   );
 }

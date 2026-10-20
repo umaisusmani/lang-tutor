@@ -8,20 +8,21 @@ import Link from 'next/link';
  * the way back from /vocab and /login. Plain `/` would reopen the learner's
  * latest conversation instead, which is what the chats menu is for.
  *
- * The wordmark's line box is pinned to the tile's height (34px), so the two
- * read as one unit rather than a small logo next to small text. That's also
- * why there's no tagline stacked under the name any more: a second line would
- * push the text block taller than the tile again.
+ * Wordmark and tagline stack beside the tile, set in the display and mono
+ * voices respectively.
  */
 export function Brand() {
   return (
-    <Link href="/?c=new" className="flex items-center gap-2.5 no-underline">
-      <div className="border-line bg-yellow text-on-bright flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px] border-2 text-base font-extrabold">
-        s
+    <Link href="/?c=new" className="flex items-center gap-2 no-underline">
+      <div className="border-line bg-yellow text-on-bright font-display flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px] border-2 text-xl tracking-[0.04em]">
+        S
       </div>
-      <span className="text-ink text-[30px] leading-[34px] font-extrabold tracking-[-0.03em] sm:text-[34px]">
-        Starvogel
-      </span>
+      <div className="flex flex-col">
+        <span className="font-display text-ink text-2xl leading-[1.1] tracking-[0.04em]">
+          Starvogel
+        </span>
+        <span className="text-ink-3 font-mono text-[10px]">german practice</span>
+      </div>
     </Link>
   );
 }

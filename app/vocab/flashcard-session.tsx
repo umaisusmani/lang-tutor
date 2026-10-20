@@ -222,7 +222,7 @@ export function FlashcardSession({
             <span className="bg-soft text-ink-2 rounded-full px-2.5 py-0.5 font-mono text-[10px]">
               new word · not in your vocab yet
             </span>
-            <p className="text-[30px] leading-tight font-extrabold break-words">
+            <p className="font-display text-[40px] leading-none font-black tracking-[0.02em] break-words">
               {discoverCard.lemma}
             </p>
             {shownAt && (
@@ -237,7 +237,7 @@ export function FlashcardSession({
             <button
               type="button"
               onClick={() => setShownAt(new Date())}
-              className="border-line bg-yellow text-on-bright cursor-pointer rounded-lg border-2 px-4 py-2.5 text-[15px] font-bold active:translate-x-px active:translate-y-px"
+              className="border-line bg-yellow text-on-bright font-display cursor-pointer rounded-lg border-2 px-4 py-2 text-lg tracking-[0.04em] active:translate-x-px active:translate-y-px"
             >
               Show example{' '}
               <span className="font-mono text-[10px] font-normal opacity-70">space</span>
@@ -272,7 +272,7 @@ export function FlashcardSession({
     const seconds = waiting ? Math.max(0, Math.ceil((waitingUntil - now) / 1000)) : 0;
     return (
       <div className="flex flex-col items-start gap-3 py-6">
-        <h2 className="text-[26px] leading-[1.05] font-extrabold tracking-[-0.02em]">
+        <h2 className="font-display text-[34px] leading-none font-black tracking-[0.02em]">
           {waiting
             ? 'Next card in a moment'
             : initialCards.length === 0
@@ -332,13 +332,13 @@ export function FlashcardSession({
           {reverse ? (
             <>
               <span className="text-ink-3 font-mono text-[10px]">say it in German</span>
-              <p className="text-[30px] leading-tight font-extrabold break-words">
+              <p className="font-display text-[40px] leading-none font-black tracking-[0.02em] break-words">
                 {current.translation}
               </p>
             </>
           ) : (
             <>
-              <p className="text-[30px] leading-tight font-extrabold break-words">{current.lemma}</p>
+              <p className="font-display text-[40px] leading-none font-black tracking-[0.02em] break-words">{current.lemma}</p>
               {showSentence && current.exampleSentence && (
                 <p className="text-ink-2 text-[14px] italic">{current.exampleSentence}</p>
               )}
@@ -361,9 +361,9 @@ export function FlashcardSession({
           <button
             type="button"
             onClick={() => setShownAt(new Date())}
-            className="border-line bg-yellow text-on-bright cursor-pointer rounded-lg border-2 px-4 py-2.5 text-[15px] font-bold active:translate-x-px active:translate-y-px"
+            className="border-line bg-yellow text-on-bright font-display cursor-pointer rounded-lg border-2 px-4 py-2 text-lg tracking-[0.04em] active:translate-x-px active:translate-y-px"
           >
-            Show answer <span className="font-mono text-[10px] font-normal opacity-70">space</span>
+            Show answer<span className="font-mono text-[10px] font-normal opacity-70">space</span>
           </button>
         ) : (
           <div className="grid grid-cols-4 gap-2">

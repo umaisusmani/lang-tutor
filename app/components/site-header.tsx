@@ -132,7 +132,7 @@ export function SiteHeader({
             <select
               value={level}
               onChange={handleLevelChange}
-              className="cursor-pointer appearance-none bg-transparent py-1 pr-6 pl-3 text-inherit outline-none"
+              className="font-display cursor-pointer appearance-none bg-transparent py-1 pr-6 pl-3 tracking-[0.04em] text-inherit outline-none"
             >
               {CEFR_LEVELS.map((l) => (
                 <option key={l} value={l} className="text-ink bg-panel">

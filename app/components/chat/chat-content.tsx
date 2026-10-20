@@ -64,7 +64,6 @@ function messageText(message: LangTutorUIMessage, separator = '\n'): string {
 export function ChatWelcome({
   level,
   remaining,
-  messageCap,
   signedIn,
   starters,
   persona,
@@ -72,7 +71,6 @@ export function ChatWelcome({
 }: {
   level: CefrLevel;
   remaining: number | null;
-  messageCap: number;
   signedIn: boolean;
   starters: Starter[];
   persona: PersonaProfile;
@@ -81,20 +79,20 @@ export function ChatWelcome({
   return (
     <main className="flex flex-1 flex-col justify-center gap-[26px] py-10">
       <div className="flex flex-col gap-2.5">
-        <span className="text-ink-3 font-mono text-[10px] tracking-[0.12em] uppercase">
-          level {level}
-          {remaining !== null && ` · ${remaining} ${signedIn ? 'messages left' : 'free messages'}`}
-        </span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <PersonaAvatar persona={persona} size={48} />
           <div className="flex flex-col">
-            <span className="text-[17px] font-bold">{persona.name}</span>
+            <span className="font-display text-[22px] tracking-[0.04em]">{persona.name}</span>
             <span className="text-ink-3 font-mono text-[11px]">
               {[persona.age, persona.city].filter((value) => value != null).join(' · ')}
             </span>
           </div>
         </div>
-        <h1 className="text-4xl leading-[1.05] font-extrabold tracking-[-0.025em]">
+        <span className="font-display text-ink-3 text-[13px] tracking-[0.12em] uppercase">
+          level {level}
+          {remaining !== null && ` · ${remaining} ${signedIn ? 'messages left' : 'free messages'}`}
+        </span>
+        <h1 className="font-display text-[52px] leading-none font-black tracking-[0.02em]">
           Sag einfach etwas.
         </h1>
         <p className="text-ink-2 max-w-[52ch] text-base leading-relaxed">
@@ -120,15 +118,6 @@ export function ChatWelcome({
           </button>
         ))}
       </div>
-
-      {remaining !== null && (
-        <div className="text-ink-3 flex items-center gap-2 font-mono text-[11px]">
-          <span className="bg-yellow text-on-bright rounded-[5px] px-[7px] py-0.5 font-medium">
-            {messageCap} {signedIn ? 'per day' : 'free'}
-          </span>
-          <span>{signedIn ? 'messages today' : 'messages a day before signing in'}</span>
-        </div>
-      )}
     </main>
   );
 }
@@ -176,12 +165,12 @@ export function ChatThread({
               key={message.id}
               className="border-line bg-yellow text-on-bright flex flex-col items-start gap-2 rounded-[18px] border-2 p-6 shadow-[4px_4px_0_var(--line)]"
             >
-              <span className="font-mono text-[10px] tracking-[0.12em] uppercase">
+              <span className="font-display text-[15px] tracking-[0.1em] uppercase">
                 {rateLimited.reason === 'global'
                   ? 'tutor is resting'
                   : `${rateLimited.cap} of ${rateLimited.cap} messages`}
               </span>
-              <h2 className="text-[26px] font-extrabold tracking-[-0.02em]">
+              <h2 className="font-display text-[38px] font-black tracking-[0.02em]">
                 Das war&apos;s für heute.
               </h2>
               <p className="max-w-[46ch] text-[15px] leading-[1.55]">
@@ -190,7 +179,7 @@ export function ChatThread({
               {!rateLimited.signedIn && (
                 <Link
                   href="/login"
-                  className="bg-ink text-paper mt-2 rounded-full px-5 py-2.5 text-[15px] font-bold no-underline transition-transform hover:translate-x-px hover:translate-y-px"
+                  className="bg-ink text-paper font-display mt-2 rounded-full px-5 py-[9px] text-[19px] tracking-[0.04em] no-underline transition-transform hover:translate-x-px hover:translate-y-px"
                 >
                   Sign in →
                 </Link>
@@ -309,7 +298,7 @@ export function ChatThread({
               {correction?.correction && (
                 <div className="border-line bg-panel relative animate-[fade-rise_240ms_ease-out] rounded-[14px] border-2 px-4 pt-[18px] pb-3.5 shadow-[3px_3px_0_var(--line)]">
                   <span
-                    className={`border-line text-on-bright absolute -top-[11px] left-3.5 rounded-md border-2 px-2 py-px font-mono text-[10px] tracking-[0.08em] uppercase ${
+                    className={`border-line text-on-bright font-display absolute -top-[11px] left-3.5 rounded-md border-2 px-2 py-px text-[13px] tracking-[0.1em] uppercase ${
                       correction.hasMistake ? 'bg-orange' : 'bg-yellow'
                     }`}
                   >
@@ -429,7 +418,7 @@ export function ChatComposer({
         <button
           type="submit"
           disabled={busy || capped || !input.trim()}
-          className="border-line bg-ink text-paper hover:bg-accent hover:text-on-accent flex-none cursor-pointer rounded-full border-2 px-[22px] py-3 text-[15px] font-bold transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:opacity-40"
+          className="border-line bg-ink text-paper hover:bg-accent hover:text-on-accent font-display flex-none cursor-pointer rounded-full border-2 px-[22px] py-3 text-xl tracking-[0.04em] transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:opacity-40"
         >
           Senden
         </button>

@@ -210,20 +210,20 @@ export function ChatSidePanel({
         aria-label="German learning tools"
         aria-hidden={!open}
         inert={!open}
-        className={`border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,390px)] flex-col border-l-2 shadow-[-5px_0_18px_rgb(0_0_0/0.12)] transition-transform duration-300 ease-out motion-reduce:transition-none lg:w-[360px] ${
+        className={`border-line bg-paper fixed inset-y-0 right-0 z-40 flex w-[min(94vw,390px)] flex-col border-l-2 transition-transform duration-300 ease-out motion-reduce:transition-none lg:w-[360px] ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="border-hair flex items-center gap-3 border-b-2 px-4 py-3">
           <div className="min-w-0 flex-1">
-            <h2 className="text-ink text-sm font-bold">Learning tools</h2>
+            <h2 className="font-display text-ink text-xl tracking-[0.04em]">Learning tools</h2>
             <p className="text-ink-3 font-mono text-[10px]">separate from your chat</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close learning panel"
-            className="border-hair text-ink-2 hover:bg-yellow hover:text-on-bright flex h-8 w-8 items-center justify-center rounded-lg border-2 font-mono text-lg leading-none"
+            className="border-hair text-ink-2 hover:bg-yellow hover:text-on-bright flex h-8 w-8 cursor-pointer items-center justify-center rounded-[9px] border-2 font-mono text-lg leading-none"
           >
             ›
           </button>
@@ -239,7 +239,7 @@ export function ChatSidePanel({
               aria-selected={view === tab}
               aria-controls={`tools-view-${tab}`}
               onClick={() => changeView(tab)}
-              className={`flex-1 rounded-lg px-3 py-2 font-mono text-xs capitalize transition-colors ${
+              className={`flex-1 cursor-pointer rounded-[9px] px-3 py-[7px] font-mono text-[11px] capitalize transition-colors ${
                 view === tab ? 'bg-yellow text-on-bright font-bold' : 'text-ink-2 hover:bg-soft'
               }`}
             >
@@ -259,7 +259,9 @@ export function ChatSidePanel({
               {turns.length === 0 ? (
                 <div className="my-auto flex flex-col gap-4">
                   <div>
-                    <p className="text-ink text-lg font-bold">Ask about German</p>
+                    <p className="font-display text-ink text-[22px] tracking-[0.04em]">
+                      Ask about German
+                    </p>
                     <p className="text-ink-2 mt-1 text-sm leading-relaxed">
                       Ask a question or paste a German sentence for a quick translation and grammar note.
                     </p>
@@ -323,7 +325,7 @@ export function ChatSidePanel({
                 <button
                   type="submit"
                   disabled={!draft.trim() || sending || remaining === 0}
-                  className="border-line bg-ink text-paper rounded-lg border-2 px-3 py-1.5 font-mono text-xs transition-opacity disabled:cursor-default disabled:opacity-40"
+                  className="border-line bg-ink text-paper font-display cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] transition-opacity disabled:cursor-default disabled:opacity-40"
                 >
                   {sending ? 'asking…' : 'ask ↗'}
                 </button>

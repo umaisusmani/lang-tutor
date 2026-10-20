@@ -68,17 +68,30 @@ export function TranslationPanel({
   return (
     <div className="gloss-panel" data-open={open} inert={!open}>
       <div>
-        <div className="border-hair bg-soft flex flex-col gap-3 rounded-xl border-2 px-4 py-3">
-          {translation ? (
-            <p className="text-ink text-[15px] leading-relaxed italic">{translation}</p>
-          ) : (
-            <p className="text-ink-3 font-mono text-[11px]">
-              No translation was saved for this older message.
-            </p>
-          )}
+        <div className="border-hair bg-soft flex flex-col gap-2 rounded-xl border-2 px-3.5 py-3">
+          <div className="flex items-baseline justify-between gap-3">
+            {translation ? (
+              <p className="text-ink-2 font-mono text-[11px] leading-relaxed">{translation}</p>
+            ) : (
+              <p className="text-ink-3 font-mono text-[11px]">
+                No translation was saved for this older message.
+              </p>
+            )}
 
-          {explanation ? (
-            <div className="border-hair flex flex-col gap-1 border-t-2 pt-3">
+            {!explanation && (
+              <button
+                type="button"
+                onClick={onExplain}
+                disabled={explaining}
+                className="text-ink-3 hover:text-ink flex-none cursor-pointer p-0 font-mono text-[10px] whitespace-nowrap transition-colors duration-150 disabled:cursor-default disabled:opacity-60"
+              >
+                {explaining ? 'explaining…' : 'explain grammar ↓'}
+              </button>
+            )}
+          </div>
+
+          {explanation && (
+            <div className="border-hair flex flex-col gap-1 border-t-2 pt-2">
               <span className="text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase">
                 grammar
               </span>
@@ -89,15 +102,6 @@ export function TranslationPanel({
                 )}
               </p>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onExplain}
-              disabled={explaining}
-              className="border-line text-ink-2 hover:bg-yellow hover:text-on-bright self-start cursor-pointer rounded-lg border-2 px-2.5 py-1 font-mono text-[11px] transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:cursor-default disabled:opacity-60"
-            >
-              {explaining ? 'explaining…' : 'explain grammar'}
-            </button>
           )}
         </div>
       </div>

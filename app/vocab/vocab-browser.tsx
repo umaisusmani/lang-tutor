@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { notifyError } from '@/app/components/toaster';
 import { startSessionAction, type SessionPayload } from '@/app/vocab/actions';
@@ -37,7 +37,18 @@ function rememberSkipped(lemma: string) {
  * flashcard session in its place. Two views of one page, so ending a session
  * lands back on the list without a navigation.
  */
-export function VocabBrowser({ entries, dueCount }: { entries: VocabEntry[]; dueCount: number }) {
+export function VocabBrowser({
+  entries,
+  dueCount,
+  heading,
+}: {
+  entries: VocabEntry[];
+  dueCount: number;
+  /** The page title block, rendered here so it can share a row with the
+   * start button (the page itself is a Server Component and can't see
+   * `starting`). */
+  heading: ReactNode;
+}) {
   const [cards, setCards] = useState<SessionPayload | null>(null);
   const [starting, setStarting] = useState(false);
   // Bumped per load so a new session never inherits the last one's state.
@@ -61,34 +72,40 @@ export function VocabBrowser({ entries, dueCount }: { entries: VocabEntry[]; due
 
   if (cards) {
     return (
-      <FlashcardSession
-        key={round}
-        initialCards={cards.cards}
-        initialDiscover={cards.discover}
-        extra={cards.extra}
-        onExit={() => setCards(null)}
-        onPracticeMore={() => void start('practice')}
-        onSkipWord={rememberSkipped}
-      />
+      <>
+        {heading}
+        <FlashcardSession
+          key={round}
+          initialCards={cards.cards}
+          initialDiscover={cards.discover}
+          extra={cards.extra}
+          onExit={() => setCards(null)}
+          onPracticeMore={() => void start('practice')}
+          onSkipWord={rememberSkipped}
+        />
+      </>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void start('due')}
-          disabled={starting}
-          className="border-line bg-yellow text-on-bright cursor-pointer rounded-lg border-2 px-4 py-2 text-[14px] font-bold shadow-[3px_3px_0_var(--line)] active:translate-x-px active:translate-y-px disabled:cursor-wait disabled:opacity-60"
-        >
-          {starting ? 'Loading…' : 'Start session'}
-        </button>
-        <span className="text-ink-3 font-mono text-[11px]">
-          {dueCount > 0 ? `${dueCount} due` : 'nothing due right now'}
-        </span>
+    <>
+      <div className="flex flex-wrap items-end gap-3.5">
+        {heading}
+        <div className="ml-auto flex flex-col items-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => void start('due')}
+            disabled={starting}
+            className="border-line bg-yellow text-on-bright font-display cursor-pointer rounded-full border-2 px-[18px] py-2 text-lg tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:cursor-wait disabled:opacity-60"
+          >
+            {starting ? 'Loading…' : dueCount > 0 ? `Practice ${dueCount} due` : 'Start session'}
+          </button>
+          {dueCount === 0 && (
+            <span className="text-ink-3 font-mono text-[11px]">nothing due right now</span>
+          )}
+        </div>
       </div>
       <VocabGrid entries={entries} />
-    </div>
+    </>
   );
 }

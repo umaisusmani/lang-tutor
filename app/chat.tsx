@@ -309,9 +309,7 @@ export default function Chat({
         dueCount={dueCount}
       />
 
-      <div
-        className="relative flex w-full max-w-[1240px] flex-1 justify-center"
-      >
+      <div className="relative flex w-full max-w-[1240px] flex-1 justify-center">
         {!sidePanelOpen && (
           <button
             type="button"
@@ -329,7 +327,6 @@ export default function Chat({
             <ChatWelcome
               level={level}
               remaining={remaining}
-              messageCap={messageCap}
               signedIn={userEmail !== null}
               starters={starters}
               persona={persona}

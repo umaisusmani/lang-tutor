@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 /*
- * Design tokens from the Übung handoff.
+ * Design tokens from the Übung design ("Ubung App.dc.html"): a warm paper /
+ * espresso-ink palette with a terracotta accent.
  *
  * Dark mode resolves two ways on purpose: the OS preference applies unless the
  * user has explicitly picked light, and an explicit data-theme always wins.
@@ -14,51 +15,51 @@
  * mode and put dark text on a dark bubble.
  */
 :root {
-  --paper: oklch(0.968 0.014 95);
-  --panel: oklch(1 0 0);
-  --ink: oklch(0.24 0.03 280);
-  --ink-2: oklch(0.52 0.03 280);
-  --ink-3: oklch(0.56 0.025 280);
-  --line: oklch(0.24 0.03 280);
-  --hair: oklch(0.86 0.015 95);
-  --accent: oklch(0.30 0.022 280);
-  --accent-ink: oklch(0.38 0.03 280);
-  --yellow: oklch(0.89 0.15 100);
-  --orange: oklch(0.82 0.14 55);
-  --soft: oklch(0.93 0.018 95);
+  --paper: #f7efe4;
+  --panel: #fdf8f2;
+  --ink: #2c1a0e;
+  --ink-2: #a0826a;
+  --ink-3: #7a6a58;
+  --line: #2c1a0e;
+  --hair: #e0c9b0;
+  --accent: #c4451a;
+  --accent-ink: #a03214;
+  --yellow: #f5c842;
+  --orange: #f0a040;
+  --soft: #f0e6d6;
 
-  --on-bright: oklch(0.24 0.03 280);
-  --on-accent: oklch(0.99 0 0);
+  --on-bright: #2c1a0e;
+  --on-accent: #f7efe4;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: oklch(0.22 0.025 285);
-    --panel: oklch(0.27 0.028 285);
-    --ink: oklch(0.96 0.01 95);
-    --ink-2: oklch(0.74 0.02 285);
-    --ink-3: oklch(0.68 0.02 285);
-    /* --line lightens in dark mode: the outline character comes from contrast
-       with the background, not from pure black. */
-    --line: oklch(0.46 0.03 285);
-    --hair: oklch(0.34 0.025 285);
-    --accent: oklch(0.40 0.025 285);
-    --accent-ink: oklch(0.82 0.02 285);
-    --soft: oklch(0.31 0.03 285);
+    --paper: #241510;
+    --panel: #2e1c12;
+    --ink: #f0e4d4;
+    --ink-2: #c49a7a;
+    --ink-3: #9a7a62;
+    /* --line is a mid brown in dark mode: the outline character comes from
+       contrast with the background, not from pure black. */
+    --line: #8a5a3a;
+    --hair: #3e2818;
+    --accent: #d4552a;
+    --accent-ink: #f0a070;
+    --soft: #321c10;
   }
 }
 
 :root[data-theme="dark"] {
-  --paper: oklch(0.22 0.025 285);
-  --panel: oklch(0.27 0.028 285);
-  --ink: oklch(0.96 0.01 95);
-  --ink-2: oklch(0.74 0.02 285);
-  --ink-3: oklch(0.68 0.02 285);
-  --line: oklch(0.46 0.03 285);
-  --hair: oklch(0.34 0.025 285);
-  --accent: oklch(0.40 0.025 285);
-  --accent-ink: oklch(0.82 0.02 285);
-  --soft: oklch(0.31 0.03 285);
+  --paper: #241510;
+  --panel: #2e1c12;
+  --ink: #f0e4d4;
+  --ink-2: #c49a7a;
+  --ink-3: #9a7a62;
+  --line: #8a5a3a;
+  --hair: #3e2818;
+  --accent: #d4552a;
+  --accent-ink: #f0a070;
+  --soft: #321c10;
 }
 
 @theme inline {
@@ -77,8 +78,12 @@
   --color-on-bright: var(--on-bright);
   --color-on-accent: var(--on-accent);
 
-  --font-sans: var(--font-archivo);
+  /* Three voices: Bricolage Grotesque for UI and German, DM Mono for English
+     glosses / labels / metadata, Londrina Solid for display -- the wordmark,
+     headings, eyebrows and primary buttons. `font-display` in markup. */
+  --font-sans: var(--font-bricolage);
   --font-mono: var(--font-dm-mono);
+  --font-display: var(--font-londrina);
 }
 
 @keyframes blink {
@@ -146,7 +151,7 @@
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-archivo), system-ui, sans-serif;
+  font-family: var(--font-bricolage), system-ui, sans-serif;
 }
 
 a {

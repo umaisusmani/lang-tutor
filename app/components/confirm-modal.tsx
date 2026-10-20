@@ -107,7 +107,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         className="border-line bg-panel text-ink m-auto w-[min(92vw,400px)] rounded-[18px] border-2 p-0 shadow-[4px_4px_0_var(--line)] backdrop:bg-black/45"
       >
         <div className="flex flex-col gap-3 p-6">
-          <h2 id={titleId} className="text-[22px] leading-tight font-extrabold tracking-[-0.02em]">
+          <h2
+            id={titleId}
+            className="font-display text-[28px] leading-none font-black tracking-[0.02em]"
+          >
             {options.title}
           </h2>
 

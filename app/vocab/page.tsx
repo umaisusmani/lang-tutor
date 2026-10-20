@@ -18,6 +18,17 @@ export default async function VocabPage() {
   const levelCookie = (await cookies()).get('cefr_level')?.value;
   const level = await resolveCefrLevel(user.id, levelCookie);
 
+  const heading = (
+    <div className="flex flex-col gap-1">
+      <h1 className="font-display text-[40px] leading-none font-black tracking-[0.04em]">
+        Vokabelliste
+      </h1>
+      <span className="text-ink-3 font-mono text-[11px]">
+        {entries.length} {entries.length === 1 ? 'word' : 'words'} saved
+      </span>
+    </div>
+  );
+
   return (
     <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
       <PageHeader
@@ -29,22 +40,16 @@ export default async function VocabPage() {
         dueCount={dueCount}
       />
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
-        <main className="flex flex-1 flex-col gap-5 py-8">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">
-              Vokabelliste
-            </h1>
-            <span className="text-ink-3 font-mono text-[11px]">
-              {entries.length} {entries.length === 1 ? 'word' : 'words'} saved
-            </span>
-          </div>
-
+        <main className="flex flex-1 flex-col gap-[22px] pt-6 pb-7">
           {entries.length === 0 ? (
-            <p className="text-ink-2 text-[15px] leading-relaxed">
-              Nothing saved yet. Words you save from the chat will show up here.
-            </p>
+            <>
+              {heading}
+              <p className="text-ink-2 text-[15px] leading-relaxed">
+                Nothing saved yet. Words you save from the chat will show up here.
+              </p>
+            </>
           ) : (
-            <VocabBrowser entries={entries} dueCount={dueCount} />
+            <VocabBrowser entries={entries} dueCount={dueCount} heading={heading} />
           )}
         </main>
       </div>

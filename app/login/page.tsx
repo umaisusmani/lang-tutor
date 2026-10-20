@@ -61,15 +61,13 @@ function LoginForm() {
   return (
     <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
       <header className="flex w-full max-w-[1080px] flex-wrap items-center gap-3 pt-5 pb-3">
-        <Link href="/" className="no-underline">
-          <Brand />
-        </Link>
+        <Brand />
       </header>
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
 
         <main className="flex max-w-[420px] flex-1 flex-col justify-center gap-[22px] py-12">
           <div className="flex flex-col gap-2">
-            <h1 className="text-[32px] leading-[1.05] font-extrabold tracking-[-0.025em]">
+            <h1 className="font-display text-[44px] leading-none font-black tracking-[0.02em]">
               {mode === 'signin' ? 'Willkommen zurück.' : 'Konto erstellen.'}
             </h1>
             <p className="text-ink-2 text-[15px] leading-relaxed">
@@ -118,7 +116,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={pending}
-              className="border-line bg-yellow text-on-bright mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-base font-bold shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
+              className="border-line bg-yellow text-on-bright font-display mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-xl tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
             >
               {pending ? '…' : mode === 'signin' ? 'Anmelden' : 'Registrieren'}
             </button>
@@ -218,14 +216,12 @@ function ConfirmCodeScreen({
   return (
     <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
       <header className="flex w-full max-w-[1080px] flex-wrap items-center gap-3 pt-5 pb-3">
-        <Link href="/" className="no-underline">
-          <Brand />
-        </Link>
+        <Brand />
       </header>
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
         <main className="flex max-w-[420px] flex-1 flex-col justify-center gap-[22px] py-12">
           <div className="flex flex-col gap-2">
-            <h1 className="text-[32px] leading-[1.05] font-extrabold tracking-[-0.025em]">
+            <h1 className="font-display text-[44px] leading-none font-black tracking-[0.02em]">
               Prüf dein Postfach.
             </h1>
             <p className="text-ink-2 text-[15px] leading-relaxed">
@@ -268,7 +264,7 @@ function ConfirmCodeScreen({
             <button
               type="submit"
               disabled={verifying}
-              className="border-line bg-yellow text-on-bright mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-base font-bold shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
+              className="border-line bg-yellow text-on-bright font-display mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-xl tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
             >
               {verifying ? '…' : 'Bestätigen'}
             </button>

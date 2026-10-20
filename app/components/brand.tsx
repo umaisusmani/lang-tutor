@@ -21,7 +21,6 @@ export function Brand() {
         <span className="font-display text-ink text-2xl leading-[1.1] tracking-[0.04em]">
           Starvogel
         </span>
-        <span className="text-ink-3 font-mono text-[10px]">german practice</span>
       </div>
     </Link>
   );

@@ -2,7 +2,7 @@
 
 German conversation practice with an AI tutor — currently a specific persona, Ramanath, 24, Düsseldorf. You chat in German at your CEFR level. Every reply comes with a whole-sentence and word-by-word translation, every mistake you make gets a correction with a plain-English explanation, and any word you tap can be saved to your own vocabulary list.
 
-**Live:** https://language-chatbot-starchy.vercel.app
+**Live:** https://starvogel.online
 
 ## Features
 
@@ -13,11 +13,12 @@ German conversation practice with an AI tutor — currently a specific persona, 
 - **Vocab page** (`/vocab`). Your saved words as click-to-reveal cards, with a show-all/hide-all toggle — doubles as light self-testing. Remove the ones you no longer want.
 - **Flashcards** (`/vocab`). Every word you save becomes a flashcard. Press **Start session**: you see the German word, recall the meaning, flip the card, and say how well you knew it. The card comes back right before you'd forget it (spaced repetition, FSRS). A badge on the `vocab` link shows how many are due.
 - **Chat history.** Conversations are saved, with their corrections, translations and grammar explanations, and you can reopen or delete them from the chats menu. The logo always opens a new chat.
+- **Ask side panel.** Signed-in learners can ask short German questions or paste a sentence for a translation and brief grammar note. The Words tab reuses the conversation's existing glosses. Ask uses `openai/gpt-oss-20b` on Groq and keeps its short thread in browser memory for the current page visit.
 - **Try before signing in.** You can send 5 messages a day without an account. Sign in with email/password (you confirm the address with a code sent by email) or Google for 35 a day, and to save your progress.
 
 ## How a message is handled
 
-Each message you send makes three LLM calls, all to `openai/gpt-oss-120b` on Groq — plus a fourth, on demand, if you click "explain grammar":
+Each message you send makes three LLM calls, all to `openai/gpt-oss-120b` on Groq. "Explain grammar" adds a call only when requested. Ask is a separate, signed-in-only call to `openai/gpt-oss-20b`:
 
 ```
 your message ──┬──► reply           streamed to you as it's written   lib/reply.ts, lib/services/chat.service.ts
@@ -25,6 +26,7 @@ your message ──┬──► reply           streamed to you as it's written 
                └──► (reply finishes) ──► translation of the reply      lib/gloss.ts
 
 "explain grammar" (only if clicked) ──► plain-English grammar explanation  lib/explain.ts
+Ask panel (only if submitted) ────────► short answer or sentence breakdown lib/ask.ts
 ```
 
 - **Correction and reply run in parallel.** The correction check only needs your message, so you don't wait for it.
@@ -73,6 +75,8 @@ npm run dev                  # http://localhost:3000
 | `SUPABASE_SERVICE_ROLE_KEY` | same page | Server-only: token-usage logs and the daily message counters. Never expose it to the browser. |
 | `GLOBAL_DAILY_MESSAGE_CAP` | optional | Messages the whole app serves per UTC day. Defaults to 300. |
 
+**Groq model access:** Ask needs `openai/gpt-oss-20b` allowed for the project associated with `GROQ_API_KEY`. If the project uses an "Only Allow" model list, add it under Groq → Settings → Projects → Limits; a blocked model returns 403.
+
 **Database:** run the migrations in [supabase/migrations/](supabase/migrations/) in order, either with `supabase db push` or by pasting each file into the Supabase SQL editor. They create every table with row-level security turned on.
 
 **Google sign-in** (optional): enable the Google provider under Supabase → Authentication → Providers, and add `http://localhost:3000/auth/callback` to the allowed redirect URLs. Email/password sign-in works without this.
@@ -116,6 +120,7 @@ app/
   page.tsx               chat page: loads the conversation, persona, saved words, level
   chat.tsx               chat state and side effects: streaming, saving, explanations
   api/chat/route.ts      the chat endpoint
+  api/ask/route.ts       signed-in Ask panel endpoint
   api/explain/route.ts   on-demand grammar explanations
   hooks/use-theme.ts     shared local theme store for client pages
   vocab/                 the saved-words page (click-to-reveal cards) and its server actions
@@ -128,6 +133,7 @@ lib/
   chat-request.ts        validates and bounds public chat requests before quota/model use
   prompts.ts             every system prompt, including LEMMA_RULES
   reply.ts               the reply call's shared model/prompt settings
+  ask.ts                 short Ask answers on Groq 20B
   explain.ts             the on-demand grammar-explanation call
   tutor.ts               correction check
   gloss.ts               sentence + word-by-word translation

@@ -62,6 +62,7 @@ export function ChatSidePanel({
   isSaved,
   onSaveWord,
   onRemainingChange,
+  onAuthRequired,
   onClose,
 }: {
   open: boolean;
@@ -72,6 +73,7 @@ export function ChatSidePanel({
   isSaved: (lemma: string) => boolean;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
   onRemainingChange: (remaining: number) => void;
+  onAuthRequired: () => void;
   onClose: () => void;
 }) {
   const [view, setView] = useState<ToolView>('ask');
@@ -139,6 +141,12 @@ export function ChatSidePanel({
       });
 
       if (!response.ok || !response.body) {
+        if (response.status === 401) {
+          setTurns((current) => current.slice(0, -2));
+          changeDraft(text);
+          onAuthRequired();
+          return;
+        }
         const payload = await response.json().catch(() => null);
         if (response.status === 429) onRemainingChange(0);
         const message =
@@ -253,11 +261,11 @@ export function ChatSidePanel({
                   <div>
                     <p className="text-ink text-lg font-bold">Ask about German</p>
                     <p className="text-ink-2 mt-1 text-sm leading-relaxed">
-                      I can use this conversation to explain a word, phrase, or grammar choice.
+                      Ask a question or paste a German sentence for a quick translation and grammar note.
                     </p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {['Why did she say “dem” here?', 'What does this phrase mean?', 'How would I say this more naturally?'].map((example) => (
+                    {['Why did she say “dem” here?', 'Ich freue mich auf das Wochenende.', 'How would I say this more naturally?'].map((example) => (
                       <button
                         key={example}
                         type="button"
@@ -305,7 +313,7 @@ export function ChatSidePanel({
                 maxLength={500}
                 rows={2}
                 aria-label="Ask a German question"
-                placeholder="Ask a question…"
+                placeholder="Ask or paste a sentence…"
                 className="border-hair bg-panel text-ink placeholder:text-ink-3 focus:border-line resize-none rounded-xl border-2 px-3 py-2.5 text-sm outline-none"
               />
               <div className="flex items-center justify-between gap-2">

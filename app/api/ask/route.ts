@@ -55,18 +55,21 @@ export async function POST(req: Request) {
   }
 
   const userId = await getCurrentUserId();
+  if (!userId) {
+    return Response.json({ error: 'Sign in to use Ask.' }, { status: 401 });
+  }
   const levelCookie = (await cookies()).get('cefr_level')?.value;
   const requestedLevel = typeof record.level === 'string' ? record.level : undefined;
   const level = isCefrLevel(requestedLevel)
     ? requestedLevel
     : await resolveCefrLevel(userId, levelCookie);
 
-  // The caller pays from the same daily allowance as chat and explanations.
+  // Signed-in learners pay from the same daily allowance as chat and explanations.
   // This check happens before the model call so capped requests cost no tokens.
   const usage = await consumeMessage(userId);
   if (!usage.allowed) {
     return Response.json(
-      { error: 'Daily message limit reached.', reason: usage.reason, signedIn: userId !== null },
+      { error: 'Daily message limit reached.', reason: usage.reason, signedIn: true },
       { status: 429 },
     );
   }

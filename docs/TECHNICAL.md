@@ -54,6 +54,15 @@ grammar explanation of a reply or a correction, only when the learner clicks
 "explain grammar" (§5.1, §8.2). It is not part of the per-message `Promise.all`
 below.
 
+The **Ask side panel** has its own `POST /api/ask` route. Signed-in learners
+can ask a question or paste a sentence; one `openai/gpt-oss-20b` call returns
+a short answer, or a translation with one or two grammar notes. Ask receives
+only six recent chat messages and four recent panel turns, each clipped to
+420 characters. The panel thread stays in client memory for the current page
+visit and does not become roleplay history. The visible edge tab opens a
+sign-up modal for anonymous visitors; the route independently returns 401
+before quota or Groq use.
+
 Every result from the three per-message calls is streamed to the browser as a
 typed part of the message and, for signed-in users, stored with the message so
 a reopened chat looks exactly as it did live without calling the model again.
@@ -75,6 +84,9 @@ POST /api/chat ─────────────────────�
 POST /api/explain ─────────────────────► route.ts (on demand, user click)
    ◄── plain-text stream ─────────────────── streamGrammarExplanation ───────► Groq
                                          (saved onto the message row if signed in)
+
+POST /api/ask ─────────────────────────► route.ts (signed-in Ask submission)
+   ◄── plain-text stream ─────────────────── streamAskAnswer (20B) ──────────► Groq
 ```
 
 ## 2. Stack and runtime
@@ -85,7 +97,7 @@ POST /api/explain ────────────────────�
 | Language | TypeScript 5 | `@/` path alias to repo root |
 | Styling | Tailwind CSS v4 (`@tailwindcss/postcss`) | Theme tokens in `app/globals.css`; light/dark via `data-theme` |
 | AI | Vercel AI SDK v6 (`ai`, `@ai-sdk/react`, `@ai-sdk/groq`) | Groq called directly with the project's own key, not through AI Gateway |
-| Model | `openai/gpt-oss-120b` on Groq, `reasoningEffort: 'low'` | Same model for all three calls |
+| Model | `openai/gpt-oss-120b` for the three chat calls and grammar explanations; `openai/gpt-oss-20b` for Ask | Groq direct, low reasoning effort |
 | Validation | Zod v4 | Structured-output schemas for correction and gloss |
 | DB + Auth | Supabase (Postgres + Auth) via `@supabase/ssr` | Provisioned through the Vercel Marketplace |
 | Toasts | `sonner` | Wrapped in `app/components/toaster.tsx` |
@@ -106,6 +118,7 @@ app/
   layout.tsx               Root layout, fonts, <ConfirmProvider>, <AppToaster>
   globals.css              Tailwind v4 + theme tokens, gloss-panel transitions
   api/chat/route.ts        POST /api/chat — thin controller
+  api/ask/route.ts         POST /api/ask — signed-in short-answer text stream
   api/explain/route.ts     POST /api/explain — on-demand grammar explanation, text/plain stream
   auth/actions.ts          Server Actions: signIn, signUp, verifySignupCode, resendConfirmation,
                            signInWithGoogle, signOut, saveLevel, saveTimezone
@@ -118,8 +131,8 @@ app/
                            startSessionAction, gradeCardAction
   review/page.tsx          redirects to /vocab (old links)
   login/page.tsx           Email/password + Google sign-in form, and the "enter the code"
-                           screen (ConfirmCodeScreen) shown after signup
-  components/              chat/ (thread, welcome state, composer and rate-limit UI),
+                           screen (ConfirmCodeScreen) shown after signup; `?mode=signup` opens registration
+  components/              chat/ (thread, welcome state, composer, Ask side panel and rate-limit UI),
                            PageHeader (SiteHeader plus level/theme state for /vocab),
                            SiteHeader (level, chats menu, vocab link with due badge, sign-out; now a 1080px sibling of the
                            860px content column, not nested inside it), Brand, ConfirmModal, Toaster,
@@ -134,6 +147,7 @@ lib/
   reply.ts                 replySettings(level, persona, previousReply) — the reply call's model,
                            system prompt and provider options, shared by chat.service.ts and the
                            reply-level eval so both exercise identical settings
+  ask.ts                   streamAskAnswer() — concise Ask prompt, Groq 20B model and usage logging
   explain.ts               streamGrammarExplanation() — the on-demand grammar-explanation call
   tutor.ts                 detectCorrection() + CorrectionSchema (usedEnglish, correctionTranslation)
   correction-card.ts       hasCorrectionCard() — whether a Correction has anything to render; its own
@@ -324,6 +338,7 @@ or gloss never breaks a reply the learner already has. Notices are sent with
 | `detectCorrection()` | `lib/tutor.ts` | `generateObject` | 0 | `CorrectionSchema` |
 | `glossText()` | `lib/gloss.ts` | `generateObject` | 0 | `{ translation: z.string(), words: WordGlossSchema }` |
 | `streamGrammarExplanation()` | `lib/explain.ts` | `streamText` | default | — (plain text, not structured) |
+| `streamAskAnswer()` | `lib/ask.ts` | `streamText` on `openai/gpt-oss-20b` | 0.2 | — (plain text, 160 output tokens max) |
 
 The first three use `providerOptions.groq.reasoningEffort = 'low'`.
 `streamGrammarExplanation` uses the same setting — explaining a rule needs a
@@ -336,6 +351,19 @@ That's why `glossText`'s schema wraps the array in `{ translation, words }`
 and the function returns that object directly (callers read `.words` and
 `.translation`). Nested inside `CorrectionSchema` the array is still accepted
 as-is.
+
+**`/api/ask` (on demand, signed-in only):** accepts a question or sentence up
+to 500 characters, the current CEFR level, up to six recent roleplay messages,
+and up to four recent panel turns. The route enforces a 9,000-character body
+limit and clips each context message to 420 characters. It returns 401 for an
+anonymous caller before `consumeMessage`; a successful request spends one
+daily message and streams plain text. The model prompt treats a bare German
+sentence as a request for an English translation and a brief grammar
+breakdown, and a bare English sentence as a request for a German translation
+with a brief grammar note. It asks for at most 50 words. The Ask transcript
+is client-only, not persisted or sent to the roleplay model. Ask usage is
+currently recorded under the existing `explain` token-usage category because
+the database endpoint constraint has no `ask` value.
 
 **`/api/explain` (on demand, not part of the per-message calls):** takes
 `{ kind: 'reply' | 'correction', text, original?, level, messageId? }`. With a
@@ -650,6 +678,13 @@ sources of truth while allowing them to change independently.
   exists yet, the translate button renders disabled and pulsing in its final
   position rather than a separate "gloss…" line, so there's no layout jump
   when it becomes clickable.
+- **Ask side panel:** a small fixed "Ask ‹" edge tab opens a full-height,
+  animated overlay; its chevron closes it. For anonymous visitors, the tab
+  opens the shared native confirmation dialog and "Create account" navigates
+  to `/login?mode=signup`. The Ask route enforces the same boundary server-side.
+  The panel has Ask and Words views. Ask reads the `/api/ask` text stream using
+  `fetch` and keeps its turns in React state for the current page visit; Words
+  filters existing reply and correction glosses without a model call.
 - **Persona avatar:** `PersonaAvatar` (`app/components/persona-avatar.tsx`)
   renders next to each of the persona's replies and on the empty-chat screen.
   It shows an image from `avatar_url` when set, or an initial badge when not
@@ -788,6 +823,11 @@ reply model (via `lib/reply.ts`'s `replySettings()`, the same settings
 | `GLOBAL_DAILY_MESSAGE_CAP` | server, optional | messages the whole app serves per UTC day (`session.service.ts`); defaults to 300. Set it in Vercel as well as `.env.local` |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | server | planned (grammar RAG embeddings), unused |
 
+The Groq project used by `GROQ_API_KEY` must allow `openai/gpt-oss-20b`
+for Ask. If project model permissions use an "Only Allow" list, add the model
+under Groq → Settings → Projects → Limits. The model was enabled and three
+live Ask calls succeeded on 2026-10-20.
+
 ### Deployment
 
 - Vercel project connected to GitHub. Pushes to `main` deploy to production,
@@ -850,8 +890,8 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
 - **The whole message list is sent every turn.** Nothing trims history before
   `streamText`, so the reply prompt grows with the conversation.
 - **The model name is repeated across call sites** (`lib/reply.ts`'s
-  `CHAT_MODEL`, plus a `CORRECTION_MODEL`/`GLOSS_MODEL`/`EXPLAIN_MODEL`
-  constant in each of `tutor.ts`/`gloss.ts`/`explain.ts`) and the Groq
+  `CHAT_MODEL`, plus a `CORRECTION_MODEL`/`GLOSS_MODEL`/`EXPLAIN_MODEL`/`ASK_MODEL`
+  constant in `tutor.ts`/`gloss.ts`/`explain.ts`/`ask.ts`) and the Groq
   provider is imported in each file. There's no single place to switch model
   or provider — the bring-your-own-model design (`plans/byom.md`, `lib/llm.ts`)
   would be the place this gets fixed, if that's ever built.

@@ -27,7 +27,10 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<'signin' | 'signup'>(
+    () => (searchParams.get('mode') === 'signup' ? 'signup' : 'signin'),
+  );
   const action = mode === 'signin' ? signIn : signUp;
   const [state, formAction, pending] = useActionState<AuthState, FormData>(action, null);
   // The address whose code screen the learner backed out of ("use a different
@@ -36,7 +39,7 @@ function LoginForm() {
 
   // Set by app/auth/callback/route.ts when Google's code exchange fails, or
   // by signInWithGoogle() if Supabase never returned a redirect URL at all.
-  const errorParam = useSearchParams().get('error');
+  const errorParam = searchParams.get('error');
   const oauthFailed = errorParam === 'auth_callback_failed' || errorParam === 'oauth_failed';
   const confirmFailed = errorParam === 'confirm_failed';
 

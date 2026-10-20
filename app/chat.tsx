@@ -1,6 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { saveLevel } from '@/app/auth/actions';
@@ -12,6 +13,7 @@ import {
   limitMessage,
 } from '@/app/components/chat/chat-content';
 import { ChatSidePanel } from '@/app/components/chat/side-panel';
+import { useConfirm } from '@/app/components/confirm-modal';
 import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
 import { useTheme } from '@/app/hooks/use-theme';
@@ -59,6 +61,8 @@ export default function Chat({
 }) {
   const [input, setInput] = useState('');
   const [level, setLevel] = useState<CefrLevel>(initialLevel);
+  const router = useRouter();
+  const confirm = useConfirm();
   const { theme, toggleTheme } = useTheme();
   const [remaining, setRemaining] = useState(initialRemaining);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
@@ -268,6 +272,24 @@ export default function Chat({
     setRemaining((r) => (r === null ? null : Math.max(0, r - 1)));
   }
 
+  async function promptAskSignUp() {
+    const signUp = await confirm({
+      title: 'Ask about German',
+      description: 'Create an account to ask questions and get short grammar help.',
+      confirmLabel: 'Create account',
+      cancelLabel: 'Not now',
+    });
+    if (signUp) router.push('/login?mode=signup');
+  }
+
+  function openAskPanel() {
+    if (userEmail === null) {
+      void promptAskSignUp();
+      return;
+    }
+    setSidePanelOpen(true);
+  }
+
   return (
     // The header sits outside the 860px column, on its own 1080px track (see
     // SiteHeader) -- wider chrome, same readable line length for replies.
@@ -296,7 +318,7 @@ export default function Chat({
             aria-label="Open Ask learning panel"
             aria-controls="chat-side-panel"
             aria-expanded={false}
-            onClick={() => setSidePanelOpen(true)}
+            onClick={openAskPanel}
             className="border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 -translate-y-1/2 items-center gap-1.5 rounded-l-xl border-2 border-r-0 py-2 pr-1 pl-2 font-mono text-[11px] shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright"
           >
             <span>Ask</span><span aria-hidden="true" className="text-base leading-none">‹</span>
@@ -353,6 +375,10 @@ export default function Chat({
           isSaved={isSaved}
           onSaveWord={saveWord}
           onRemainingChange={setRemaining}
+          onAuthRequired={() => {
+            setSidePanelOpen(false);
+            void promptAskSignUp();
+          }}
           onClose={() => setSidePanelOpen(false)}
         />
       </div>

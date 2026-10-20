@@ -3,8 +3,14 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import { WordGlossSchema } from '@/lib/gloss';
+import { hasCorrectionCard } from '@/lib/correction-card';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
-import { buildCorrectionSystemPrompt, DEFAULT_CEFR_LEVEL, type CefrLevel } from '@/lib/prompts';
+import {
+  buildCorrectionSecondLookPrompt,
+  buildCorrectionSystemPrompt,
+  DEFAULT_CEFR_LEVEL,
+  type CefrLevel,
+} from '@/lib/prompts';
 import { logUsage, type UsageContext } from '@/lib/services/usage.service';
 
 const CORRECTION_MODEL = 'openai/gpt-oss-120b';
@@ -30,6 +36,27 @@ const CorrectionSchema = z.object({
 
 export type Correction = z.infer<typeof CorrectionSchema>;
 
+/** A clean first verdict gets an independent second look. A positive verdict
+ * without a sentence is retried too, then treated as a failed check if the
+ * second pass cannot produce a usable correction. */
+export async function checkWithSecondLook(
+  check: (secondLook: boolean) => Promise<Correction>,
+): Promise<Correction> {
+  const first = await check(false);
+  if (hasCorrectionCard(first)) return first;
+
+  const second = await check(true);
+  if (hasCorrectionCard(second)) return second;
+
+  if (first.hasMistake || first.usedEnglish || second.hasMistake || second.usedEnglish) {
+    throw new Error('correction verdict without a corrected sentence');
+  }
+  if (second.correction?.trim()) {
+    throw new Error('corrected sentence without a correction verdict');
+  }
+  return second;
+}
+
 /**
  * Classifies a single learner message for grammar mistakes. Pure function —
  * no HTTP, no request/response objects — so both the chat route and the
@@ -42,24 +69,26 @@ export async function detectCorrection(
   level: CefrLevel = DEFAULT_CEFR_LEVEL,
   usageContext: UsageContext = {},
 ): Promise<Correction> {
-  const { object, usage } = await generateObject({
-    model: groq(CORRECTION_MODEL),
-    schema: CorrectionSchema,
-    system: buildCorrectionSystemPrompt(level),
-    prompt: userMessage,
-    // This is classification, not creative writing -- there's one correct
-    // answer, so temperature 0 for determinism. The eval suite caught a
-    // real case where the default temperature produced a different verdict
-    // on an identical input across two runs.
-    temperature: 0,
-    providerOptions: {
-      // Classification doesn't need deep reasoning either -- same rationale
-      // as the conversation route.
-      groq: { reasoningEffort: 'low' },
-    },
+  return checkWithSecondLook(async (secondLook) => {
+    const { object, usage } = await generateObject({
+      model: groq(CORRECTION_MODEL),
+      schema: CorrectionSchema,
+      system: secondLook
+        ? buildCorrectionSecondLookPrompt(level)
+        : buildCorrectionSystemPrompt(level),
+      prompt: userMessage,
+      // Classification should be steady across runs; the second look uses
+      // a different checklist rather than randomizing the same prompt.
+      temperature: 0,
+      providerOptions: {
+        groq: { reasoningEffort: 'low' },
+      },
+    });
+
+    await logUsage('correction', CORRECTION_MODEL, usage, usageContext);
+    if (secondLook && hasCorrectionCard(object)) {
+      console.info('[correction] second look recovered a missed correction');
+    }
+    return object;
   });
-
-  await logUsage('correction', CORRECTION_MODEL, usage, usageContext);
-
-  return object;
 }

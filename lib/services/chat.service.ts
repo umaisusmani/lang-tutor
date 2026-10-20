@@ -211,6 +211,15 @@ export async function runChatTurn(
           // response -- the conversation reply still matters more. But say
           // so: a missing correction card otherwise reads as "no mistake".
           console.error('[correction] failed:', err);
+          try {
+            writer.write({
+              type: 'data-correctionCheck',
+              id: 'correction-check-1',
+              data: { status: 'failed' },
+            });
+          } catch (writeErr) {
+            console.error('[correction] status write failed:', writeErr);
+          }
           notify(writer, 'correction', "Couldn't check your German this time.");
         })
     : Promise.resolve();

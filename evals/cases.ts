@@ -14,11 +14,9 @@ export interface EvalCase {
 }
 
 /**
- * 20 curated cases: one or more per mistake type, several correct-sentence
- * controls (to catch over-correction), a couple of level-sensitivity pairs
- * (same sentence, different level, different expected verdict -- this is
- * what actually tests the strictness-by-level design, not just "can it spot
- * a mistake"), and one robustness check on trivial input.
+ * Curated cases: one or more per mistake type, several correct-sentence
+ * controls (to catch over-correction), a case error checked at two levels,
+ * and robustness checks on trivial input.
  */
 export const EVAL_CASES: EvalCase[] = [
   // --- One real example per mistake type ---
@@ -61,6 +59,14 @@ export const EVAL_CASES: EvalCase[] = [
     expectHasMistake: true,
     expectMistakeType: 'verb_conjugation',
     note: 'Third person singular needs "geht", not the infinitive/plural form.',
+  },
+  {
+    id: 'verb-conjugation-a1',
+    level: 'A1',
+    input: 'Er gehen jeden Tag zur Arbeit.',
+    expectHasMistake: true,
+    expectMistakeType: 'verb_conjugation',
+    note: 'A clear verb-form error should still get a correction at A1.',
   },
   {
     id: 'auxiliary-verb-1',
@@ -148,22 +154,22 @@ export const EVAL_CASES: EvalCase[] = [
     note: 'Correct, idiomatic, complex C1-level construction.',
   },
 
-  // --- Level-sensitivity pairs: same sentence, different expected verdict ---
-  // Tests the strictness-by-level design directly, not just mistake-spotting.
+  // --- Clear case errors should be corrected at every level ---
   {
-    id: 'level-sensitivity-lenient-a1',
+    id: 'case-error-a1',
     level: 'A1',
     input: 'Ich gehe zu Schule.',
-    expectHasMistake: false,
-    note: 'Missing contraction "zur" (zu der) — A1 guidance says ignore dropped articles/case slips like this.',
+    expectHasMistake: true,
+    expectMistakeType: 'case_declension',
+    note: 'Missing contraction "zur" (zu der) is a clear case/article error even at A1.',
   },
   {
-    id: 'level-sensitivity-strict-c1',
+    id: 'case-error-c1',
     level: 'C1',
     input: 'Ich gehe zu Schule.',
     expectHasMistake: true,
     expectMistakeType: 'case_declension',
-    note: 'Same sentence, but C1 guidance says flag anything a native speaker would notice.',
+    note: 'The same clear error remains a mistake at C1.',
   },
 
   // --- Robustness: trivial/short input shouldn't crash or false-positive ---

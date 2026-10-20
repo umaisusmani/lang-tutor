@@ -207,6 +207,9 @@ export function ChatThread({
           correctionPart && hasCorrectionCard(correctionPart.data)
             ? correctionPart.data
             : undefined;
+        const correctionFailed = message.parts.some(
+          (part) => part.type === 'data-correctionCheck' && part.data.status === 'failed',
+        );
         const dbIds = message.parts.find((part) => part.type === 'data-messageIds')?.data;
         const storedExplanations = message.parts.find(
           (part) => part.type === 'data-explanations',
@@ -220,7 +223,8 @@ export function ChatThread({
         const textStreaming = message.parts.some(
           (part) => part.type === 'text' && part.state === 'streaming',
         );
-        const checking = inFlight && !correctionPart && priorUserText.trim() !== '';
+        const checking =
+          inFlight && !correctionPart && !correctionFailed && priorUserText.trim() !== '';
         const checkedClean =
           !!correctionPart &&
           !correctionPart.data.hasMistake &&
@@ -292,6 +296,11 @@ export function ChatThread({
               {checkedClean && (
                 <span className="text-ink-3 animate-[fade-rise_240ms_ease-out] font-mono text-[10px] tracking-[0.06em]">
                   ✓ no corrections
+                </span>
+              )}
+              {correctionFailed && (
+                <span className="font-mono text-[11px] text-red-600 dark:text-red-400">
+                  Couldn&apos;t check your German this time.
                 </span>
               )}
 

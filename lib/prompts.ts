@@ -112,9 +112,9 @@ ${LEVEL_GUIDANCE[level]}`;
 }
 
 const STRICTNESS_BY_LEVEL: Record<CefrLevel, string> = {
-  A1: 'Be very lenient. Do NOT flag: missing or wrong case endings, dropped or missing articles (including contracted forms like "zur"/"zum"/"im"), or minor word-order slips. These are completely normal at this level and do not block understanding. Only flag a mistake that would genuinely confuse a listener about what the learner means.',
-  A2: 'Be lenient: ignore minor case-ending slips, dropped articles, or small word-order issues that don’t obscure meaning. Flag mistakes that a teacher would actually mention.',
-  B1: 'Be moderately strict: flag mistakes a careful teacher would correct, but let very minor slips pass if the sentence is otherwise clear.',
+  A1: 'Flag genuine German mistakes a beginner can learn from, including wrong or missing articles and case endings, verb forms, word order, and word choice. The sentence need not be confusing to deserve correction. Do not flag purely stylistic preferences or optional punctuation.',
+  A2: 'Flag genuine grammar and word-choice mistakes, including case endings and articles, even when the intended meaning is clear. Do not flag purely stylistic preferences or optional punctuation.',
+  B1: 'Flag genuine grammar and word-choice mistakes a careful teacher would correct, even when the intended meaning is clear. Do not flag purely stylistic preferences.',
   B2: 'Be strict: flag anything a native speaker would notice as wrong, including case and word-order issues, but not purely stylistic choices.',
   C1: 'Be strict but precise: only flag genuine mistakes, never stylistic preferences — an advanced learner has earned some stylistic latitude.',
 };
@@ -229,6 +229,10 @@ ${LEMMA_RULES}
 
 If there is no mistake worth flagging at this level, hasMistake must be false and mistakeType/correction/correctionTranslation/explanation/correctionGloss must all be null.
 
+Before deciding the sentence is clean, check each verb form and the order of
+the verb in its clause, then check for missing or wrong words and endings.
+A sentence can be understandable and still contain a mistake worth correcting.
+
 English words -- a separate question from hasMistake. Learners are told they
 may write English for words they don't know yet ("Ich habe einen dog").
 - "usedEnglish" is true when English words stand in for German ones. Names,
@@ -242,6 +246,18 @@ may write English for words they don't know yet ("Ich habe einen dog").
   English words replaced (plus the fix, if hasMistake) -- along with its
   correctionTranslation, correctionGloss, and an explanation naming the
   German word(s), with the article for nouns ("dog" is "der Hund").`;
+}
+
+/** A different checklist for a second look at a clean verdict. */
+export function buildCorrectionSecondLookPrompt(level: CefrLevel): string {
+  return `${buildCorrectionSystemPrompt(level)}
+
+Check the learner's message independently before returning a clean verdict.
+First look for English stand-ins, including a single English noun, adjective,
+or activity inside an otherwise German sentence. Then read each German clause
+for a clear verb, word-order, case, article, or word-choice error. Do not require
+the meaning to be unclear before flagging a clear error. If either check finds
+something, produce the full corrected German sentence and all accompanying fields.`;
 }
 
 /** System prompt for the per-reply word-gloss pass (lib/gloss.ts). Glosses

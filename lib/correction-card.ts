@@ -10,5 +10,5 @@ import type { Correction } from '@/lib/tutor';
  * the browser bundle. This imports only a type, which compiles away.
  */
 export function hasCorrectionCard(correction: Correction): boolean {
-  return (correction.hasMistake || !!correction.usedEnglish) && !!correction.correction;
+  return (correction.hasMistake || !!correction.usedEnglish) && !!correction.correction?.trim();
 }

@@ -29,6 +29,7 @@ export type LangTutorUIMessage = UIMessage<
   never, // no message metadata yet
   {
     correction: Correction;
+    correctionCheck: { status: 'failed' };
     // Reloaded rows can predate `translation` -- page.tsx normalizes them with
     // translation: null, which the UI shows as "not available".
     gloss: Omit<ReplyGloss, 'translation'> & { translation: string | null };

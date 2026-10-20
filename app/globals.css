@@ -9,10 +9,11 @@
  * That's what lets the header's toggle override the system setting instead of
  * fighting it.
  *
- * --on-bright and --on-accent do NOT flip between themes. Yellow, orange and
- * the accent fill are (near enough) constant across both, so text sitting on
- * them has to stay constant too -- using --ink there would invert it in dark
- * mode and put dark text on a dark bubble.
+ * --on-bright and --on-accent are the text colors that sit ON the yellow /
+ * orange / accent fills. Those fills are (near enough) constant across both
+ * themes, so these stay dark-on-bright and light-on-accent in both -- using
+ * --ink there would invert in dark mode and put dark text on a dark bubble.
+ * Dark mode only nudges their exact values (#141414, #fff).
  */
 :root {
   --paper: #f7efe4;
@@ -34,32 +35,34 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #241510;
-    --panel: #2e1c12;
-    --ink: #f0e4d4;
-    --ink-2: #c49a7a;
-    --ink-3: #9a7a62;
-    /* --line is a mid brown in dark mode: the outline character comes from
-       contrast with the background, not from pure black. */
-    --line: #8a5a3a;
-    --hair: #3e2818;
+    --paper: #141414;
+    --panel: #1e1e1e;
+    --ink: #e8e8e8;
+    --ink-2: #888888;
+    --ink-3: #606060;
+    --line: #303030;
+    --hair: #242424;
     --accent: #d4552a;
-    --accent-ink: #f0a070;
-    --soft: #321c10;
+    --accent-ink: #f07050;
+    --soft: #252525;
+    --on-bright: #141414;
+    --on-accent: #ffffff;
   }
 }
 
 :root[data-theme="dark"] {
-  --paper: #241510;
-  --panel: #2e1c12;
-  --ink: #f0e4d4;
-  --ink-2: #c49a7a;
-  --ink-3: #9a7a62;
-  --line: #8a5a3a;
-  --hair: #3e2818;
+  --paper: #141414;
+  --panel: #1e1e1e;
+  --ink: #e8e8e8;
+  --ink-2: #888888;
+  --ink-3: #606060;
+  --line: #303030;
+  --hair: #242424;
   --accent: #d4552a;
-  --accent-ink: #f0a070;
-  --soft: #321c10;
+  --accent-ink: #f07050;
+  --soft: #252525;
+  --on-bright: #141414;
+  --on-accent: #ffffff;
 }
 
 @theme inline {

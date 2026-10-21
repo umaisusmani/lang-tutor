@@ -317,13 +317,21 @@ export default function Chat({
         onThemeToggle={toggleTheme}
         activePage="chat"
         dueCount={dueCount}
-        onOpenTools={openAskPanel}
-        toolsOpen={sidePanelOpen}
       />
 
       <div className="relative flex min-h-0 w-full max-w-[1240px] flex-1 justify-center">
+          <button
+            type="button"
+            aria-label="Open Ask learning panel"
+            aria-controls="chat-side-panel"
+            aria-expanded={sidePanelOpen}
+            onClick={openAskPanel}
+            className={`${sidePanelOpen ? 'invisible' : ''} border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 -translate-y-1/2 items-center gap-1.5 rounded-l-xl border-2 border-r-0 py-2 pr-1 pl-2 font-mono text-[11px] shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright`}
+          >
+            <span>Ask</span><span aria-hidden="true" className="text-base leading-none">‹</span>
+          </button>
         <div className="flex min-h-0 min-w-0 max-w-[860px] flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+          <div className="chat-scroll-area flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           {messages.length === 0 ? (
             <ChatWelcome
               level={level}

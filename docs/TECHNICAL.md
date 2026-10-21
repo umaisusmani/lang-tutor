@@ -61,8 +61,8 @@ can ask a question or paste a sentence; one `openai/gpt-oss-20b` call returns
 a short answer, or a translation with one or two grammar notes. Ask receives
 only six recent chat messages and four recent panel turns, each clipped to
 420 characters. The panel thread stays in client memory for the current page
-visit and does not become roleplay history. The Ask button in the chat header
-opens a sign-up modal for anonymous visitors; the route independently returns 401
+visit and does not become roleplay history. The visible edge tab opens a
+sign-up modal for anonymous visitors; the route independently returns 401
 before quota or Groq use.
 
 Every result from the three per-message calls is streamed to the browser as a
@@ -695,7 +695,7 @@ sources of truth while allowing them to change independently.
   exists yet, the translate button renders disabled and pulsing in its final
   position rather than a separate "gloss…" line, so there's no layout jump
   when it becomes clickable.
-- **Ask side panel:** an Ask button beside the header's daily allowance opens a full-height,
+- **Ask side panel:** a small fixed "Ask ‹" edge tab opens a full-height,
   native modal dialog; its chevron closes it. For anonymous visitors, the tab
   opens the shared native confirmation dialog and "Create account" navigates
   to `/login?mode=signup`. The Ask route enforces the same boundary server-side.

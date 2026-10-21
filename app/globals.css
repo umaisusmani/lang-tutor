@@ -145,6 +145,16 @@
   min-height: 0;
 }
 
+/* Keep the chat history scrollable without drawing a scrollbar beside it. */
+.chat-scroll-area {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat-scroll-area::-webkit-scrollbar {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

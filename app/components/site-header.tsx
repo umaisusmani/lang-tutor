@@ -25,8 +25,6 @@ export function SiteHeader({
   onThemeToggle,
   activePage = 'chat',
   dueCount = 0,
-  onOpenTools,
-  toolsOpen = false,
 }: {
   level: CefrLevel;
   onLevelChange: (next: CefrLevel) => void;
@@ -41,8 +39,6 @@ export function SiteHeader({
   activePage?: 'chat' | 'vocab';
   /** Cards waiting in the review queue; the badge on the vocab link. */
   dueCount?: number;
-  onOpenTools?: () => void;
-  toolsOpen?: boolean;
 }) {
   const [chatsOpen, setChatsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -386,18 +382,6 @@ export function SiteHeader({
           <span>
             {remaining} of {messageCap} messages left
           </span>
-          {onOpenTools && (
-            <button
-              type="button"
-              aria-label="Open learning tools"
-              aria-controls="chat-side-panel"
-              aria-expanded={toolsOpen}
-              onClick={onOpenTools}
-              className="border-line text-ink hover:bg-yellow hover:text-on-bright flex-none cursor-pointer rounded-full border-2 px-3 py-1 text-xs font-semibold transition-colors"
-            >
-              Ask
-            </button>
-          )}
         </div>
       )}
 

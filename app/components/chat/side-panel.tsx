@@ -105,8 +105,22 @@ export function ChatSidePanel({
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
+    if (open) {
+      dialog.removeAttribute('data-closing');
+      if (!dialog.open) dialog.showModal();
+      return;
+    }
+    if (!dialog.open) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      dialog.close();
+      return;
+    }
+    dialog.dataset.closing = 'true';
+    const timer = window.setTimeout(() => {
+      dialog.close();
+      dialog.removeAttribute('data-closing');
+    }, 180);
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   useEffect(() => {

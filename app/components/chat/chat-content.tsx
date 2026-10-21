@@ -159,7 +159,7 @@ export function ChatThread({
   const busy = status === 'submitted' || status === 'streaming';
 
   return (
-    <main className="flex min-h-full flex-col gap-[34px] pt-[22px] pb-7">
+    <main className="flex min-h-full flex-col gap-[34px] px-2 pt-[22px] pb-7">
       <p className="sr-only" role="status">
         {busy ? 'The tutor is replying.' : messages.length > 0 ? 'Reply complete.' : ''}
       </p>
@@ -174,7 +174,7 @@ export function ChatThread({
         if (message.role === 'user') {
           return (
             <div key={message.id} className="flex justify-end">
-              <div className="border-line bg-accent text-on-accent max-w-[82%] rounded-[18px_18px_5px_18px] border-2 px-4 py-[11px] text-[17px] leading-[1.45] whitespace-pre-wrap shadow-[3px_3px_0_var(--line)]">
+              <div className="border-line bg-accent text-on-accent max-w-[82%] rounded-[18px_18px_5px_18px] border-2 px-4 py-[11px] text-[17px] leading-[1.45] break-words whitespace-pre-wrap shadow-[3px_3px_0_var(--line)]">
                 {text}
               </div>
             </div>

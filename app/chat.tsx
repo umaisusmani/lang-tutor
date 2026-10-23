@@ -69,6 +69,11 @@ export default function Chat({
   const { quota, accept: acceptQuota, refresh: refreshQuota } = useQuota(initialQuota);
   const remaining = quota.remaining;
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  // Set right before opening the panel, so a specific entry point (the "out
+  // of messages" card's Translate button) can land on that tab instead of
+  // the default "ask" view. Left alone otherwise, so the panel keeps
+  // whichever tab the learner was already on.
+  const [toolsView, setToolsView] = useState<'ask' | 'words' | 'translate' | undefined>();
   // Which translation panels are open, keyed `${message.id}-reply` / `-corr`.
   const [openPanel, setOpenPanel] = useState<Record<string, boolean>>({});
   // Grammar explanations fetched this session (same keys), and which are
@@ -141,6 +146,10 @@ export default function Chat({
 
   const busy = status === 'submitted' || status === 'streaming';
   const capped = quota.reason !== null || remaining <= 0;
+  // The narrower case the takeover card answers to: the learner's own daily
+  // cap, not a shared-limit or allowance-check failure, which keep the
+  // smaller banner and a still-visible (if disabled) composer.
+  const cappedByUser = quota.reason === 'user' || (quota.reason === null && remaining <= 0);
   // Anonymous visitors have no vocab_entries to save into, so their gloss
   // panels stay exactly as they were: words and translations, no buttons.
   const canSave = userEmail !== null;
@@ -279,11 +288,12 @@ export default function Chat({
     if (signUp) router.push('/login?mode=signup');
   }
 
-  function openLearningPanel() {
+  function openLearningPanel(view?: 'ask' | 'words' | 'translate') {
     if (userEmail === null) {
       void promptToolsSignUp();
       return;
     }
+    setToolsView(view);
     setSidePanelOpen(true);
   }
 
@@ -312,7 +322,7 @@ export default function Chat({
             aria-label="Open learning tools"
             aria-controls="chat-side-panel"
             aria-expanded={sidePanelOpen}
-            onClick={openLearningPanel}
+            onClick={() => openLearningPanel()}
             className={`${sidePanelOpen ? 'invisible' : ''} border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 -translate-y-1/2 items-center gap-1.5 rounded-l-xl border-2 border-r-0 py-2 pr-1 pl-2 font-mono text-[11px] shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright`}
           >
             <span>Tools</span><span aria-hidden="true" className="text-base leading-none">‹</span>
@@ -355,7 +365,17 @@ export default function Chat({
             input={input}
             busy={busy}
             capped={capped}
-            quotaNotice={<QuotaBanner quota={quota} signedIn={userEmail !== null} onRetry={() => void refreshQuota()} />}
+            hideInput={cappedByUser}
+            quotaNotice={
+              <QuotaBanner
+                quota={quota}
+                signedIn={userEmail !== null}
+                onRetry={() => void refreshQuota()}
+                persona={persona}
+                dueCount={dueCount}
+                onOpenTranslate={() => openLearningPanel('translate')}
+              />
+            }
             onInputChange={setInput}
             onSend={send}
           />
@@ -363,6 +383,7 @@ export default function Chat({
 
         <ChatSidePanel
           open={sidePanelOpen}
+          openOnView={toolsView}
           messages={messages}
           level={level}
           remaining={remaining}

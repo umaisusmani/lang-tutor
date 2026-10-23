@@ -61,6 +61,7 @@ function collectWords(messages: LangTutorUIMessage[]): PanelWord[] {
 
 export function ChatSidePanel({
   open,
+  openOnView,
   messages,
   level,
   remaining,
@@ -74,6 +75,9 @@ export function ChatSidePanel({
   onClose,
 }: {
   open: boolean;
+  /** Which tab to land on the moment the panel opens; left alone (the panel
+   * keeps whatever tab was last active) when omitted. */
+  openOnView?: ToolView;
   messages: LangTutorUIMessage[];
   level: CefrLevel;
   remaining: number | null;
@@ -87,6 +91,16 @@ export function ChatSidePanel({
   onClose: () => void;
 }) {
   const [view, setView] = useState<ToolView>('ask');
+  // Adjusted during render rather than in an effect (React's recommended
+  // pattern for state that depends on a prop change): `wasOpen` lets us tell
+  // "just opened" from "still open while re-rendering for other reasons",
+  // so re-rendering for, say, a streaming answer doesn't keep snapping the
+  // tab back to `openOnView`.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open && openOnView) setView(openOnView);
+  }
   const [draft, setDraft] = useState('');
   const [turns, setTurns] = useState<PanelTurn[]>([]);
   const [sending, setSending] = useState(false);
@@ -384,7 +398,7 @@ export function ChatSidePanel({
               }}
               className="border-hair flex flex-col gap-2 border-t-2 p-3"
             >
-              <QuotaBanner quota={quota} signedIn={canSave} onRetry={() => void onQuotaRefresh()} />
+              <QuotaBanner quota={quota} signedIn={canSave} onRetry={() => void onQuotaRefresh()} compact />
               <textarea
                 value={draft}
                 onChange={(event) => changeDraft(event.target.value.slice(0, 500))}

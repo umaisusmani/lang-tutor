@@ -354,6 +354,7 @@ export function ChatComposer({
   input,
   busy,
   capped,
+  hideInput = false,
   quotaNotice,
   onInputChange,
   onSend,
@@ -361,6 +362,9 @@ export function ChatComposer({
   input: string;
   busy: boolean;
   capped: boolean;
+  /** Once the daily cap is hit, the notice becomes a full takeover card that
+   * replaces the input row entirely, rather than sitting disabled above it. */
+  hideInput?: boolean;
   quotaNotice: ReactNode;
   onInputChange: (value: string) => void;
   onSend: (text: string) => void;
@@ -374,23 +378,28 @@ export function ChatComposer({
       className="bg-paper sticky bottom-0 flex flex-col gap-3 pt-3 pb-6"
     >
       {quotaNotice}
-      <div className="bg-line h-0.5 opacity-50" />
-      <div className="flex items-center gap-2.5">
-        <input
-          value={input}
-          onChange={(event) => onInputChange(event.currentTarget.value)}
-          aria-label="Message in German"
-          placeholder="Schreib auf Deutsch… English words are fine too"
-          className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
-        />
-        <button
-          type="submit"
-          disabled={busy || capped || !input.trim()}
-          className="border-line bg-ink text-paper hover:bg-accent hover:text-on-accent font-display flex-none cursor-pointer rounded-full border-2 px-[22px] py-3 text-xl tracking-[0.04em] transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:opacity-40"
-        >
-          Senden
-        </button>
-      </div>
+      {!hideInput && (
+        <>
+          <div className="bg-line h-0.5 opacity-50" />
+          <div className="flex items-center gap-2.5">
+            <input
+              value={input}
+              onChange={(event) => onInputChange(event.currentTarget.value)}
+              disabled={capped}
+              aria-label="Message in German"
+              placeholder="Schreib auf Deutsch… English words are fine too"
+              className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
+            />
+            <button
+              type="submit"
+              disabled={busy || capped || !input.trim()}
+              className="border-line bg-ink text-paper hover:bg-accent hover:text-on-accent font-display flex-none cursor-pointer rounded-full border-2 px-[22px] py-3 text-xl tracking-[0.04em] transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:opacity-40"
+            >
+              Senden
+            </button>
+          </div>
+        </>
+      )}
     </form>
   );
 }

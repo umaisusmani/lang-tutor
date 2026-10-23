@@ -8,7 +8,7 @@ const SESSION_COOKIE = 'session_id';
 /** Anonymous visitors get this many messages per day before being asked to sign in. */
 export const ANON_DAILY_CAP = 5;
 
-/** Signed-in users: messages per day. Grammar explanations count too. */
+/** Signed-in users: chat and Ask messages per day. */
 export const USER_DAILY_CAP = 35;
 
 /**
@@ -90,7 +90,7 @@ export async function getQuotaStatus(userId: string | null): Promise<QuotaStatus
 /**
  * Takes one message out of today's allowance -- the caller's own and the
  * global one -- or says why it can't. Called for every model-spending request
- * (chat, grammar explanations), signed in or not, before any model call.
+ * (chat and Ask), signed in or not, before any model call.
  *
  * Uses the service-role client because `daily_usage` has RLS enabled with zero
  * policies: no user session can read or write it directly, so a client can't

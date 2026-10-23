@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     ? requestedLevel
     : await resolveCefrLevel(userId, levelCookie);
 
-  // Signed-in learners pay from the same daily allowance as chat and explanations.
+  // Signed-in learners pay from the same daily allowance as chat.
   // This check happens before the model call so capped requests cost no tokens.
   const usage = await consumeMessage(userId);
   const quota = await getQuotaStatus(userId);

@@ -375,11 +375,8 @@ database row (not from the request body) and, if that row already has a
 reopening an explanation is free. Otherwise it streams a new one and saves it
 onto the row via `annotateMessage`. Without a usable `messageId` (anonymous,
 or a turn whose rows failed to save), it explains the text sent in the
-request and saves nothing. A fresh explanation, signed in or not, spends one
-message of the same daily allowance chat uses (`consumeMessage`), checked
-before the model call; a cached one costs nothing. Over the limit it answers
-429 with `{reason, signedIn}`, and a successful response carries the new
-allowance in an `X-Messages-Remaining` header.
+request and saves nothing. Fresh explanations do not consume the chat/Ask
+message allowance. Cached explanations still avoid a new model call.
 
 ### 5.2 Prompts (`lib/prompts.ts`)
 
@@ -592,8 +589,8 @@ keyed by who is asking, with days rolling over at 00:00 UTC:
 | `user:<uuid>` | a signed-in account | `USER_DAILY_CAP` = 35 |
 | `global` | the whole app | `GLOBAL_DAILY_MESSAGE_CAP` env var, default 300 |
 
-The caps are in `lib/services/session.service.ts`. A chat message costs one, and
-so does a freshly generated grammar explanation (cached ones are free).
+The caps are in `lib/services/session.service.ts`. Chat and Ask each consume
+one message; grammar explanations do not consume this allowance.
 
 - **Atomic:** `consume_message(p_key, p_cap, p_global_cap)` is one Postgres
   function. It takes the global slot first, then the caller's, each with a
@@ -653,8 +650,8 @@ sources of truth while allowing them to change independently.
   it after errors, on focus, and at UTC rollover.
 - `QuotaBanner` sits directly above the composer for personal limits, the
   shared app cap, or a counter outage. `/api/quota` and the initial page load
-  read both counters without spending a message. Ask and fresh explanations
-  report quota changes to the same client state.
+  read both counters without spending a message. Ask reports quota changes
+  to the same client state.
 - The chat column fills the viewport and scrolls its welcome or message area
   inside it, keeping the composer visible on a phone-sized screen.
 - `conversationId` is kept in a ref, updated from `data-conversation`, and
@@ -695,13 +692,18 @@ sources of truth while allowing them to change independently.
   exists yet, the translate button renders disabled and pulsing in its final
   position rather than a separate "gloss…" line, so there's no layout jump
   when it becomes clickable.
-- **Ask side panel:** a small fixed "Ask ‹" edge tab opens a full-height,
+- **Learning tools panel:** a small fixed "Tools ‹" edge tab opens a full-height,
   native modal dialog; its chevron closes it. For anonymous visitors, the tab
   opens the shared native confirmation dialog and "Create account" navigates
-  to `/login?mode=signup`. The Ask route enforces the same boundary server-side.
-  The panel has Ask and Words views. Ask reads the `/api/ask` text stream using
+  to `/login?mode=signup`. Ask and Translate enforce the same boundary server-side.
+  The panel has Ask, Words, and Translate views. Ask reads the `/api/ask` text stream using
   `fetch` and keeps its turns in React state for the current page visit; Words
-  filters existing reply and correction glosses without a model call.
+  filters existing reply and correction glosses without a model call. Translate
+  sends up to 200 characters to `/api/translate`, using Azure Dictionary Lookup
+  for isolated words and Text Translate for phrases or fallback. A swap button
+  changes German ↔ English. The route consumes separate atomic counters in
+  `daily_usage` through `consume_translation` (migration `0008`): 50 per signed-in
+  user and 300 app-wide per UTC day. The Azure key and region remain server-only.
 - **Persona avatar:** `PersonaAvatar` (`app/components/persona-avatar.tsx`)
   renders next to each of the persona's replies and on the empty-chat screen.
   It shows an image from `avatar_url` when set, or an initial badge when not
@@ -882,9 +884,9 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
   on the `session_id` cookie, so incognito or clearing cookies gives a fresh 5
   messages. The global cap bounds the damage; per-IP buckets are the next step
   if it gets abused.
-- **Some model spend isn't counted against the daily limit:** starter-vocab
-  translations (`lib/starter-vocab/translate.ts`) call the model but don't
-  call `consumeMessage`.
+- **Some model spend isn't counted against the daily limit:** grammar
+  explanations and starter-vocab translations (`lib/starter-vocab/translate.ts`)
+  call the model but don't call `consumeMessage`.
 - **Verification doesn't stop throwaway inboxes.** A code proves the person
   controls an address, not that it's a real one. A CAPTCHA on signup is the
   usual next step.

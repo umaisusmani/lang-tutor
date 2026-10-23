@@ -4,10 +4,9 @@ import { streamGrammarExplanation, type ExplainKind } from '@/lib/explain';
 import { isCefrLevel } from '@/lib/prompts';
 import { annotateMessage, getMessage } from '@/lib/services/conversation.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
-import { consumeMessage, getQuotaStatus } from '@/lib/services/session.service';
 
 /** Longest text an unpersisted request may ask about. Replies are a few
- * sentences; this only stops the endpoint being used as a free model proxy. */
+ * sentences; this bounds the size of each model request. */
 const MAX_TEXT_LENGTH = 1500;
 
 function isKind(value: unknown): value is ExplainKind {
@@ -27,8 +26,7 @@ function clip(value: unknown): string {
  *   again (or after a reload) costs nothing. getMessage() goes through RLS,
  *   so another user's id reads as missing; no ownership check needed here.
  * - Anonymous, or a turn whose rows didn't save: the text comes from the
- *   request and nothing is stored. A fresh explanation counts against the same
- *   daily message cap as chat, checked before any model call.
+ *   request and nothing is stored. Explanations do not spend chat messages.
  */
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -76,18 +74,6 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Nothing to explain.' }, { status: 400 });
   }
 
-  // A fresh explanation spends a message from the same daily allowance as
-  // chat, signed in or not. Cached ones returned above and cost nothing.
-  const usage = await consumeMessage(userId);
-  const quota = await getQuotaStatus(userId);
-  if (!usage.allowed) quota.reason = usage.reason;
-  if (!usage.allowed) {
-    return Response.json(
-      { quota, error: usage.reason === 'unavailable' ? 'Could not check your message allowance.' : 'Daily message limit reached.', reason: usage.reason, signedIn: userId !== null },
-      { status: usage.reason === 'unavailable' ? 503 : 429 },
-    );
-  }
-
   const result = streamGrammarExplanation({
     kind,
     text,
@@ -97,9 +83,5 @@ export async function POST(req: Request) {
     onText: persist,
   });
 
-  // Lets the client show the new allowance without guessing whether this
-  // request was a cached (free) one -- cached answers return early, above.
-  return result.toTextStreamResponse({
-    headers: { 'X-Messages-Remaining': String(usage.remaining), 'X-Quota-Status': JSON.stringify(quota) },
-  });
+  return result.toTextStreamResponse();
 }

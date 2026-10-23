@@ -2,7 +2,6 @@
 
 import type { ChatStatus } from 'ai';
 import type { ReactNode } from 'react';
-import type { QuotaReason } from '@/lib/quota';
 
 import { GlossedText } from '@/app/components/glossed-text';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
@@ -37,24 +36,6 @@ export type ExplanationRequest = {
   text: string;
   original?: string;
 };
-
-function resetTimeLabel(): string {
-  const now = new Date();
-  const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
-  return reset.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-export function limitMessage(
-  reason: QuotaReason | undefined,
-  signedIn: boolean,
-): string {
-  if (reason === 'unavailable') return 'Could not check your message allowance. Please try again.';
-  const resets = `Resets at ${resetTimeLabel()}.`;
-  if (reason === 'global') return `The tutor has hit its limit for today. ${resets}`;
-  return signedIn
-    ? `You've used today's messages. ${resets}`
-    : `You've used your free messages for today. ${resets} Or sign in to get more.`;
-}
 
 function messageText(message: LangTutorUIMessage, separator = '\n'): string {
   return message.parts

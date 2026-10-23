@@ -14,9 +14,10 @@ German conversation practice with an AI tutor — currently a specific persona, 
 - **Flashcards** (`/vocab`). Review due words or choose extra practice. Each review round ends after its available cards, returns to the word list, and shows a completion summary. A badge on the `vocab` link shows how many words are ready.
 - **Chat history.** Conversations are saved, with their corrections, translations and grammar explanations, and you can reopen or delete them from the chats menu. The logo always opens a new chat.
 - **Ask side panel.** Signed-in learners can ask short German questions or paste a sentence for a translation and brief grammar note. The Words tab reuses the conversation's existing glosses. Ask uses `openai/gpt-oss-20b` on Groq and keeps its short thread in browser memory for the current page visit.
+- **Translate side-panel tab.** Signed-in learners can translate a word or short sentence between German and English, switching direction with the swap button. It uses Azure Translator and has a separate daily allowance.
 - **Try before signing in.** You can send 5 messages a day without an account. Sign in with email/password (you confirm the address with a code sent by email) or Google for 35 a day, and to save your progress.
 
-Daily limits reset at 00:00 UTC. Ask submissions and fresh grammar explanations use the same allowance as chat messages. A banner above the chat box shows when your limit or the shared app-wide cap is reached and when it resets. See the [roadmap](ROADMAP.md) for Translate and remaining work.
+Daily limits reset at 00:00 UTC. Ask submissions use the same allowance as chat messages; grammar explanations do not use that allowance. Translate has its own caps: 50 lookups per signed-in user and 300 app-wide per day, with a 200-character input limit. A banner above the chat box shows when your message limit or the shared app-wide cap is reached and when it resets. See the [roadmap](ROADMAP.md) for remaining work.
 
 ## How a message is handled
 
@@ -57,7 +58,7 @@ The rules live in one place, `LEMMA_RULES` in [lib/prompts.ts](lib/prompts.ts), 
 
 ## Stack
 
-Next.js 16 (App Router) · TypeScript · Tailwind CSS · Vercel AI SDK · Groq · Supabase (Postgres, Auth, row-level security) · Vercel
+Next.js 16 (App Router) · TypeScript · Tailwind CSS · Vercel AI SDK · Groq · Azure Translator · Supabase (Postgres, Auth, row-level security) · Vercel
 
 ## Run locally
 
@@ -75,11 +76,15 @@ npm run dev                  # http://localhost:3000
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API | Database and auth |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same page | Database and auth, as the signed-in user |
 | `SUPABASE_SERVICE_ROLE_KEY` | same page | Server-only: token-usage logs and the daily message counters. Never expose it to the browser. |
+| `AZURE_TRANSLATOR_KEY` | Azure Translator resource → Keys and Endpoint → Key 1 | Server-only: Translate tab requests. Use an F0 resource. |
+| `AZURE_TRANSLATOR_REGION` | same Azure page → Location/Region (for example `eastus`) | Server-only: Translator region header. |
 | `GLOBAL_DAILY_MESSAGE_CAP` | optional | Messages the whole app serves per UTC day. Defaults to 300. |
 
 **Groq model access:** Ask needs `openai/gpt-oss-20b` allowed for the project associated with `GROQ_API_KEY`. If the project uses an "Only Allow" model list, add it under Groq → Settings → Projects → Limits; a blocked model returns 403.
 
 **Database:** run the migrations in [supabase/migrations/](supabase/migrations/) in order, either with `supabase db push` or by pasting each file into the Supabase SQL editor. They create every table with row-level security turned on.
+
+**Translate setup:** apply `0008_translation_usage.sql`, set both Azure variables in `.env.local` and in your hosting environment, then restart or redeploy. Keep the Translator resource on F0. The server checks both daily counters before contacting Azure; a missing migration fails closed and displays an allowance error.
 
 **Google sign-in** (optional): enable the Google provider under Supabase → Authentication → Providers, and add `http://localhost:3000/auth/callback` to the allowed redirect URLs. Email/password sign-in works without this.
 
@@ -128,6 +133,7 @@ app/
   chat.tsx               chat state and side effects: streaming, saving, explanations
   api/chat/route.ts      the chat endpoint
   api/ask/route.ts       signed-in Ask panel endpoint
+  api/translate/route.ts signed-in Azure Translate endpoint
   api/explain/route.ts   on-demand grammar explanations
   hooks/use-theme.ts     shared local theme store for client pages
   vocab/                 the saved-words page (click-to-reveal cards) and its server actions
@@ -141,6 +147,7 @@ lib/
   prompts.ts             every system prompt, including LEMMA_RULES
   reply.ts               the reply call's shared model/prompt settings
   ask.ts                 short Ask answers on Groq 20B
+  translator.ts          Azure Dictionary Lookup and Text Translate adapter
   explain.ts             the on-demand grammar-explanation call
   tutor.ts               correction check
   gloss.ts               sentence + word-by-word translation

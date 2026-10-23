@@ -10,7 +10,6 @@ import {
   ChatThread,
   ChatWelcome,
   type ExplanationRequest,
-  limitMessage,
 } from '@/app/components/chat/chat-content';
 import { ChatSidePanel } from '@/app/components/chat/side-panel';
 import { useConfirm } from '@/app/components/confirm-modal';
@@ -18,7 +17,7 @@ import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
 import { QuotaBanner } from '@/app/components/quota-banner';
 import { useQuota } from '@/app/hooks/use-quota';
-import { isQuotaStatus, quotaFromResponse, type QuotaStatus } from '@/lib/quota';
+import type { QuotaStatus } from '@/lib/quota';
 import { useTheme } from '@/app/hooks/use-theme';
 import { saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
@@ -235,20 +234,9 @@ export default function Chat({
       });
 
       if (!res.ok || !res.body) {
-        let message = "Couldn't explain this one. Please try again.";
-        if (res.status === 429 || res.status === 503) {
-          const body = await res.json().catch(() => null);
-          message = limitMessage(body?.reason, body?.signedIn === true);
-          if (isQuotaStatus(body?.quota)) acceptQuota(body.quota);
-        }
-        notifyError(message, `explain-${key}`);
+        notifyError("Couldn't explain this one. Please try again.", `explain-${key}`);
         return;
       }
-
-      // A fresh explanation spends a message server-side; a cached one doesn't.
-      // The server says where the allowance stands either way.
-      const updatedQuota = quotaFromResponse(res);
-      if (updatedQuota) acceptQuota(updatedQuota);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -268,7 +256,6 @@ export default function Chat({
       notifyError("Couldn't explain this one. Please try again.", `explain-${key}`);
     } finally {
       setExplaining((s) => ({ ...s, [key]: false }));
-      void refreshQuota();
     }
   }
 
@@ -282,19 +269,19 @@ export default function Chat({
 
   }
 
-  async function promptAskSignUp() {
+  async function promptToolsSignUp() {
     const signUp = await confirm({
-      title: 'Ask about German',
-      description: 'Create an account to ask questions and get short grammar help.',
+      title: 'Learning tools',
+      description: 'Create an account to ask questions, translate, and save words.',
       confirmLabel: 'Create account',
       cancelLabel: 'Not now',
     });
     if (signUp) router.push('/login?mode=signup');
   }
 
-  function openAskPanel() {
+  function openLearningPanel() {
     if (userEmail === null) {
-      void promptAskSignUp();
+      void promptToolsSignUp();
       return;
     }
     setSidePanelOpen(true);
@@ -322,13 +309,13 @@ export default function Chat({
       <div className="relative flex min-h-0 w-full max-w-[1240px] flex-1 justify-center">
           <button
             type="button"
-            aria-label="Open Ask learning panel"
+            aria-label="Open learning tools"
             aria-controls="chat-side-panel"
             aria-expanded={sidePanelOpen}
-            onClick={openAskPanel}
+            onClick={openLearningPanel}
             className={`${sidePanelOpen ? 'invisible' : ''} border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 -translate-y-1/2 items-center gap-1.5 rounded-l-xl border-2 border-r-0 py-2 pr-1 pl-2 font-mono text-[11px] shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright`}
           >
-            <span>Ask</span><span aria-hidden="true" className="text-base leading-none">‹</span>
+            <span>Tools</span><span aria-hidden="true" className="text-base leading-none">‹</span>
           </button>
         <div className="flex min-h-0 min-w-0 max-w-[860px] flex-1 flex-col">
           <div className="chat-scroll-area flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
@@ -387,7 +374,7 @@ export default function Chat({
           onQuotaRefresh={refreshQuota}
           onAuthRequired={() => {
             setSidePanelOpen(false);
-            void promptAskSignUp();
+            void promptToolsSignUp();
           }}
           onClose={() => setSidePanelOpen(false)}
         />

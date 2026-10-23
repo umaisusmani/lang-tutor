@@ -4,7 +4,7 @@ This records the code-level findings from 2026-10-20, before the current uncommi
 
 | Area | Current status |
 |---|---|
-| Quota banner and count recovery | Implemented locally above the chat composer. Personal, shared, and unavailable states have separate copy; chat, Ask, and explanations update the same allowance. Live tests of the final allowed request, reload, and UTC rollover remain. |
+| Quota banner and count recovery | Implemented locally above the chat composer. Personal, shared, and unavailable states have separate copy; chat and Ask update the same allowance. Grammar explanations no longer consume it. Live tests of the final allowed request, reload, and UTC rollover remain. |
 | Review completion | Implemented locally. Each available card is graded once per round; completion returns to the word grid with a summary. Save failures retain the card for retry. A live graded session remains to be tested. |
 | Vocabulary page | Search, sort, filters, missing-meaning status, an empty-state chat action, and separate due review and extra practice are implemented locally. Phone and keyboard checks remain. |
 | Other UI | Auth copy and password reset, drawer focus behavior, composer labeling, and menu keyboard behavior are implemented locally. A phone-width browser check found and fixed an off-screen composer on an empty chat. Password recovery email and assistive-technology checks remain. |
@@ -58,7 +58,7 @@ Validate the revised flow on a phone-sized viewport and with keyboard/screen rea
 
 ## 4. Documentation and sequence
 
-- [README.md](../README.md) now states that Ask and fresh explanations share the chat allowance, and that a shared cap can stop requests early.
+- [README.md](../README.md) now states that Ask shares the chat allowance, while grammar explanations do not consume it.
 - [ROADMAP.md](../ROADMAP.md) now tracks the quota banner, audit follow-up, and Translate as a side-panel tab. Translate is planned/in progress by the user; it is not a shipped page.
 - [TECHNICAL.md](TECHNICAL.md) identifies the current code revision and points to this audit. Its implementation description is separate from future work.
 

@@ -4,7 +4,7 @@ The one place feature status is recorded. Design notes live in local
 `plans/*.md` files (not committed), and they don't carry status. What is
 built, and how, is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-**Current sequence (2026-10-21):** Translate is in design/development for a third tab in the existing chat side panel. The quota and vocabulary UI fixes from [the UI audit](docs/UI_AUDIT.md) are implemented locally and await live browser testing and deployment. After Translate, fix and evaluate Ask's German grammar accuracy before exposing it more widely. The eight-case eval found recurring 20B errors and occasional 120B errors, so expand the cases and manually review answers before choosing a model. Then improve tutor personalization from existing structured learner data; evaluate semantic retrieval only if simpler methods miss relevant context. Validate demand for a Topics view before adding it. Voice features remain parked.
+**Current sequence (2026-10-22):** Translate is implemented locally as a third tab in the existing chat side panel; apply migration `0008`, configure the Azure F0 key/region, and verify a live lookup before release. The quota and vocabulary UI fixes from [the UI audit](docs/UI_AUDIT.md) are implemented locally and await live browser testing and deployment. After Translate, fix and evaluate Ask's German grammar accuracy before exposing it more widely. The eight-case eval found recurring 20B errors and occasional 120B errors, so expand the cases and manually review answers before choosing a model. Then improve tutor personalization from existing structured learner data; evaluate semantic retrieval only if simpler methods miss relevant context. Validate demand for a Topics view before adding it. Voice features remain parked.
 
 Status: ✅ done · 🟡 partly done · ⬜ not started
 
@@ -45,7 +45,7 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Recasting | 🟡 | `69615a7` | Only English stand-ins come back in German. Grammar mistakes aren't recast |
 | Level-gated glossing (B1+ tap to reveal) | ⬜ | | |
 | Ask side panel (German-learning utilities, separate from roleplay) | 🟡 | | Code uses signed-in-only Ask on Groq 20B, short answers or sentence translation with grammar notes; Words reuses glosses. Anonymous visitors see a sign-up modal. Groq permission works, but the new `ask` eval exposes recurring 20B grammar errors; compare 120B and expand/repeat cases before launch. Topics deferred; no RAG. Design: `plans/ask-panel.md` |
-| Translate side-panel tab | ⬜ | | In design/development by the user; planned as the third tab beside Ask and Words, not `/translate`. Design: `plans/translate.md` |
+| Translate side-panel tab | 🟡 | | Implemented locally with German ↔ English swap, Azure Dictionary Lookup/Text Translate, and separate atomic 50/user and 300/global daily caps. Migration `0008`, Azure environment setup, and live lookup verification remain before release. Design: `plans/translate.md` |
 | On-demand grammar explanations | ✅ | `69615a7` | Not in the original plan. Saved to the message |
 
 ## Later

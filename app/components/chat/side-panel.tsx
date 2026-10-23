@@ -8,8 +8,10 @@ import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { WordGloss } from '@/lib/gloss';
 import type { CefrLevel } from '@/lib/prompts';
 import type { VocabSource } from '@/lib/types/db';
+import type { TranslationDirection } from '@/lib/translator';
 
-type ToolView = 'ask' | 'words';
+type ToolView = 'ask' | 'words' | 'translate';
+const toolViews: ToolView[] = ['ask', 'words', 'translate'];
 type PanelTurn = { role: 'user' | 'assistant'; content: string };
 type PanelWord = {
   entry: WordGloss[number];
@@ -88,6 +90,13 @@ export function ChatSidePanel({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [wordFilter, setWordFilter] = useState('');
+  const [translationDirection, setTranslationDirection] = useState<TranslationDirection>('de-en');
+  const [translationDraft, setTranslationDraft] = useState('');
+  const [translationResult, setTranslationResult] = useState('');
+  const [translationError, setTranslationError] = useState('');
+  const [translationRemaining, setTranslationRemaining] = useState<number | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const translationRequestRef = useRef<AbortController | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const blocked = quota.reason !== null || remaining === 0;
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -133,6 +142,59 @@ export function ChatSidePanel({
 
   function changeDraft(value: string) {
     setDraft(value);
+  }
+
+  function cancelTranslation() {
+    translationRequestRef.current?.abort();
+    translationRequestRef.current = null;
+    setTranslating(false);
+  }
+
+  function swapTranslationDirection() {
+    cancelTranslation();
+    setTranslationDirection((current) => current === 'de-en' ? 'en-de' : 'de-en');
+    setTranslationResult('');
+    setTranslationError('');
+  }
+
+  async function translate() {
+    const text = translationDraft.trim();
+    if (!text || translating) return;
+    const controller = new AbortController();
+    translationRequestRef.current = controller;
+    setTranslating(true);
+    setTranslationResult('');
+    setTranslationError('');
+
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, direction: translationDirection }),
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => null);
+      if (translationRequestRef.current !== controller) return;
+      if (typeof payload?.remaining === 'number') setTranslationRemaining(payload.remaining);
+      if (response.status === 401) {
+        onAuthRequired();
+        return;
+      }
+      if (!response.ok || typeof payload?.translation !== 'string') {
+        setTranslationError(payload?.error ?? 'Translation is unavailable right now.');
+        return;
+      }
+      setTranslationResult(payload.translation);
+    } catch {
+      if (translationRequestRef.current === controller) {
+        setTranslationError('Could not connect. Please try again.');
+      }
+    } finally {
+      if (translationRequestRef.current === controller) {
+        translationRequestRef.current = null;
+        setTranslating(false);
+      }
+    }
   }
 
   async function ask(question = draft) {
@@ -235,7 +297,7 @@ export function ChatSidePanel({
         </div>
 
         <div role="tablist" aria-label="Learning tools" className="border-hair flex gap-1 border-b-2 p-2">
-          {(['ask', 'words'] as const).map((tab) => (
+          {toolViews.map((tab) => (
             <button
               key={tab}
               id={`tools-tab-${tab}`}
@@ -246,7 +308,10 @@ export function ChatSidePanel({
               onKeyDown={(event) => {
                 if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
                 event.preventDefault();
-                const next: ToolView = event.key === 'Home' ? 'ask' : event.key === 'End' ? 'words' : view === 'ask' ? 'words' : 'ask';
+                const index = toolViews.indexOf(tab);
+                const next = event.key === 'Home' ? toolViews[0]
+                  : event.key === 'End' ? toolViews.at(-1)!
+                    : toolViews[(index + (event.key === 'ArrowRight' ? 1 : -1) + toolViews.length) % toolViews.length];
                 setView(next);
                 document.getElementById(`tools-tab-${next}`)?.focus();
               }}
@@ -347,7 +412,7 @@ export function ChatSidePanel({
               </div>
             </form>
           </section>
-        ) : (
+        ) : view === 'words' ? (
           <section
             id="tools-view-words"
             role="tabpanel"
@@ -397,6 +462,90 @@ export function ChatSidePanel({
                     </div>
                   </article>
                 ))
+              )}
+            </div>
+          </section>
+        ) : (
+          <section
+            id="tools-view-translate"
+            role="tabpanel"
+            aria-labelledby="tools-tab-translate"
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4"
+          >
+            <div className="my-auto flex flex-col gap-5">
+              <div>
+                <h3 className="font-display text-ink text-[22px] tracking-[0.04em]">Translate</h3>
+                <p className="text-ink-2 mt-1 text-sm">A word or short sentence, either way.</p>
+              </div>
+
+              <div className="border-hair bg-panel flex items-center justify-between gap-2 rounded-xl border-2 p-2">
+                <span className="text-ink flex-1 text-center text-sm font-semibold">
+                  {translationDirection === 'de-en' ? 'German' : 'English'}
+                </span>
+                <button
+                  type="button"
+                  onClick={swapTranslationDirection}
+                  aria-label="Swap translation direction"
+                  className="border-hair text-ink-2 hover:bg-yellow hover:text-on-bright cursor-pointer rounded-lg border-2 px-2.5 py-1 font-mono text-lg leading-none"
+                >
+                  ⇄
+                </button>
+                <span className="text-ink flex-1 text-center text-sm font-semibold">
+                  {translationDirection === 'de-en' ? 'English' : 'German'}
+                </span>
+              </div>
+
+              <form
+                onSubmit={(event) => { event.preventDefault(); void translate(); }}
+                className="flex flex-col gap-3"
+              >
+                <textarea
+                  value={translationDraft}
+                  onChange={(event) => {
+                    cancelTranslation();
+                    setTranslationDraft(event.target.value);
+                    setTranslationResult('');
+                    setTranslationError('');
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      void translate();
+                    }
+                  }}
+                  maxLength={200}
+                  rows={3}
+                  aria-label={`Text to translate from ${translationDirection === 'de-en' ? 'German' : 'English'}`}
+                  placeholder={translationDirection === 'de-en' ? 'Type German here…' : 'Type English here…'}
+                  className="border-hair bg-panel text-ink placeholder:text-ink-3 focus:border-line w-full resize-none rounded-xl border-2 px-3 py-2.5 text-sm outline-none"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-ink-3 font-mono text-[10px]">{translationDraft.length}/200</span>
+                  <button
+                    type="submit"
+                    disabled={!translationDraft.trim() || translating}
+                    className="border-line bg-ink text-paper font-display cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] disabled:cursor-default disabled:opacity-40"
+                  >
+                    {translating ? 'translating…' : 'translate ↗'}
+                  </button>
+                </div>
+              </form>
+
+              <div className="border-hair bg-panel min-h-28 rounded-xl border-2 p-4" aria-live="polite">
+                <p className="text-ink-3 font-mono text-[10px] uppercase tracking-wide">
+                  {translationDirection === 'de-en' ? 'English' : 'German'}
+                </p>
+                {translationResult ? (
+                  <p className="text-ink mt-2 text-lg leading-relaxed break-words">{translationResult}</p>
+                ) : (
+                  <p className="text-ink-3 mt-2 text-sm">{translating ? 'Translating…' : 'Your translation appears here.'}</p>
+                )}
+              </div>
+              {translationError && <p role="alert" className="text-ink text-sm">{translationError}</p>}
+              {translationRemaining !== null && (
+                <p className="text-ink-3 font-mono text-[10px]">
+                  {translationRemaining} translations left today · resets at 00:00 UTC
+                </p>
               )}
             </div>
           </section>

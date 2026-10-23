@@ -224,8 +224,13 @@ export async function runChatTurn(
         })
     : Promise.resolve();
 
+  const previousReplies = messages
+    .filter((message) => message.role === 'assistant')
+    .slice(-2)
+    .reverse()
+    .map((message) => message.parts.filter((part) => part.type === 'text').map((part) => part.text).join('\n'));
   const result = streamText({
-    ...replySettings(level, persona, lastMessageText(messages, 'assistant')),
+    ...replySettings(level, persona, previousReplies[0], previousReplies[1]),
     messages: await convertToModelMessages(messages),
     onFinish: ({ totalUsage }) => logUsage('chat', CHAT_MODEL, totalUsage, { userId }),
   });

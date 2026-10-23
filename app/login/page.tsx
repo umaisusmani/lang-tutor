@@ -68,7 +68,7 @@ function LoginForm() {
         <main className="flex max-w-[420px] flex-1 flex-col justify-center gap-[22px] py-12">
           <div className="flex flex-col gap-2">
             <h1 className="font-display text-[44px] leading-none font-black tracking-[0.02em]">
-              {mode === 'signin' ? 'Willkommen zurück.' : 'Konto erstellen.'}
+              {mode === 'signin' ? 'Welcome back.' : 'Create an account.'}
             </h1>
             <p className="text-ink-2 text-[15px] leading-relaxed">
               {mode === 'signin'
@@ -87,7 +87,7 @@ function LoginForm() {
               type="email"
               required
               autoComplete="email"
-              placeholder="du@beispiel.de"
+              placeholder="you@example.com"
               className={fieldInput}
             />
 
@@ -118,7 +118,7 @@ function LoginForm() {
               disabled={pending}
               className="border-line bg-yellow text-on-bright font-display mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-xl tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
             >
-              {pending ? '…' : mode === 'signin' ? 'Anmelden' : 'Registrieren'}
+              {pending ? '…' : mode === 'signin' ? 'Sign in' : 'Register'}
             </button>
           </form>
 
@@ -163,7 +163,7 @@ function LoginForm() {
                   d="M12 4.77c1.76 0 3.35.61 4.6 1.8l3.45-3.45C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.28 6.6l4.01 3.11c.94-2.83 3.59-4.94 6.71-4.94z"
                 />
               </svg>
-              Mit Google anmelden
+              Sign in with Google
             </button>
           </form>
 
@@ -223,7 +223,7 @@ function ConfirmCodeScreen({
         <main className="flex max-w-[420px] flex-1 flex-col justify-center gap-[22px] py-12">
           <div className="flex flex-col gap-2">
             <h1 className="font-display text-[44px] leading-none font-black tracking-[0.02em]">
-              Prüf dein Postfach.
+              Check your inbox.
             </h1>
             <p className="text-ink-2 text-[15px] leading-relaxed">
               We sent a code to <span className="text-ink font-semibold">{email}</span>. Enter it
@@ -267,7 +267,7 @@ function ConfirmCodeScreen({
               disabled={verifying}
               className="border-line bg-yellow text-on-bright font-display mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-xl tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
             >
-              {verifying ? '…' : 'Bestätigen'}
+              {verifying ? '…' : 'Confirm'}
             </button>
           </form>
 

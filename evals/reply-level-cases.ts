@@ -53,9 +53,9 @@ export const QUESTION_SHARE_CONVERSATION: { level: CefrLevel; turns: string[] } 
   ],
 };
 
-/** At most this share of QUESTION_SHARE_CONVERSATION's replies may end in a
- * question. buildTurnGuidance() caps it near half; above that, it's broken. */
-export const MAX_QUESTION_SHARE = 0.5;
+/** Keep questions present without letting a short chat become an interview. */
+export const MIN_QUESTION_SHARE = 0.25;
+export const MAX_QUESTION_SHARE = 0.75;
 
 /**
  * Reply cases for the conversation prompt. Weighted toward A1, which is what

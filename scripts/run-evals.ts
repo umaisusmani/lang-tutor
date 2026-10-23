@@ -16,6 +16,7 @@ import { EVAL_CASES } from '@/evals/cases';
 import { GLOSS_EVAL_CASES } from '@/evals/gloss-cases';
 import {
   HELPER_PHRASES,
+  MIN_QUESTION_SHARE,
   MAX_QUESTION_SHARE,
   QUESTION_SHARE_CONVERSATION,
   REPLY_EVAL_CASES,
@@ -237,29 +238,29 @@ async function runReplySuite(): Promise<SuiteResult> {
 
   // The question rate, over a real conversation: each reply is generated
   // from the actual history, exactly as chat does, so buildTurnGuidance()
-  // sees her previous reply.
+  // sees her last two replies.
   const { level, turns } = QUESTION_SHARE_CONVERSATION;
   const history: { role: 'user' | 'assistant'; content: string }[] = [];
   let questions = 0;
   try {
     for (const turn of turns) {
       history.push({ role: 'user', content: turn });
-      const previous = history.findLast((m) => m.role === 'assistant')?.content;
+      const previousReplies = history.filter((message) => message.role === 'assistant').slice(-2).reverse();
       const { text } = await withRateLimitRetry(() =>
-        generateText({ ...replySettings(level, FALLBACK_PERSONA, previous), messages: history }),
+        generateText({ ...replySettings(level, FALLBACK_PERSONA, previousReplies[0]?.content, previousReplies[1]?.content), messages: history }),
       );
       history.push({ role: 'assistant', content: text });
       if (text.trim().endsWith('?')) questions++;
       console.log(`    > ${turn}\n    < ${text.replace(/\s+/g, ' ')}`);
     }
     const share = questions / turns.length;
-    const shareOk = share <= MAX_QUESTION_SHARE;
+    const shareOk = share >= MIN_QUESTION_SHARE && share <= MAX_QUESTION_SHARE;
     console.log(
       `${shareOk ? '✓' : '✗'} question-share: ${questions}/${turns.length} replies end in a question` +
-        ` (max ${Math.round(MAX_QUESTION_SHARE * 100)}%)`,
+        ` (target ${Math.round(MIN_QUESTION_SHARE * 100)}–${Math.round(MAX_QUESTION_SHARE * 100)}%)`,
     );
     if (shareOk) passed++;
-    else failures.push(`question-share: ${questions}/${turns.length} end in a question -- reads like an interview`);
+    else failures.push(`question-share: ${questions}/${turns.length} end in a question -- outside the conversational range`);
   } catch (err) {
     failures.push(`question-share: threw an error -- ${err instanceof Error ? err.message : err}`);
     console.log('✗ question-share (ERROR)');

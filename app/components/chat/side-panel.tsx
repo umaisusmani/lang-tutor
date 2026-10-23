@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { QuotaBanner } from '@/app/components/quota-banner';
@@ -12,6 +13,7 @@ import type { TranslationDirection } from '@/lib/translator';
 
 type ToolView = 'ask' | 'words' | 'translate';
 const toolViews: ToolView[] = ['ask', 'words', 'translate'];
+const toolViewLabels: Record<ToolView, string> = { ask: 'ask', words: 'vocabulary', translate: 'translate' };
 type PanelTurn = { role: 'user' | 'assistant'; content: string };
 type PanelWord = {
   entry: WordGloss[number];
@@ -321,7 +323,7 @@ export function ChatSidePanel({
                 view === tab ? 'bg-yellow text-on-bright font-bold' : 'text-ink-2 hover:bg-soft'
               }`}
             >
-              {tab}{tab === 'words' ? ` · ${words.length}` : ''}
+              {toolViewLabels[tab]}{tab === 'words' ? ` · ${words.length}` : ''}
             </button>
           ))}
         </div>
@@ -419,7 +421,7 @@ export function ChatSidePanel({
             aria-labelledby="tools-tab-words"
             className="flex min-h-0 flex-1 flex-col"
           >
-            <div className="border-hair border-b p-3">
+            <div className="border-hair flex items-center gap-2 border-b p-3">
               <input
                 value={wordFilter}
                 onChange={(event) => setWordFilter(event.target.value)}
@@ -428,6 +430,13 @@ export function ChatSidePanel({
                 placeholder="Find a word…"
                 className="border-hair bg-panel text-ink placeholder:text-ink-3 focus:border-line w-full rounded-xl border-2 px-3 py-2 text-sm outline-none"
               />
+              <Link
+                href="/vocab"
+                onClick={onClose}
+                className="text-ink-2 hover:text-ink flex-none font-mono text-[11px] underline underline-offset-[3px]"
+              >
+                open vocabulary →
+              </Link>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
               {visibleWords.length === 0 ? (

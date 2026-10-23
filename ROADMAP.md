@@ -4,7 +4,9 @@ The one place feature status is recorded. Design notes live in local
 `plans/*.md` files (not committed), and they don't carry status. What is
 built, and how, is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-**Current sequence (2026-10-23):** Translate is deployed as a third tab in the existing chat side panel; migration `0008` is applied, the Azure F0 key/region are configured, and live Azure lookups pass in both directions. A signed-in panel test remains before calling it fully verified. The quota and vocabulary UI fixes from [the UI audit](docs/UI_AUDIT.md) are implemented locally and await live browser testing and deployment. After Translate, fix and evaluate Ask's German grammar accuracy before exposing it more widely. The eight-case eval found recurring 20B errors and occasional 120B errors, so expand the cases and manually review answers before choosing a model. Then improve tutor personalization from existing structured learner data; evaluate semantic retrieval only if simpler methods miss relevant context. Validate demand for a Topics view before adding it. Voice features remain parked.
+**Current sequence (2026-10-23):** Translate is deployed as a third tab in the existing chat side panel; migration `0008` is applied, the Azure F0 key/region are configured, and live Azure lookups pass in both directions. The user has confirmed the panel works. The quota and vocabulary UI fixes from [the UI audit](docs/UI_AUDIT.md) are implemented locally and await live browser testing and deployment. Next, build tutor personalization: identify recurring weak points from mistake history and review data, select relevant vocabulary and prior conversation topics, and steer the chat toward natural practice opportunities. Start with structured SQL selection and measure whether the tutor uses this context well; evaluate semantic retrieval only if simpler selection misses useful history. After that, fix and evaluate Ask's German grammar accuracy before exposing it more widely. The eight-case eval found recurring 20B errors and occasional 120B errors, so expand the cases and manually review answers before choosing a model. Validate demand for a separate Topics view before adding it. Voice features remain parked.
+
+Before personalization, review the findings in [the AI prompt audit](docs/AI_PROMPT_AUDIT.md), especially visible-reasoning risk and the accuracy of mistake data used for steering.
 
 Status: ✅ done · 🟡 partly done · ⬜ not started
 
@@ -24,7 +26,7 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Conversation history (reopen, delete) | ✅ | `75083e2`, `e73d23c` | Not in the original plan |
 | Eval suites: correction, gloss, reply | ✅ | `55896e5`, `875969f`, `69615a7` | |
 | Token usage logging | ✅ | `ad002cf` | `token_usage` table |
-| Tutor personalization, SQL-first | ⬜ | | Use existing mistake, vocab, review, and recent-conversation data to adapt prompts; define evals before changing behavior. Design: `plans/v1.md` |
+| Tutor personalization, SQL-first | ⬜ | | Next development milestone: identify recurring weak points, select relevant vocabulary and prior conversation topics, and use them to steer chat naturally. Define evals before changing behavior. Design: `plans/v1.md` |
 | Semantic retrieval (RAG) decision | ⬜ | | Optional follow-up only if SQL-first personalization misses relevant history in evals/user tests; compare simpler SQL/summary selection against vector search first. Design: `plans/v1.md` |
 | UI pass + launch (step 7) | ✅ | `5dc547b`, `69615a7` | User reports launch prep complete; continue polish from tester feedback |
 | UI audit follow-up | 🟡 | | Empty-vocab onboarding, modal keyboard behavior, truthful auth copy, and password reset are implemented locally. Browser and assistive-technology checks remain; see [the UI audit](docs/UI_AUDIT.md). |
@@ -45,7 +47,7 @@ Status: ✅ done · 🟡 partly done · ⬜ not started
 | Recasting | 🟡 | `69615a7` | Only English stand-ins come back in German. Grammar mistakes aren't recast |
 | Level-gated glossing (B1+ tap to reveal) | ⬜ | | |
 | Ask side panel (German-learning utilities, separate from roleplay) | 🟡 | | Code uses signed-in-only Ask on Groq 20B, short answers or sentence translation with grammar notes; Words reuses glosses. Anonymous visitors see a sign-up modal. Groq permission works, but the new `ask` eval exposes recurring 20B grammar errors; compare 120B and expand/repeat cases before launch. Topics deferred; no RAG. Design: `plans/ask-panel.md` |
-| Translate side-panel tab | 🟡 | | Production deployment is ready with German ↔ English swap, Azure Dictionary Lookup/Text Translate, and separate atomic 50/user and 300/global daily caps. Migration `0008` is applied; Azure variables are configured in Vercel; live Azure lookups passed in both directions. Signed-in panel testing remains. Design: `plans/translate.md` |
+| Translate side-panel tab | 🟡 | | Production deployment is ready with German ↔ English swap, Azure Dictionary Lookup/Text Translate, and separate atomic 50/user and 300/global daily caps. Migration `0008` is applied; Azure variables are configured in Vercel; live Azure lookups passed in both directions, and the user confirmed the panel works. Limit-state testing remains. Design: `plans/translate.md` |
 | On-demand grammar explanations | ✅ | `69615a7` | Not in the original plan. Saved to the message |
 
 ## Later

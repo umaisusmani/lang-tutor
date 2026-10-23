@@ -158,9 +158,17 @@ export function SiteHeader({
 
           {userEmail && (
             <div className="flex items-center gap-2.5">
-              {/* The "chat" nav link was removed: "+ new chat" in the chats
-                  menu below already opens a chat, and every conversation in
-                  it links back to `/`, so this only duplicated them. */}
+              <Link
+                href="/"
+                className={`font-mono text-xs underline underline-offset-[3px] transition-colors ${
+                  activePage === 'chat'
+                    ? 'text-ink bg-yellow text-on-bright rounded-full px-2 py-1 no-underline'
+                    : 'text-ink-2 hover:text-ink'
+                }`}
+                aria-current={activePage === 'chat' ? 'page' : undefined}
+              >
+                chat
+              </Link>
               <Link
                 href="/vocab"
                 className={`font-mono text-xs underline underline-offset-[3px] transition-colors ${

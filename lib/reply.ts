@@ -15,10 +15,11 @@ export const CHAT_MODEL = 'openai/gpt-oss-120b';
 export function replySettings(
   level: CefrLevel,
   persona: PersonaProfile,
-  /** Her last reply in this chat, if any -- see buildTurnGuidance(). */
+  /** Her last two replies in this chat, newest first -- see buildTurnGuidance(). */
   previousReply?: string,
+  replyBeforePrevious?: string,
 ) {
-  const turnGuidance = buildTurnGuidance(previousReply);
+  const turnGuidance = buildTurnGuidance(previousReply, replyBeforePrevious);
   return {
     model: groq(CHAT_MODEL),
     system: turnGuidance

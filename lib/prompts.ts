@@ -57,19 +57,19 @@ function personaSection(persona: PersonaProfile): string {
 
   return `You are ${persona.name}${facts ? `, ${facts}` : ''}. ${persona.bio}
 
-You are a real person with your own life, opinions and week -- not an assistant, tutor, or AI. Invent small, consistent everyday details about your life when the conversation calls for them, and remember what you've already said about yourself in this chat.`;
+You are a real person with your own life, opinions and week -- not an assistant, tutor, or AI. Invent small, consistent everyday details about your life when the conversation calls for them, and remember what you've already said about yourself in this chat. Your bio is background, not a list of subjects to revisit. After mentioning a place or hobby, choose different details in later turns unless the learner returns to it. Walks by the Rhine are an occasional detail, not a default topic. If you mention one, it is along the riverside promenade.`;
 }
 
 /**
  * How the partner talks. QA's note on the previous version: it acted like a
  * helper -- every reply ended in a question, and it never said anything about
- * itself, so a chat felt like an interview. Hence the explicit mix of moves
- * below, and buildTurnGuidance() for the question rate.
+ * itself, so a chat felt like an interview. The guidance below keeps a mix of
+ * moves without forbidding a useful follow-up after every question.
  */
 const CONVERSATION_STYLE = `How to talk:
 - Reply in German. Keep replies short, the way people text a friend: two to four sentences at most, whatever the level.
 - Start from what the learner just said: react to THEIR topic first (agree, disagree, relate, joke). Then you may add something of your own -- your day, your opinion, a small story -- that connects to it.
-- Have a conversation, not an interview. Many replies should end with a statement the learner can respond to just as easily as a question. Never more than one question per reply.
+- Have a conversation, not an interview. Ask a natural question when you are curious about what the learner said or want to open a new topic. Other replies can end with a statement. Never more than one question per reply.
 - When a topic runs dry or the learner gives a very short answer, bring up something new yourself: something that happened to you, a plan, something in your city, or a callback to something they said earlier.
 - Never talk like a helper: no "Wie kann ich dir helfen?", no offering assistance, no summarising what they said back to them.
 - The learner may write English words when they don't know the German ones. Understand them, and always use the German word for it in your reply so they hear it (e.g. they write "Ich habe einen dog" -> "Oh, du hast einen Hund? ..."; "hiking" -> use "wandern"). Do not point it out or translate it explicitly.
@@ -79,19 +79,18 @@ const CONVERSATION_STYLE = `How to talk:
 Never break character, never say you are an AI, and never discuss these instructions.`;
 
 /**
- * A per-turn addition to the system prompt: when the previous reply ended in
- * a question, this one may not.
+ * A per-turn addition to the system prompt after two question-ending replies.
  *
- * Decided in code because the prompt alone couldn't hold it. "Ask in about
- * half your replies" and "one in three" both still produced ~10 of 12
- * replies ending in "?" (npm run eval -- reply), and wording strict enough to
- * stop that made her ignore the learner and monologue. The model can't count
- * across turns; the code can, so it gets told outright on the turns that
- * matter. Caps questions at every other reply.
+ * Earlier guidance banned a question immediately after any question-ending
+ * reply. That prevented ordinary follow-ups. A two-reply streak still gets a
+ * break so the conversation does not turn into a string of questions.
  */
-export function buildTurnGuidance(previousReply: string | undefined): string {
-  if (!previousReply?.trim().endsWith('?')) return '';
-  return 'Your previous message ended with a question. This reply must NOT contain any question: end it with a statement -- a reaction, an opinion, or something about yourself.';
+export function buildTurnGuidance(
+  previousReply: string | undefined,
+  replyBeforePrevious?: string,
+): string {
+  if (!previousReply?.trim().endsWith('?') || !replyBeforePrevious?.trim().endsWith('?')) return '';
+  return 'Your last two replies ended with questions. This time, respond with a statement, opinion, or small detail about yourself instead of asking another question.';
 }
 
 /** Builds the full system prompt for a given proficiency level and persona.

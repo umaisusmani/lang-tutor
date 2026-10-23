@@ -343,7 +343,7 @@ export function ChatThread({
 
       {error && (
         <p role="alert" className="font-mono text-[12.5px] text-red-600 dark:text-red-400">
-          Etwas ist schiefgelaufen. Bitte versuch es noch einmal.
+          Something went wrong. Please try again.
         </p>
       )}
     </main>

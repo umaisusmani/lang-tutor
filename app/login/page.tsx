@@ -78,7 +78,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
+    <div className="bg-paper bg-dotted text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
       <header className="flex w-full max-w-[1080px] flex-wrap items-center gap-3 pt-5 pb-3">
         <Brand />
         <GuestChatLink />
@@ -299,7 +299,7 @@ function ConfirmCodeScreen({
   const shownNotice = resendState?.notice ?? verifyState?.notice ?? notice;
 
   return (
-    <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
+    <div className="bg-paper bg-dotted text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
       <header className="flex w-full max-w-[1080px] flex-wrap items-center gap-3 pt-5 pb-3">
         <Brand />
         <GuestChatLink />

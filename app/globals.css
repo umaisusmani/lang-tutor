@@ -29,6 +29,7 @@
   --yellow: #f5c842;
   --orange: #f0a040;
   --soft: #f0e6d6;
+  --dot: #ead9c2;
 
   --on-bright: #2c1a0e;
   --on-accent: #f7efe4;
@@ -47,6 +48,7 @@
     --accent: #d4552a;
     --accent-ink: #f07050;
     --soft: #252525;
+    --dot: #1c1c1c;
     --on-bright: #141414;
     --on-accent: #ffffff;
   }
@@ -64,6 +66,7 @@
   --accent: #d4552a;
   --accent-ink: #f07050;
   --soft: #252525;
+  --dot: #1c1c1c;
   --on-bright: #141414;
   --on-accent: #ffffff;
 }
@@ -91,6 +94,17 @@
   --font-sans: var(--font-bricolage);
   --font-mono: var(--font-dm-mono);
   --font-display: var(--font-londrina);
+}
+
+/*
+ * The faint dot-grid texture behind the open canvas (chat/login/vocab page
+ * backgrounds) -- never on panels, dialogs, the sticky header/composer, or
+ * anything small, which all stay solid. Pair with `bg-paper` on a page's
+ * root wrapper, not a swap for it.
+ */
+.bg-dotted {
+  background-image: radial-gradient(var(--dot) 1.6px, transparent 1.8px);
+  background-size: 28px 28px;
 }
 
 @keyframes blink {

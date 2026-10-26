@@ -1,5 +1,37 @@
 @AGENTS.md
 
+## Implementation work goes to Codex
+
+In this project, Claude's job is to plan, scope, and verify -- not to write
+or edit application code directly. Any task that involves writing or
+changing files under `app/`, `lib/`, or other source directories (not docs,
+not pure investigation/research) is implemented by the `codex` CLI, not by
+Claude's own Edit/Write tools. This doesn't apply to editing this repo's own
+doc files (`CLAUDE.md`, `AGENTS.md`, `README.md`, `ROADMAP.md`,
+`docs/TECHNICAL.md`, `plans/*.md`) -- Claude edits those directly.
+
+1. Write a self-contained prompt to a scratch file first. Codex starts with
+   none of the conversation's context, so the prompt has to spell out
+   whatever a fresh engineer would need: exact file paths, the relevant
+   pieces of this project's own conventions (design tokens in
+   `app/globals.css`, the brutalist button classes, the font roles, the
+   English-everywhere-except-the-chat-interface rule), and the precise
+   scope -- what to change and what not to touch.
+2. Run it non-interactively: `cat prompt.txt | codex exec -s workspace-write
+   -C <repo root> -o <final-message file> -`. `-s workspace-write` lets it
+   read/write within the repo and run shell commands (so it can run its own
+   `tsc`/`eslint` checks) without network access or touching anything
+   outside the working directory. Never pass
+   `--dangerously-bypass-approvals-and-sandbox`.
+3. Tell it explicitly, every time: read `AGENTS.md` and `CLAUDE.md` first;
+   never create a git commit; run `npx tsc --noEmit -p .` and `npx eslint .`
+   and fix every error before finishing; report file-by-file what changed
+   and what it deliberately skipped and why.
+4. After it finishes, Claude verifies independently rather than taking its
+   summary on faith: `git diff --stat` to confirm only the expected files
+   changed, rerun `tsc`/`eslint` itself, and read the actual diff on
+   anything non-mechanical before reporting the work as done.
+
 ## Keeping docs in sync
 
 Each doc has one job. Feature status is recorded in exactly one place,

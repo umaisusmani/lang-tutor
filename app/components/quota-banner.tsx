@@ -10,11 +10,12 @@ const subscribe = () => () => {};
 const clientSnapshot = () => true;
 const serverSnapshot = () => false;
 
-/** Below this many messages left, a non-blocking heads-up shows above the composer. */
-const WARNING_AT = 5;
+/** At or below this many messages left, a non-blocking heads-up shows above the composer. */
+export const WARNING_AT = 5;
 
-function useResetLabel(resetsAt: string) {
+export function useResetLabel(resetsAt?: string) {
   const hydrated = useSyncExternalStore(subscribe, clientSnapshot, serverSnapshot);
+  if (!resetsAt) return '';
   return hydrated
     ? new Date(resetsAt).toLocaleString([], {
       month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',

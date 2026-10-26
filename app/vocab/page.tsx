@@ -32,7 +32,7 @@ export default async function VocabPage() {
   );
 
   return (
-    <div className="bg-paper text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
+    <div className="bg-paper bg-dotted text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
       <PageHeader
         initialLevel={level}
         userEmail={user.email ?? null}

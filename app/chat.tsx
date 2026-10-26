@@ -300,7 +300,7 @@ export default function Chat({
   return (
     // The header sits outside the 860px column, on its own 1080px track (see
     // SiteHeader) -- wider chrome, same readable line length for replies.
-    <div className="bg-paper text-ink flex h-dvh min-h-[400px] flex-col items-center overflow-hidden px-[18px]">
+    <div className="bg-paper bg-dotted text-ink flex h-dvh min-h-[400px] flex-col items-center overflow-hidden px-[18px]">
       <SiteHeader
         level={level}
         onLevelChange={handleLevelChange}
@@ -310,6 +310,7 @@ export default function Chat({
         conversationId={conversationId.current}
         remaining={remaining}
         messageCap={messageCap}
+        resetsAt={quota.resetsAt}
         persona={persona}
         theme={theme}
         onThemeToggle={toggleTheme}

@@ -1,7 +1,9 @@
 'use client';
 
 /**
- * The button that opens a TranslationPanel.
+ * The button that opens a TranslationPanel. Labeled "explain" rather than
+ * "translate" -- the translation is the first thing it reveals, not the only
+ * thing; "explain grammar" inside the panel goes a level deeper from there.
  *
  * `pending` is the placeholder QA asked for: while a reply streams, its
  * translation doesn't exist yet (it's fetched once the reply is complete), so
@@ -26,14 +28,14 @@ export function TranslateButton({
       onClick={onToggle}
       disabled={pending}
       aria-expanded={pending ? undefined : open}
-      title={pending ? 'Translating…' : undefined}
+      title={pending ? 'Explaining…' : undefined}
       className={`border-line text-ink-2 flex-none rounded-lg border-2 px-2 py-0.5 font-mono text-[11px] transition-colors duration-150 ${
         pending
           ? 'animate-pulse cursor-default opacity-60'
           : 'hover:bg-yellow hover:text-on-bright cursor-pointer active:translate-x-px active:translate-y-px'
       } ${className ?? ''}`}
     >
-      {open && !pending ? 'hide' : 'translate'}
+      {open && !pending ? 'hide' : 'explain'}
     </button>
   );
 }

@@ -37,7 +37,7 @@ export function PasswordInput({
         type="button"
         onClick={() => setShown((v) => !v)}
         aria-label={shown ? 'Hide password' : 'Show password'}
-        className="text-ink-2 hover:text-ink absolute inset-y-0 right-3 cursor-pointer font-mono text-[11px] font-bold tracking-[0.04em] uppercase"
+        className="text-ink-2 hover:text-ink absolute inset-y-0 right-3 min-h-11 min-w-11 cursor-pointer font-mono text-[11px] font-bold tracking-[0.04em] uppercase"
       >
         {shown ? 'Hide' : 'Show'}
       </button>

@@ -23,7 +23,7 @@ export default async function VocabPage() {
   const heading = (
     <div className="flex flex-col gap-1">
       <h1 className="font-display text-[40px] leading-none font-black tracking-[0.04em]">
-        Vokabelliste
+        Your <span className="text-accent">vocabulary</span>
       </h1>
       <span className="text-ink-3 font-mono text-[11px]">
         {entries.length} {entries.length === 1 ? 'word' : 'words'} saved

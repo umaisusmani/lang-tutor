@@ -306,7 +306,7 @@ export function ChatSidePanel({
             type="button"
             onClick={onClose}
             aria-label="Close learning panel"
-            className="border-hair text-ink-2 hover:bg-yellow hover:text-on-bright flex h-8 w-8 cursor-pointer items-center justify-center rounded-[9px] border-2 font-mono text-lg leading-none"
+            className="border-hair text-ink-2 hover:bg-yellow hover:text-on-bright flex h-8 min-h-11 w-8 min-w-11 cursor-pointer items-center justify-center rounded-[9px] border-2 font-mono text-lg leading-none"
           >
             ›
           </button>
@@ -333,7 +333,7 @@ export function ChatSidePanel({
               }}
               aria-controls={`tools-view-${tab}`}
               onClick={() => changeView(tab)}
-              className={`flex-1 cursor-pointer rounded-[9px] px-3 py-[7px] font-mono text-[11px] capitalize transition-colors ${
+              className={`min-h-11 flex-1 cursor-pointer rounded-[9px] px-3 py-[7px] font-mono text-[11px] capitalize transition-colors ${
                 view === tab ? 'bg-yellow text-on-bright font-bold' : 'text-ink-2 hover:bg-soft'
               }`}
             >
@@ -366,7 +366,7 @@ export function ChatSidePanel({
                         key={example}
                         type="button"
                         onClick={() => changeDraft(example)}
-                        className="border-hair text-ink-2 hover:border-line hover:bg-soft rounded-xl border-2 px-3 py-2.5 text-left text-xs leading-relaxed"
+                        className="border-hair text-ink-2 hover:border-line hover:bg-soft min-h-11 rounded-xl border-2 px-3 py-2.5 text-left text-xs leading-relaxed"
                       >
                         {example}
                       </button>
@@ -421,7 +421,7 @@ export function ChatSidePanel({
                 <button
                   type="submit"
                   disabled={!draft.trim() || sending || blocked}
-                  className="border-line bg-ink text-paper font-display cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] transition-opacity disabled:cursor-default disabled:opacity-40"
+                  className="border-line bg-ink text-paper font-display min-h-11 cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] transition-opacity disabled:cursor-default disabled:opacity-40"
                 >
                   {sending ? 'asking…' : 'ask ↗'}
                 </button>
@@ -447,7 +447,7 @@ export function ChatSidePanel({
               <Link
                 href="/vocab"
                 onClick={onClose}
-                className="text-ink-2 hover:text-ink flex-none font-mono text-[11px] underline underline-offset-[3px]"
+                className="text-ink-2 hover:text-ink flex min-h-11 flex-none items-center font-mono text-[11px] underline underline-offset-[3px]"
               >
                 open vocabulary →
               </Link>
@@ -477,7 +477,7 @@ export function ChatSidePanel({
                           type="button"
                           disabled={!canSave || isSaved(entry.lemma)}
                           onClick={() => onSaveWord(entry, source, sourceText)}
-                          className="border-line text-ink-2 hover:bg-yellow hover:text-on-bright flex-none rounded-lg border-2 px-2 py-1 font-mono text-[10px] disabled:cursor-default disabled:opacity-50"
+                          className="border-line text-ink-2 hover:bg-yellow hover:text-on-bright min-h-11 min-w-11 flex-none rounded-lg border-2 px-2 py-1 font-mono text-[10px] disabled:cursor-default disabled:opacity-50"
                         >
                           {!canSave ? 'sign in' : isSaved(entry.lemma) ? '✓ saved' : '+ save'}
                         </button>
@@ -509,7 +509,7 @@ export function ChatSidePanel({
                   type="button"
                   onClick={swapTranslationDirection}
                   aria-label="Swap translation direction"
-                  className="border-hair text-ink-2 hover:bg-yellow hover:text-on-bright cursor-pointer rounded-lg border-2 px-2.5 py-1 font-mono text-lg leading-none"
+                  className="border-hair text-ink-2 hover:bg-yellow hover:text-on-bright min-h-11 min-w-11 cursor-pointer rounded-lg border-2 px-2.5 py-1 font-mono text-lg leading-none"
                 >
                   ⇄
                 </button>
@@ -547,7 +547,7 @@ export function ChatSidePanel({
                   <button
                     type="submit"
                     disabled={!translationDraft.trim() || translating}
-                    className="border-line bg-ink text-paper font-display cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] disabled:cursor-default disabled:opacity-40"
+                    className="border-line bg-ink text-paper font-display min-h-11 cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] disabled:cursor-default disabled:opacity-40"
                   >
                     {translating ? 'translating…' : 'translate ↗'}
                   </button>

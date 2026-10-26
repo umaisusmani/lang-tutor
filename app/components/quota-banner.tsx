@@ -124,7 +124,7 @@ function OutOfMessagesCard({
   onOpenTranslate?: () => void;
 }) {
   return (
-    <div className="border-line bg-panel text-ink flex flex-col gap-3 rounded-xl border-2 p-5">
+    <div className="border-line bg-panel text-ink flex animate-[fade-rise_160ms_ease-out] flex-col gap-3 rounded-xl border-2 p-5">
       {persona && (
         <div className="flex items-center gap-2.5">
           <PersonaAvatar persona={persona} size={32} />
@@ -163,7 +163,7 @@ function OutOfMessagesCard({
 /** The signed-out equivalent: same shape, points at sign-up instead of the tools. */
 function OutOfMessagesGuestCard() {
   return (
-    <div className="border-line bg-panel text-ink flex flex-col gap-3 rounded-xl border-2 p-5">
+    <div className="border-line bg-panel text-ink flex animate-[fade-rise_160ms_ease-out] flex-col gap-3 rounded-xl border-2 p-5">
       <h2 className="font-display text-[28px] leading-none tracking-[0.02em]">That&apos;s it for today.</h2>
       <p className="text-ink-2 text-sm leading-relaxed">
         You&apos;ve used today&apos;s guest messages. Sign up free for a bigger daily allowance, saved chats

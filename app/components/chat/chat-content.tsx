@@ -78,7 +78,7 @@ export function ChatWelcome({
           {remaining !== null && ` · ${remaining} ${signedIn ? 'messages left' : 'free messages'}`}
         </span>
         <h1 className="font-display text-[52px] leading-none font-black tracking-[0.02em]">
-          Sag einfach etwas.
+          Sag einfach <span className="text-accent">etwas</span>.
         </h1>
         <p className="text-ink-2 max-w-[52ch] text-base leading-relaxed">
           Chat with {persona.name} in German, however rough. Don&apos;t know a word? Just write it
@@ -393,7 +393,7 @@ export function ChatComposer({
             <button
               type="submit"
               disabled={busy || capped || !input.trim()}
-              className="border-line bg-ink text-paper hover:bg-accent hover:text-on-accent font-display flex-none cursor-pointer rounded-full border-2 px-[22px] py-3 text-xl tracking-[0.04em] transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:opacity-40"
+              className="border-line bg-ink text-paper hover:bg-accent hover:text-on-accent font-display min-h-11 flex-none cursor-pointer rounded-full border-2 px-[22px] py-3 text-xl tracking-[0.04em] transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:opacity-40"
             >
               Senden
             </button>

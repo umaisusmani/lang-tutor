@@ -38,7 +38,7 @@ function GuestChatLink() {
   return (
     <Link
       href="/"
-      className="border-line text-ink hover:bg-yellow hover:text-on-bright ml-auto rounded-full border-2 px-3 py-1.5 font-mono text-xs font-bold no-underline transition-colors"
+      className="border-line text-ink hover:bg-yellow hover:text-on-bright ml-auto flex min-h-11 items-center rounded-full border-2 px-3 py-1.5 font-mono text-xs font-bold no-underline transition-colors"
     >
       Chat as guest
     </Link>
@@ -192,15 +192,15 @@ function LoginForm() {
           </form>
 
           <div className="text-ink-3 flex flex-col gap-1.5 font-mono text-[11px] leading-[1.7]">
-            {mode === 'signin' && <Link href="/login/reset" className="py-1 text-sm underline">Forgot your password?</Link>}
+            {mode === 'signin' && <Link href="/login/reset" className="flex min-h-11 items-center py-1 text-sm underline">Forgot your password?</Link>}
             <button
               type="button"
               onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-              className="hover:text-ink cursor-pointer text-left underline underline-offset-[3px]"
+              className="hover:text-ink min-h-11 cursor-pointer text-left underline underline-offset-[3px]"
             >
               {mode === 'signin' ? 'No account yet? Register' : 'Already have an account? Sign in'}
             </button>
-            <Link href="/" className="text-ink-3 hover:text-ink no-underline">
+            <Link href="/" className="text-ink-3 hover:text-ink flex min-h-11 items-center no-underline">
               <span className="underline underline-offset-[3px]">Keep chatting without an account</span>
             </Link>
           </div>
@@ -244,7 +244,7 @@ function Callout({ tone = 'default', label, children }: {
   return (
     <div
       role={tone === 'error' ? 'alert' : undefined}
-      className={`flex flex-col gap-1 rounded-xl border-2 px-4 py-3 ${
+      className={`flex animate-[fade-rise_160ms_ease-out] flex-col gap-1 rounded-xl border-2 px-4 py-3 ${
         tone === 'error' ? 'border-red-600/60 bg-red-600/5 dark:border-red-400/50' : 'border-hair bg-panel'
       }`}
     >
@@ -372,7 +372,7 @@ function ConfirmCodeScreen({
                 type="submit"
                 onClick={() => setCooldownUntil(Date.now() + RESEND_COOLDOWN_SECONDS * 1000)}
                 disabled={resending || secondsLeft > 0}
-                className="hover:text-ink cursor-pointer text-left underline underline-offset-[3px] disabled:cursor-default disabled:opacity-50 disabled:no-underline"
+                className="hover:text-ink min-h-11 cursor-pointer text-left underline underline-offset-[3px] disabled:cursor-default disabled:opacity-50 disabled:no-underline"
               >
                 {resending
                   ? 'Sending…'
@@ -384,7 +384,7 @@ function ConfirmCodeScreen({
             <button
               type="button"
               onClick={onBack}
-              className="hover:text-ink cursor-pointer text-left underline underline-offset-[3px]"
+              className="hover:text-ink min-h-11 cursor-pointer text-left underline underline-offset-[3px]"
             >
               Use a different email
             </button>

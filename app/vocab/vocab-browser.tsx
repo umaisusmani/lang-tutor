@@ -134,9 +134,9 @@ export function VocabBrowser({
       {heading}
       {(summary || notice) && (
         <div ref={noticeRef} tabIndex={-1} role="status"
-          className="border-line bg-yellow text-on-bright rounded-2xl border-2 p-5 outline-none">
+          className={`border-line rounded-2xl border-2 p-5 outline-none ${summary ? 'bg-panel text-ink' : 'bg-yellow text-on-bright'}`}>
           {summary ? <>
-            <h2 className="font-display text-2xl">{summary.complete ? 'Review complete' : 'Review ended'}</h2>
+            <h2 className="font-display text-2xl">Review <span className="text-accent">{summary.complete ? 'complete' : 'ended'}</span></h2>
             <p className="mt-1">{summary.reviewed} {summary.reviewed === 1 ? 'word' : 'words'} reviewed and saved.</p>
             {summary.scheduledLater > 0 && <p className="mt-1 text-sm">
               {summary.scheduledLater} {summary.scheduledLater === 1 ? 'word is' : 'words are'} scheduled for another review.
@@ -149,7 +149,7 @@ export function VocabBrowser({
         <div className="border-hair bg-panel flex flex-col items-start gap-3 rounded-2xl border-2 p-6">
           <h2 className="font-display text-2xl">Your vocabulary starts with one word</h2>
           <p className="text-ink-2">In a chat, tap a German word and choose + to save it here for review.</p>
-          <Link href="/?c=new" className="border-line rounded-full border-2 px-4 py-2 font-semibold">Start a chat →</Link>
+          <Link href="/?c=new" className="border-line bg-yellow text-on-bright font-display rounded-full border-2 px-4 py-2 shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]">Start a chat →</Link>
         </div>
       ) : (
         <>
@@ -160,7 +160,7 @@ export function VocabBrowser({
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" disabled={starting || dueCount === 0} onClick={() => void start('due')}
-                className="border-line bg-yellow text-on-bright rounded-full border-2 px-4 py-2 font-semibold disabled:opacity-50">
+                className="border-line bg-yellow text-on-bright font-display rounded-full border-2 px-4 py-2 shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50">
                 {starting ? 'Loading…' : 'Review due words'}
               </button>
               <button type="button" disabled={starting} onClick={() => void start('practice')}

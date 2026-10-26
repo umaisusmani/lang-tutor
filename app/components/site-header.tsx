@@ -7,8 +7,10 @@ import { useEffect, useRef, useState } from 'react';
 import { saveTimezone, signOut } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
 import { useConfirm } from '@/app/components/confirm-modal';
+import { PersonaAvatar } from '@/app/components/persona-avatar';
 import { notifyError } from '@/app/components/toaster';
 import { deleteConversationAction } from '@/app/conversations/actions';
+import type { PersonaProfile } from '@/lib/personas';
 import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
 
@@ -21,6 +23,7 @@ export function SiteHeader({
   conversationId,
   remaining,
   messageCap,
+  persona,
   theme,
   onThemeToggle,
   activePage = 'chat',
@@ -34,6 +37,7 @@ export function SiteHeader({
   conversationId: string | null;
   remaining: number | null;
   messageCap: number;
+  persona?: PersonaProfile;
   theme?: 'light' | 'dark' | null;
   onThemeToggle?: () => void;
   activePage?: 'chat' | 'vocab';
@@ -137,8 +141,8 @@ export function SiteHeader({
       <div className="flex flex-wrap items-center gap-3">
         <Brand />
 
-        <div className="ml-auto flex items-center gap-3.5">
-          <label className="border-line text-ink hover:bg-yellow hover:text-on-bright relative flex items-center rounded-full border-2 text-[13px] font-bold transition-colors duration-150">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3.5">
+          <label className="border-line text-ink hover:bg-yellow hover:text-on-bright relative flex min-h-11 items-center rounded-full border-2 text-[13px] font-bold transition-colors duration-150">
             <span className="sr-only">Level</span>
             <select
               value={level}
@@ -157,10 +161,10 @@ export function SiteHeader({
           </label>
 
           {userEmail && (
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
               <Link
                 href="/"
-                className={`font-mono text-xs underline underline-offset-[3px] transition-colors ${
+                className={`flex min-h-11 min-w-11 items-center font-mono text-xs underline underline-offset-[3px] transition-colors ${
                   activePage === 'chat'
                     ? 'text-ink bg-yellow text-on-bright rounded-full px-2 py-1 no-underline'
                     : 'text-ink-2 hover:text-ink'
@@ -171,7 +175,7 @@ export function SiteHeader({
               </Link>
               <Link
                 href="/vocab"
-                className={`font-mono text-xs underline underline-offset-[3px] transition-colors ${
+                className={`flex min-h-11 min-w-11 items-center font-mono text-xs underline underline-offset-[3px] transition-colors ${
                   activePage === 'vocab'
                     ? 'text-ink bg-yellow text-on-bright rounded-full px-2 py-1 no-underline'
                     : 'text-ink-2 hover:text-ink'
@@ -204,7 +208,7 @@ export function SiteHeader({
                   setAccountOpen(false);
                   setChatsOpen((v) => !v);
                 }}
-                className="text-ink-2 hover:text-ink cursor-pointer font-mono text-xs underline underline-offset-[3px]"
+                className="text-ink-2 hover:text-ink min-h-11 min-w-11 cursor-pointer font-mono text-xs underline underline-offset-[3px]"
               >
                 chats{conversations.length > 0 && ` · ${conversations.length}`}
               </button>
@@ -222,7 +226,7 @@ export function SiteHeader({
                     <Link
                       href="/?c=new"
                       onClick={() => setChatsOpen(false)}
-                      className={`rounded-lg px-2.5 py-2 font-mono text-[11px] no-underline ${
+                      className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-[11px] no-underline ${
                         conversationId === null
                           ? 'bg-yellow text-on-bright'
                           : 'text-ink hover:bg-yellow hover:text-on-bright'
@@ -246,7 +250,7 @@ export function SiteHeader({
                             <Link
                               href={`/?c=${c.id}`}
                               onClick={() => setChatsOpen(false)}
-                              className={`min-w-0 flex-1 truncate px-2.5 py-2 text-[13px] no-underline ${
+                              className={`flex min-h-11 min-w-0 flex-1 items-center truncate px-2.5 py-2 text-[13px] no-underline ${
                                 current ? 'font-semibold' : 'text-ink-2 group-hover:text-ink'
                               }`}
                               aria-current={current ? 'page' : undefined}
@@ -262,7 +266,7 @@ export function SiteHeader({
                               onClick={() => handleDeleteChat(c)}
                               aria-label={`Delete chat: ${c.title ?? 'Untitled'}`}
                               title="Delete chat"
-                              className="mr-1 flex h-6 w-6 flex-none cursor-pointer items-center justify-center rounded-md text-[15px] leading-none opacity-70 transition-opacity hover:bg-black/10 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                              className="mr-1 flex h-6 min-h-11 w-6 min-w-11 flex-none cursor-pointer items-center justify-center rounded-md text-[15px] leading-none opacity-70 transition-opacity hover:bg-black/10 hover:opacity-100 sm:min-h-0 sm:min-w-0 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                             >
                               ×
                             </button>
@@ -275,6 +279,8 @@ export function SiteHeader({
               )}
             </div>
           )}
+
+          {persona && <PersonaAvatar persona={persona} size={32} className="hidden sm:flex" />}
 
           {userEmail ? (
             <div className="relative" onBlur={(event) => {
@@ -290,7 +296,7 @@ export function SiteHeader({
                   setChatsOpen(false);
                   setAccountOpen((v) => !v);
                 }}
-                className="border-line hover:bg-yellow hover:text-on-bright flex cursor-pointer items-center gap-2 rounded-full border-2 py-[3px] pr-3 pl-[3px] transition-colors duration-150"
+                className="border-line hover:bg-yellow hover:text-on-bright flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 py-[3px] pr-3 pl-[3px] transition-colors duration-150"
               >
                 <span
                   aria-hidden
@@ -332,7 +338,7 @@ export function SiteHeader({
                       type="button"
                       aria-label="Toggle color theme"
                       onClick={() => onThemeToggle?.()}
-                      className="text-ink hover:bg-soft flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium"
+                      className="text-ink hover:bg-soft flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium"
                     >
                       <span>theme</span>
                       <span className="flex items-center gap-2">
@@ -358,7 +364,7 @@ export function SiteHeader({
                     <form action={signOut}>
                       <button
                         type="submit"
-                          className="text-ink hover:bg-yellow hover:text-on-bright w-full cursor-pointer rounded-lg px-2.5 py-2 text-left font-mono text-[11px]"
+                          className="text-ink hover:bg-yellow hover:text-on-bright min-h-11 w-full cursor-pointer rounded-lg px-2.5 py-2 text-left font-mono text-[11px]"
                       >
                         sign out
                       </button>
@@ -370,7 +376,7 @@ export function SiteHeader({
           ) : (
             <Link
               href="/login"
-              className="text-ink-2 hover:text-ink font-mono text-xs underline underline-offset-[3px]"
+              className="text-ink-2 hover:text-ink flex min-h-11 min-w-11 items-center font-mono text-xs underline underline-offset-[3px]"
             >
               sign in
             </Link>
@@ -381,7 +387,7 @@ export function SiteHeader({
       {remaining !== null && (
         <div className="text-ink-3 flex items-center gap-2.5 font-mono text-[10px]">
           <span>{userEmail ? 'today' : 'free trial'}</span>
-          <div className="bg-soft h-1.5 flex-1 overflow-hidden rounded-full">
+          <div className="bg-soft h-1.5 flex-1 overflow-hidden rounded-full" title={`${remaining} of ${messageCap} messages left`}>
             <div
               className="bg-accent h-full rounded-full transition-[width] duration-500 ease-out"
               style={{ width: `${progressPct}%` }}

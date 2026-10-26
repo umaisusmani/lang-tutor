@@ -310,6 +310,7 @@ export default function Chat({
         conversationId={conversationId.current}
         remaining={remaining}
         messageCap={messageCap}
+        persona={persona}
         theme={theme}
         onThemeToggle={toggleTheme}
         activePage="chat"

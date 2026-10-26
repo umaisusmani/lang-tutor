@@ -77,7 +77,7 @@ export function DiscoverWords({ words, onSkip, onFinish }: {
         <div className="flex flex-wrap justify-center gap-3">
           <button disabled={busy} onClick={() => void resolve(false)} className="border-line rounded-xl border-2 px-4 py-3 disabled:opacity-50">Skip word</button>
           <button disabled={busy} onClick={() => void (meaning ? resolve(true) : preview())}
-            className="border-line bg-yellow text-on-bright rounded-xl border-2 px-4 py-3 font-semibold disabled:opacity-50">
+            className="border-line bg-yellow text-on-bright font-display rounded-xl border-2 px-4 py-3 shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50">
             {busy ? 'Please wait…' : meaning ? 'Add to my vocabulary' : 'Show meaning and example'}
           </button>
         </div>

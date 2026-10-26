@@ -166,7 +166,7 @@ export function FlashcardSession({
               {BUTTONS.map(({ grade: rating, label, help }) => (
                 <button key={rating} type="button" disabled={saving || needsReload}
                   onClick={(event) => void handleGrade(rating, event.timeStamp)}
-                  className={`border-line flex min-h-24 flex-col items-center justify-center gap-1 rounded-xl border-2 px-2 py-3 disabled:opacity-50 ${rating === Grades.Good ? 'bg-yellow text-on-bright shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]' : 'bg-panel'}`}>
+                  className={`border-line flex min-h-24 flex-col items-center justify-center gap-1 rounded-xl border-2 px-2 py-3 disabled:opacity-50 ${rating === Grades.Good ? 'bg-yellow text-on-bright shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]' : 'bg-panel hover:bg-soft cursor-pointer'}`}>
                   <span className="font-bold">{label}</span>
                   <span className="text-xs">{help}</span>
                   <span className="text-sm">{intervals && shownAt && formatInterval(shownAt, intervals[rating])}</span>

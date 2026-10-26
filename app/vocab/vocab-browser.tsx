@@ -164,9 +164,9 @@ export function VocabBrowser({
                 {starting ? 'Loading…' : 'Review due words'}
               </button>
               <button type="button" disabled={starting} onClick={() => void start('practice')}
-                className="border-line rounded-full border-2 px-4 py-2 text-sm disabled:opacity-50">Extra practice</button>
+                className="border-line hover:bg-soft cursor-pointer rounded-full border-2 px-4 py-2 text-sm disabled:opacity-50">Extra practice</button>
               <button type="button" disabled={starting} onClick={() => void discover()}
-                className="border-line rounded-full border-2 px-4 py-2 text-sm disabled:opacity-50">Discover words</button>
+                className="border-line hover:bg-soft cursor-pointer rounded-full border-2 px-4 py-2 text-sm disabled:opacity-50">Discover words</button>
             </div>
           </div>
           <VocabGrid entries={entries} dueWordIds={dueWordIds} />

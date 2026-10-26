@@ -7,21 +7,11 @@ import { useEffect, useRef, useState } from 'react';
 import { saveTimezone, signOut } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
 import { useConfirm } from '@/app/components/confirm-modal';
-import { PersonaAvatar } from '@/app/components/persona-avatar';
 import { WARNING_AT, useResetLabel } from '@/app/components/quota-banner';
 import { notifyError } from '@/app/components/toaster';
 import { deleteConversationAction } from '@/app/conversations/actions';
-import type { PersonaProfile } from '@/lib/personas';
 import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
-
-const CEFR_DESCRIPTIONS: Record<CefrLevel, string> = {
-  A1: 'Beginner',
-  A2: 'Elementary',
-  B1: 'Intermediate',
-  B2: 'Upper-Intermediate',
-  C1: 'Advanced',
-};
 
 export function SiteHeader({
   level,
@@ -33,7 +23,6 @@ export function SiteHeader({
   remaining,
   messageCap,
   resetsAt,
-  persona,
   theme,
   onThemeToggle,
   activePage = 'chat',
@@ -48,7 +37,6 @@ export function SiteHeader({
   remaining: number | null;
   messageCap: number;
   resetsAt?: string;
-  persona?: PersonaProfile;
   theme?: 'light' | 'dark' | null;
   onThemeToggle?: () => void;
   activePage?: 'chat' | 'vocab';
@@ -154,24 +142,23 @@ export function SiteHeader({
         <Brand />
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3.5">
-          <label className="border-line bg-yellow text-on-bright hover:brightness-105 relative flex min-h-11 items-center rounded-full border-2 text-[13px] font-bold transition-[filter] duration-150">
-            <span className="sr-only">Level</span>
-            <select
-              value={level}
-              onChange={handleLevelChange}
-              className="font-display w-[58px] cursor-pointer appearance-none bg-transparent py-1 pr-6 pl-3 tracking-[0.04em] text-transparent outline-none"
-            >
-              {CEFR_LEVELS.map((l) => (
-                <option key={l} value={l} className="text-ink bg-panel">
-                  {l} — {CEFR_DESCRIPTIONS[l]}
-                </option>
-              ))}
-            </select>
-            <span aria-hidden="true" className="font-display pointer-events-none absolute inset-y-0 left-3 flex items-center tracking-[0.04em]">
-              {level}
-            </span>
-            <span aria-hidden className="pointer-events-none absolute right-2.5 text-[9px] opacity-60">
-              ▾
+          <label className="flex items-center gap-2">
+            <span className="text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase">Proficiency</span>
+            <span className="border-line bg-yellow text-on-bright hover:brightness-105 relative flex min-h-11 items-center rounded-full border-2 text-[13px] font-bold transition-[filter] duration-150">
+              <select
+                value={level}
+                onChange={handleLevelChange}
+                className="font-display w-[58px] cursor-pointer appearance-none bg-transparent py-1 pr-6 pl-3 tracking-[0.04em] outline-none"
+              >
+                {CEFR_LEVELS.map((l) => (
+                  <option key={l} value={l} className="text-ink bg-panel">
+                    {l}
+                  </option>
+                ))}
+              </select>
+              <span aria-hidden className="pointer-events-none absolute right-2.5 text-[9px] opacity-60">
+                ▾
+              </span>
             </span>
           </label>
 
@@ -294,8 +281,6 @@ export function SiteHeader({
               )}
             </div>
           )}
-
-          {persona && <PersonaAvatar persona={persona} size={32} className="hidden sm:flex" />}
 
           {userEmail ? (
             <div className="relative" onBlur={(event) => {

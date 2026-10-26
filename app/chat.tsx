@@ -311,7 +311,6 @@ export default function Chat({
         remaining={remaining}
         messageCap={messageCap}
         resetsAt={quota.resetsAt}
-        persona={persona}
         theme={theme}
         onThemeToggle={toggleTheme}
         activePage="chat"

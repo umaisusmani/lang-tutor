@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { requestPasswordReset, updatePassword, type AuthState } from '@/app/auth/actions';
+import { Button } from '@/app/components/button';
 import { PasswordInput } from '@/app/components/password-input';
 
 export function PasswordResetForm({ updating, invalidLink }: { updating: boolean; invalidLink: boolean }) {
@@ -20,12 +21,14 @@ export function PasswordResetForm({ updating, invalidLink }: { updating: boolean
         </p>
       )}
       {state?.success ? (
-        <Link
+        <Button
+          variant="primary"
+          size="lg"
           href="/"
-          className="border-line bg-yellow text-on-bright font-display w-fit rounded-xl border-2 px-4 py-3 text-xl tracking-[0.04em] no-underline shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]"
+          className="w-fit no-underline"
         >
           Continue to chat →
-        </Link>
+        </Button>
       ) : (
         <form action={action} className="flex flex-col gap-2.5">
           {updating ? (
@@ -50,13 +53,15 @@ export function PasswordResetForm({ updating, invalidLink }: { updating: boolean
           {state?.notice && (
             <p role="status" className="text-ink-2 font-mono text-[11px] leading-[1.7]">{state.notice}</p>
           )}
-          <button
+          <Button
+            variant="primary"
+            size="lg"
             disabled={pending}
             type="submit"
-            className="border-line bg-yellow text-on-bright font-display mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-xl tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
+            className="mt-1.5"
           >
             {pending ? 'Please wait…' : updating ? 'Save new password' : 'Send reset link'}
-          </button>
+          </Button>
         </form>
       )}
       <div className="text-ink-3 flex flex-col gap-1.5 font-mono text-[11px] leading-[1.7]">

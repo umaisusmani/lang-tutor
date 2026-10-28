@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
+import { Button } from '@/app/components/button';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
 import type { PersonaProfile } from '@/lib/personas';
 import type { QuotaStatus } from '@/lib/quota';
@@ -10,7 +11,7 @@ const subscribe = () => () => {};
 const clientSnapshot = () => true;
 const serverSnapshot = () => false;
 
-/** At or below this many messages left, a non-blocking heads-up shows above the composer. */
+/** At or below this many messages left, the header's allowance bar turns red. */
 export const WARNING_AT = 5;
 
 export function useResetLabel(resetsAt?: string) {
@@ -92,23 +93,7 @@ export function QuotaBanner({
     );
   }
 
-  // Not capped yet: a quiet, graduated heads-up as the allowance runs low.
-  if (quota.remaining === 1) {
-    return (
-      <div role="status" className="border-line bg-yellow text-on-bright rounded-xl border-2 px-4 py-3">
-        <p className="font-semibold">Last message for today.</p>
-        <p className="text-sm">Make it a good one — words, flashcards and Translate keep working after.</p>
-      </div>
-    );
-  }
-  if (quota.remaining <= WARNING_AT) {
-    return (
-      <div role="status" className="border-hair bg-panel text-ink rounded-xl border-2 px-4 py-3 text-sm">
-        <span className="font-semibold">{quota.remaining} messages left today.</span> Words, flashcards
-        and Translate keep working.
-      </div>
-    );
-  }
+  // Not capped yet: the header's allowance bar is the only warning.
   return null;
 }
 
@@ -141,20 +126,20 @@ function OutOfMessagesCard({
         Translate don&apos;t use the allowance.
       </p>
       <div className="flex flex-wrap gap-2 pt-1">
-        <Link
+        <Button
+          variant="primary"
           href="/vocab"
-          className="border-line bg-yellow text-on-bright font-display rounded-xl border-2 px-4 py-2 text-base tracking-[0.02em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]"
         >
           {dueCount > 0 ? `Practice ${dueCount} due` : 'Open vocabulary'}
-        </Link>
+        </Button>
         {onOpenTranslate && (
-          <button
+          <Button
+            variant="secondary"
             type="button"
             onClick={onOpenTranslate}
-            className="border-line bg-panel text-ink hover:shadow-[3px_3px_0_var(--line)] cursor-pointer rounded-xl border-2 px-4 py-2 text-base font-bold transition-transform hover:-translate-x-px hover:-translate-y-px"
           >
             Translate
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -171,18 +156,18 @@ function OutOfMessagesGuestCard() {
         and flashcards.
       </p>
       <div className="flex flex-wrap gap-2 pt-1">
-        <Link
+        <Button
+          variant="primary"
           href="/login?mode=signup"
-          className="border-line bg-yellow text-on-bright font-display rounded-xl border-2 px-4 py-2 text-base tracking-[0.02em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]"
         >
           Register
-        </Link>
-        <Link
+        </Button>
+        <Button
+          variant="secondary"
           href="/login"
-          className="border-line bg-panel text-ink hover:shadow-[3px_3px_0_var(--line)] rounded-xl border-2 px-4 py-2 text-base font-bold transition-transform hover:-translate-x-px hover:-translate-y-px"
         >
           Sign in
-        </Link>
+        </Button>
       </div>
     </div>
   );

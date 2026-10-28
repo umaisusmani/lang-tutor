@@ -13,6 +13,7 @@ import {
   type AuthState,
 } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
+import { Button } from '@/app/components/button';
 import { PasswordInput } from '@/app/components/password-input';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
 import { FALLBACK_PERSONA } from '@/lib/personas';
@@ -137,13 +138,15 @@ function LoginForm() {
               <p className="text-ink-2 font-mono text-[11px] leading-[1.7]">{state.notice}</p>
             )}
 
-            <button
+            <Button
+              variant="primary"
+              size="lg"
               type="submit"
               disabled={pending}
-              className="border-line bg-yellow text-on-bright font-display mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-xl tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
+              className="mt-1.5"
             >
               {pending ? '…' : mode === 'signin' ? 'Sign in' : 'Register'}
-            </button>
+            </Button>
           </form>
 
           {confirmFailed && (
@@ -165,9 +168,10 @@ function LoginForm() {
           </div>
 
           <form action={signInWithGoogle}>
-            <button
+            <Button
+              variant="secondary"
               type="submit"
-              className="border-line bg-panel text-ink hover:shadow-[3px_3px_0_var(--line)] flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border-2 px-4 py-3 text-base font-bold transition-transform hover:-translate-x-px hover:-translate-y-px"
+              className="w-full"
             >
               <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
                 <path
@@ -188,7 +192,7 @@ function LoginForm() {
                 />
               </svg>
               Sign in with Google
-            </button>
+            </Button>
           </form>
 
           <div className="text-ink-3 flex flex-col gap-1.5 font-mono text-[11px] leading-[1.7]">
@@ -356,13 +360,15 @@ function ConfirmCodeScreen({
               <p className="text-ink-2 font-mono text-[11px] leading-[1.7]">{shownNotice}</p>
             )}
 
-            <button
+            <Button
+              variant="primary"
+              size="lg"
               type="submit"
               disabled={verifying}
-              className="border-line bg-yellow text-on-bright font-display mt-1.5 cursor-pointer rounded-xl border-2 px-4 py-3 text-xl tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50"
+              className="mt-1.5"
             >
               {verifying ? '…' : 'Confirm'}
-            </button>
+            </Button>
           </form>
 
           <div className="text-ink-3 flex flex-col gap-1.5 font-mono text-[11px] leading-[1.7]">

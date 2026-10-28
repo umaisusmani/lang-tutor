@@ -31,6 +31,21 @@ doc files (`CLAUDE.md`, `AGENTS.md`, `README.md`, `ROADMAP.md`,
    summary on faith: `git diff --stat` to confirm only the expected files
    changed, rerun `tsc`/`eslint` itself, and read the actual diff on
    anything non-mechanical before reporting the work as done.
+5. `tsc`/`eslint` only catch compile errors and lint issues -- they don't
+   catch behavioral bugs (e.g. two buttons sharing one loading flag, so
+   clicking one changes the other's label). For any change to stateful,
+   interactive UI (anything with its own `useState`/event handlers, not pure
+   styling), Codex also writes a focused component test under
+   `*.test.tsx` next to the file it changed, using Vitest + React Testing
+   Library (`npm run test:ui` runs these; `jsdom` environment, `@/` alias,
+   and `@testing-library/jest-dom` matchers are already configured in
+   `vitest.config.mts` -- this is separate from the existing `npm test`,
+   which stays Node's built-in test runner over `lib/*.test.ts` and is
+   untouched by this). The test should exercise the actual bug/behavior in
+   question (render, fire the real event, assert on what the user would
+   see) rather than re-asserting implementation details. Claude runs
+   `npm run test:ui` itself as part of step 4's verification, alongside
+   `tsc`/`eslint`.
 
 ## Keeping docs in sync
 

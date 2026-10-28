@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { Button } from '@/app/components/button';
 import { addStarterWordAction, previewStarterWordAction, type DiscoverCard } from './actions';
 
 export function DiscoverWords({ words, onSkip, onFinish }: {
@@ -61,9 +62,9 @@ export function DiscoverWords({ words, onSkip, onFinish }: {
     <section className="flex flex-col gap-5" aria-labelledby="discover-heading">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="discover-heading" className="font-display text-2xl">Discover new words</h2>
-        <button disabled={busy} onClick={() => onFinish(added)} className="border-line rounded-full border-2 px-4 py-2 text-sm disabled:opacity-50">
+        <Button variant="secondary" disabled={busy} onClick={() => onFinish(added)}>
           Back to vocabulary
-        </button>
+        </Button>
       </div>
       <p className="text-ink-2 text-sm" role="status">Word {index + 1} of {words.length} · {added} added</p>
       <div className="border-line bg-panel mx-auto flex w-full max-w-[600px] flex-col gap-5 rounded-2xl border-2 p-6">
@@ -75,11 +76,10 @@ export function DiscoverWords({ words, onSkip, onFinish }: {
         </div>}
         {error && <p role="alert" className="text-ink rounded-xl border-2 border-orange p-3">{error}</p>}
         <div className="flex flex-wrap justify-center gap-3">
-          <button disabled={busy} onClick={() => void resolve(false)} className="border-line rounded-xl border-2 px-4 py-3 disabled:opacity-50">Skip word</button>
-          <button disabled={busy} onClick={() => void (meaning ? resolve(true) : preview())}
-            className="border-line bg-yellow text-on-bright font-display rounded-xl border-2 px-4 py-3 shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50">
+          <Button variant="secondary" disabled={busy} onClick={() => void resolve(false)}>Skip word</Button>
+          <Button variant="primary" disabled={busy} onClick={() => void (meaning ? resolve(true) : preview())}>
             {busy ? 'Please wait…' : meaning ? 'Add to my vocabulary' : 'Show meaning and example'}
-          </button>
+          </Button>
         </div>
       </div>
     </section>

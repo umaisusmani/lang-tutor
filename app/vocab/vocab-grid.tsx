@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import { Pill } from '@/app/components/pill';
+import { Select } from '@/app/components/select';
 import { RemoveWordButton } from '@/app/vocab/remove-word-button';
 import type { VocabEntry } from '@/lib/types/db';
 
@@ -56,33 +58,27 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Show
-          <span className="relative flex">
-            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="border-line bg-panel hover:bg-soft focus:shadow-[3px_3px_0_var(--line)] w-full cursor-pointer appearance-none rounded-xl border-2 py-2 pr-8 pl-3 font-mono text-xs outline-none transition-colors">
-              <option value="all">All words</option><option value="due">Ready to review</option>
-              <option value="mistakes">From corrections</option><option value="missing">Missing meaning</option>
-            </select>
-            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[9px] opacity-60">▾</span>
-          </span>
+          <Select variant="panel" value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="all">All words</option><option value="due">Ready to review</option>
+            <option value="mistakes">From corrections</option><option value="missing">Missing meaning</option>
+          </Select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Sort
-          <span className="relative flex">
-            <select value={sort} onChange={(event) => setSort(event.target.value)} className="border-line bg-panel hover:bg-soft focus:shadow-[3px_3px_0_var(--line)] w-full cursor-pointer appearance-none rounded-xl border-2 py-2 pr-8 pl-3 font-mono text-xs outline-none transition-colors">
-              <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="az">A–Z</option>
-            </select>
-            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[9px] opacity-60">▾</span>
-          </span>
+          <Select variant="panel" value={sort} onChange={(event) => setSort(event.target.value)}>
+            <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="az">A–Z</option>
+          </Select>
         </label>
       </div>
       <p className="text-ink-3 text-sm" role="status">{visible.length} of {entries.length} words shown</p>
-      <button
-        type="button"
+      <Pill
+        size="sm"
         onClick={toggleAll}
         aria-pressed={revealAll}
-        className="border-line text-ink-2 hover:bg-yellow hover:text-on-bright self-end cursor-pointer rounded-full border-2 px-3 py-1 font-mono text-[11px] transition-colors duration-150 active:translate-x-px active:translate-y-px"
+        className="self-end"
       >
         {revealAll ? 'hide all meanings' : 'show all meanings'}
-      </button>
+      </Pill>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
         {visible.map((entry) => {

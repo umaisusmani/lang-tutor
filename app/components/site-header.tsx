@@ -8,6 +8,7 @@ import { saveTimezone, signOut } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
 import { useConfirm } from '@/app/components/confirm-modal';
 import { WARNING_AT, useResetLabel } from '@/app/components/quota-banner';
+import { Select } from '@/app/components/select';
 import { notifyError } from '@/app/components/toaster';
 import { deleteConversationAction } from '@/app/conversations/actions';
 import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
@@ -132,6 +133,8 @@ export function SiteHeader({
 
   const progressPct =
     remaining === null ? 0 : Math.round(((messageCap - remaining) / messageCap) * 100);
+  const activeNavHighlight =
+    "relative z-0 after:absolute after:inset-x-[-2px] after:bottom-[1px] after:-z-10 after:h-[6px] after:rounded-[2px] after:bg-yellow after:content-['']";
 
   return (
     // Its own 1080px track, wider than the 860px content column below it: the
@@ -144,47 +147,38 @@ export function SiteHeader({
         <div className="ml-auto flex items-center gap-2 sm:gap-3.5">
           <label className="flex items-center gap-2">
             <span className="text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase">Proficiency</span>
-            <span className="border-line bg-yellow text-on-bright hover:brightness-105 relative flex min-h-11 items-center rounded-full border-2 text-[13px] font-bold transition-[filter] duration-150">
-              <select
-                value={level}
-                onChange={handleLevelChange}
-                className="font-display w-[58px] cursor-pointer appearance-none bg-transparent py-1 pr-6 pl-3 tracking-[0.04em] outline-none"
-              >
-                {CEFR_LEVELS.map((l) => (
-                  <option key={l} value={l} className="text-ink bg-panel">
-                    {l}
-                  </option>
-                ))}
-              </select>
-              <span aria-hidden className="pointer-events-none absolute right-2.5 text-[9px] opacity-60">
-                ▾
-              </span>
-            </span>
+            <Select variant="pill" selectClassName="w-[58px]" value={level} onChange={handleLevelChange}>
+              {CEFR_LEVELS.map((l) => (
+                <option key={l} value={l} className="text-ink bg-panel">
+                  {l}
+                </option>
+              ))}
+            </Select>
           </label>
 
           {userEmail && (
             <div className="flex items-center gap-1.5 sm:gap-2.5">
               <Link
                 href="/"
-                className={`flex min-h-11 min-w-11 items-center border-b-4 font-mono text-xs underline underline-offset-[3px] transition-colors ${
+                className={`flex min-h-11 min-w-11 items-center font-mono text-xs underline underline-offset-[3px] transition-colors ${
                   activePage === 'chat'
-                    ? 'text-ink border-yellow no-underline'
-                    : 'text-ink-2 hover:text-ink border-transparent'
+                    ? 'text-ink no-underline'
+                    : 'text-ink-2 hover:text-ink'
                 }`}
                 aria-current={activePage === 'chat' ? 'page' : undefined}
               >
-                chat
+                <span className={activePage === 'chat' ? activeNavHighlight : undefined}>chat</span>
               </Link>
               <Link
                 href="/vocab"
-                className={`flex min-h-11 min-w-11 items-center border-b-4 font-mono text-xs underline underline-offset-[3px] transition-colors ${
+                className={`flex min-h-11 min-w-11 items-center font-mono text-xs underline underline-offset-[3px] transition-colors ${
                   activePage === 'vocab'
-                    ? 'text-ink border-yellow no-underline'
-                    : 'text-ink-2 hover:text-ink border-transparent'
+                    ? 'text-ink no-underline'
+                    : 'text-ink-2 hover:text-ink'
                 }`}
                 aria-current={activePage === 'vocab' ? 'page' : undefined}
               >
-                vocab
+                <span className={activePage === 'vocab' ? activeNavHighlight : undefined}>vocab</span>
                 {dueCount > 0 && (
                   <span
                     className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"

@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
+import { Button } from '@/app/components/button';
 import { notifyError } from '@/app/components/toaster';
 import { discoverWordsAction, startSessionAction, type DiscoverCard, type SessionPayload } from '@/app/vocab/actions';
 import { FlashcardSession } from '@/app/vocab/flashcard-session';
@@ -58,7 +58,7 @@ export function VocabBrowser({
   const router = useRouter();
   const [cards, setCards] = useState<SessionPayload | null>(null);
   const [discovery, setDiscovery] = useState<DiscoverCard[] | null>(null);
-  const [starting, setStarting] = useState(false);
+  const [starting, setStarting] = useState<'due' | 'practice' | 'discover' | null>(null);
   const [round, setRound] = useState(0);
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
   const [notice, setNotice] = useState('');
@@ -70,7 +70,7 @@ export function VocabBrowser({
   async function start(mode: 'due' | 'practice') {
     if (startingRef.current) return;
     startingRef.current = true;
-    setStarting(true);
+    setStarting(mode);
     try {
       const loaded = await startSessionAction(mode);
       if (!loaded) throw new Error('Session unavailable');
@@ -90,14 +90,14 @@ export function VocabBrowser({
       notifyError("Couldn't load your review. Please try again.", 'session-start');
     } finally {
       startingRef.current = false;
-      setStarting(false);
+      setStarting(null);
     }
   }
 
   async function discover() {
     if (startingRef.current) return;
     startingRef.current = true;
-    setStarting(true);
+    setStarting('discover');
     try {
       const words = await discoverWordsAction(readSkipped());
       if (words.length) setDiscovery(words);
@@ -106,7 +106,7 @@ export function VocabBrowser({
       notifyError("Couldn't load new words. Please try again.", 'discover-load');
     } finally {
       startingRef.current = false;
-      setStarting(false);
+      setStarting(null);
     }
   }
 
@@ -149,7 +149,7 @@ export function VocabBrowser({
         <div className="border-hair bg-panel flex flex-col items-start gap-3 rounded-2xl border-2 p-6">
           <h2 className="font-display text-2xl">Your vocabulary starts with one word</h2>
           <p className="text-ink-2">In a chat, tap a German word and choose + to save it here for review.</p>
-          <Link href="/?c=new" className="border-line bg-yellow text-on-bright font-display rounded-full border-2 px-4 py-2 shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]">Start a chat →</Link>
+          <Button variant="primary" href="/?c=new">Start a chat →</Button>
         </div>
       ) : (
         <>
@@ -159,14 +159,11 @@ export function VocabBrowser({
               <p className="text-ink-2 mt-1 max-w-[48ch] text-sm">One direction per word in each round. The other direction waits until another day.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={starting || dueCount === 0} onClick={() => void start('due')}
-                className="border-line bg-yellow text-on-bright font-display rounded-full border-2 px-4 py-2 shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50">
-                {starting ? 'Loading…' : 'Review due words'}
-              </button>
-              <button type="button" disabled={starting} onClick={() => void start('practice')}
-                className="border-line hover:bg-soft cursor-pointer rounded-full border-2 px-4 py-2 text-sm disabled:opacity-50">Extra practice</button>
-              <button type="button" disabled={starting} onClick={() => void discover()}
-                className="border-line hover:bg-soft cursor-pointer rounded-full border-2 px-4 py-2 text-sm disabled:opacity-50">Discover words</button>
+              <Button variant="primary" type="button" disabled={starting !== null || dueCount === 0} onClick={() => void start('due')}>
+                {starting === 'due' ? 'Loading…' : 'Review due words'}
+              </Button>
+              <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void start('practice')}>{starting === 'practice' ? 'Loading…' : 'Extra practice'}</Button>
+              <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void discover()}>{starting === 'discover' ? 'Loading…' : 'Discover words'}</Button>
             </div>
           </div>
           <VocabGrid entries={entries} dueWordIds={dueWordIds} />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@/app/components/button';
 import { gradeCardAction, type SessionCard } from '@/app/vocab/actions';
 import type { ReviewSummary } from '@/lib/review-session';
 import { formatInterval, Grades, previewIntervals, type Grade } from '@/lib/srs';
@@ -118,10 +119,9 @@ export function FlashcardSession({
             {summary.reviewed} of {initialCards.length} words reviewed · {queue.length} left
           </p>
         </div>
-        <button type="button" disabled={saving} onClick={() => onFinish({ ...summary, complete: false })}
-          className="border-line rounded-full border-2 px-4 py-2 text-sm disabled:opacity-50">
+        <Button variant="secondary" type="button" disabled={saving} onClick={() => onFinish({ ...summary, complete: false })}>
           End review
-        </button>
+        </Button>
       </div>
       <progress aria-label="Review progress" value={summary.reviewed} max={initialCards.length}
         className="h-2 w-full accent-[var(--accent)]" />
@@ -155,10 +155,9 @@ export function FlashcardSession({
           </div>
         )}
         {!shownAt ? (
-          <button type="button" onClick={revealAnswer}
-            className="border-line bg-yellow text-on-bright font-display rounded-xl border-2 px-4 py-3 text-lg shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]">
+          <Button variant="primary" size="lg" type="button" onClick={revealAnswer}>
             Show answer
-          </button>
+          </Button>
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-ink-2 text-center text-sm">Forgot it? Choose Again. Hard means you remembered, with effort.</p>

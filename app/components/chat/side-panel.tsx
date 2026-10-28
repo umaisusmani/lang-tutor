@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { Button } from '@/app/components/button';
+import { Pill } from '@/app/components/pill';
 import { QuotaBanner } from '@/app/components/quota-banner';
 import { isQuotaStatus, quotaFromResponse, type QuotaStatus } from '@/lib/quota';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
@@ -418,13 +420,13 @@ export function ChatSidePanel({
                 <span className="text-ink-3 font-mono text-[10px]">
                   {blocked ? 'messages paused' : `${level} · ${remaining ?? '—'} left`}
                 </span>
-                <button
+                <Button
+                  variant="dark"
                   type="submit"
                   disabled={!draft.trim() || sending || blocked}
-                  className="border-line bg-ink text-paper font-display min-h-11 cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] transition-opacity disabled:cursor-default disabled:opacity-40"
                 >
                   {sending ? 'asking…' : 'ask ↗'}
-                </button>
+                </Button>
               </div>
             </form>
           </section>
@@ -473,14 +475,15 @@ export function ChatSidePanel({
                         )}
                       </div>
                       {entry.lemma && (
-                        <button
-                          type="button"
+                        <Pill
+                          size="sm"
+                          muted={!canSave || isSaved(entry.lemma)}
                           disabled={!canSave || isSaved(entry.lemma)}
                           onClick={() => onSaveWord(entry, source, sourceText)}
-                          className="border-line text-ink-2 hover:bg-yellow hover:text-on-bright min-h-11 min-w-11 flex-none rounded-lg border-2 px-2 py-1 font-mono text-[10px] disabled:cursor-default disabled:opacity-50"
+                          className="min-h-11 min-w-11 flex-none"
                         >
                           {!canSave ? 'sign in' : isSaved(entry.lemma) ? '✓ saved' : '+ save'}
-                        </button>
+                        </Pill>
                       )}
                     </div>
                   </article>
@@ -544,13 +547,13 @@ export function ChatSidePanel({
                 />
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-ink-3 font-mono text-[10px]">{translationDraft.length}/200</span>
-                  <button
+                  <Button
+                    variant="dark"
                     type="submit"
                     disabled={!translationDraft.trim() || translating}
-                    className="border-line bg-ink text-paper font-display min-h-11 cursor-pointer rounded-lg border-2 px-3 py-[5px] text-[15px] tracking-[0.04em] disabled:cursor-default disabled:opacity-40"
                   >
                     {translating ? 'translating…' : 'translate ↗'}
-                  </button>
+                  </Button>
                 </div>
               </form>
 

@@ -3,6 +3,7 @@
 import type { ChatStatus } from 'ai';
 import type { ReactNode } from 'react';
 
+import { Button } from '@/app/components/button';
 import { GlossedText } from '@/app/components/glossed-text';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
 import { TranslateButton, TranslationPanel } from '@/app/components/translation-panel';
@@ -390,13 +391,14 @@ export function ChatComposer({
               placeholder="Schreib auf Deutsch… English words are fine too"
               className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
             />
-            <button
+            <Button
+              variant="dark"
               type="submit"
               disabled={busy || capped || !input.trim()}
-              className="border-line bg-ink text-paper hover:bg-accent hover:text-on-accent font-display min-h-11 flex-none cursor-pointer rounded-full border-2 px-[22px] py-3 text-xl tracking-[0.04em] transition-colors duration-150 active:translate-x-px active:translate-y-px disabled:opacity-40"
+              className="flex-none px-[22px] py-3 text-xl active:translate-x-px active:translate-y-px"
             >
               Senden
-            </button>
+            </Button>
           </div>
         </>
       )}

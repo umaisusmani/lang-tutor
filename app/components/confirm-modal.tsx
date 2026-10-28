@@ -11,6 +11,8 @@ import {
   type ReactNode,
 } from 'react';
 
+import { Button } from '@/app/components/button';
+
 export type ConfirmOptions = {
   title: string;
   description?: ReactNode;
@@ -124,22 +126,20 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               first focusable element, so a destructive dialog opens with the
               safe choice focused -- a stray Enter cancels rather than deletes. */}
           <div className="mt-2 flex justify-end gap-2.5">
-            <button
+            <Button
+              variant="secondary"
               type="button"
               onClick={() => settle(false)}
-              className="border-line text-ink hover:bg-soft cursor-pointer rounded-full border-2 px-4 py-2 text-[14px] font-bold transition-colors duration-150"
             >
               {options.cancelLabel ?? 'Cancel'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={danger ? 'danger' : 'dark'}
               type="button"
               onClick={() => settle(true)}
-              className={`border-line cursor-pointer rounded-full border-2 px-4 py-2 text-[14px] font-bold transition-transform duration-150 hover:translate-x-px hover:translate-y-px ${
-                danger ? 'bg-orange text-on-bright' : 'bg-ink text-paper'
-              }`}
             >
               {options.confirmLabel ?? 'Confirm'}
-            </button>
+            </Button>
           </div>
         </div>
       </dialog>

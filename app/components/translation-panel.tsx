@@ -29,13 +29,17 @@ export function TranslateButton({
       disabled={pending}
       aria-expanded={pending ? undefined : open}
       title={pending ? 'Explaining…' : undefined}
-      className={`border-line text-ink-2 min-h-11 flex-none rounded-lg border-2 px-2 py-0.5 font-mono text-[11px] transition-colors duration-150 ${
-        pending
-          ? 'animate-pulse cursor-default opacity-60'
-          : 'hover:bg-yellow hover:text-on-bright cursor-pointer active:translate-x-px active:translate-y-px'
+      className={`group flex min-h-11 min-w-11 flex-none items-center justify-center ${
+        pending ? 'cursor-default' : 'cursor-pointer'
       } ${className ?? ''}`}
     >
-      {open && !pending ? 'hide' : 'explain'}
+      <span className={`border-line text-ink-2 rounded-full border-2 px-3 py-1 font-mono text-[11px] leading-none transition-colors duration-150 ${
+        pending
+          ? 'animate-pulse opacity-60'
+          : 'group-hover:bg-yellow group-hover:text-on-bright group-active:translate-x-px group-active:translate-y-px'
+      }`}>
+        {open && !pending ? 'hide' : 'explain'}
+      </span>
     </button>
   );
 }

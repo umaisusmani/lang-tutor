@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
+import { Pill } from '@/app/components/pill';
 import type { WordGloss } from '@/lib/gloss';
 import { stripPunctuation } from '@/lib/text';
 
@@ -58,18 +59,15 @@ function WordMenu({
           on, so those stay read-only rather than saving an inflected form. */}
       {entry.lemma &&
         (canSave ? (
-          <button
-            type="button"
+          <Pill
+            size="sm"
+            muted={saved}
             onClick={onSave}
             disabled={saved}
-            className={
-              saved
-                ? 'border-hair text-ink-3 self-start rounded-lg border-2 px-2 py-0.5 font-mono text-[11px]'
-                : 'border-line text-ink-2 hover:bg-yellow hover:text-on-bright self-start cursor-pointer rounded-lg border-2 px-2 py-0.5 font-mono text-[11px] transition-colors duration-150 active:translate-x-px active:translate-y-px'
-            }
+            className="self-start"
           >
             {saved ? `✓ "${entry.lemma}" saved` : `+ save "${entry.lemma}"`}
-          </button>
+          </Pill>
         ) : (
           <Link href="/login" className="self-start font-mono text-[11px]">
             sign in to save words

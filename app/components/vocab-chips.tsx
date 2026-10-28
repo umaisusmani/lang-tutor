@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { Pill } from '@/app/components/pill';
 import { saveVocabAction } from '@/app/vocab/actions';
 import type { VocabCandidate } from '@/lib/services/vocab.service';
 
@@ -44,18 +45,14 @@ function VocabChip({ candidate }: { candidate: VocabCandidate }) {
   }
 
   return (
-    <button
-      type="button"
+    <Pill
+      size="md"
+      muted={saved}
       onClick={handleClick}
       disabled={saved}
-      className={
-        saved
-          ? 'border-hair text-ink-3 cursor-default rounded-full border-2 px-[13px] py-[5px] text-[13.5px] font-semibold'
-          : 'border-line text-ink hover:bg-yellow hover:text-on-bright cursor-pointer rounded-full border-2 px-[13px] py-[5px] text-[13.5px] font-semibold transition-colors duration-150 active:translate-x-px active:translate-y-px'
-      }
     >
       {saved ? `✓ ${candidate.lemma}` : `+ ${candidate.lemma}`}
-    </button>
+    </Pill>
   );
 }
 

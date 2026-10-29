@@ -1,24 +1,40 @@
 # Starvogel — Technical Documentation
 
-> State of the codebase as of 2026-10-21 (`804f84d` plus local, uncommitted UI changes). This describes
+> State of the codebase as of 2026-10-29 (`a3194e1`). This describes
 > what is **built**. Feature status is in [ROADMAP.md](../ROADMAP.md); design
 > notes live in local `plans/*.md` files that aren't committed. For the
 > user-facing overview, see [README.md](../README.md). Where a plan and the
 > code disagree, the code is right. Section 11 lists where the build departed
 > from the original design.
 > The original UX findings and current verification gaps are recorded in [UI_AUDIT.md](UI_AUDIT.md).
+> A source-level review of every Groq-backed prompt is in [AI_PROMPT_AUDIT.md](AI_PROMPT_AUDIT.md).
 >
-> **Recent changes since the F2 baseline (2026-10-10):** Message limits are now daily and apply to everyone: 5 a day anonymous,
-> 35 a day signed in, plus a global cap on the whole app, all counted in
-> `daily_usage` (migration 0007) through the atomic `consume_message()`
-> function. `session_usage` is no longer written. See §4.1, §6 and §7.4.
-> Signing up with an email now needs the address confirmed: the
-> confirmation email carries a numeric code that is entered on a second
-> login screen (`verifySignupCode`), with `/auth/confirm` kept as a link
-> fallback. See §7.2. Adding Supabase's confirmation template and custom
-> SMTP are dashboard settings, not code (§10).
-> Ask, its eval suite, the refreshed UI/theme, and formatted grammar explanations
-> are also present in this revision (§1, §8, §9).
+> **Recent changes since the 2026-10-21 revision:** The side panel's tab set
+> dropped from Ask/Words/Translate to **Ask/Translate** — Translate now owns
+> word-saving itself: the German→English direction keeps the existing
+> `TranslationWords` breakdown-on-request, and the new English→German
+> direction uses `TranslatableResult` (`app/components/chat/translatable-result.tsx`)
+> to map the Azure translation's tokens back onto gloss units inline. The old
+> always-listed "Words" tab (`collectWords` over the thread's glosses) is gone.
+> A standalone **`AddWord`** search box (`app/vocab/add-word.tsx`) was added to
+> `/vocab` so a word can be added by typing, independent of chat or Translate,
+> via a new `POST /api/translate/words` route and `lib/word-units.ts`
+> (`groupGlossIntoUnits`). The quota banner became a full takeover card
+> (`OutOfMessagesCard`/`OutOfMessagesGuestCard`) once the learner's own daily
+> cap is hit, replacing the composer instead of sitting disabled above it; the
+> side panel still gets the older one-line `compact` banner. The reply prompt's
+> question cadence changed from "never two question-ending replies in a row"
+> to "a break only after **two** consecutive question-ending replies"
+> (`buildTurnGuidance`, §5.2), and the persona bio note about Rhine walks was
+> softened to an occasional detail, not a default topic — see
+> [AI_PROMPT_AUDIT.md](AI_PROMPT_AUDIT.md) for the review that prompted it.
+> Auth copy (login/signup/confirm screens) is now in English throughout,
+> matching the rest of the UI, with a shared `PasswordInput` component. New
+> shared UI primitives: `Button`, `Pill`, `Select` (`app/components/`).
+> Vitest + React Testing Library (`npm run test:ui`, `vitest.config.mts`) were
+> added alongside the existing `tsx --test` unit runner, with component tests
+> for the quota banner, site header, vocab browser, add-word, translation
+> words and translatable-result. See §2, §8, §9.
 
 ## Contents
 
@@ -47,7 +63,7 @@ makes **three LLM calls**:
 
 | Call | Input | Output | When |
 |---|---|---|---|
-| **Reply** | full conversation, persona, level, "don't ask a question if the last reply did" guidance | streamed German reply | immediately |
+| **Reply** | full conversation, persona, level, "no question after two question-ending replies in a row" guidance | streamed German reply | immediately |
 | **Correction** | the learner's last message only | `{hasMistake, usedEnglish, mistakeType, correction, correctionTranslation, explanation, correctionGloss}` | immediately, in parallel with the reply |
 | **Gloss** | the finished reply text | `{translation, words: {word, lemma, lemmaTranslation, translation}[]}` | after the reply finishes |
 
@@ -107,6 +123,7 @@ POST /api/ask ──────────────────────
 | Evals | `tsx` script against real Groq | `npm run eval` |
 | Spaced repetition | `ts-fsrs` (FSRS-6) | Wrapped by `lib/srs.ts`, the only importer |
 | Unit tests | Node's built-in runner via `tsx --test` | `npm test`; pure functions only |
+| Component tests | Vitest + React Testing Library | `npm run test:ui`; `jsdom`, `@/` alias, `@testing-library/jest-dom` in `vitest.config.mts`/`vitest.setup.ts`; separate from `npm test` |
 
 **Why Groq direct, not AI Gateway:** the project aims for zero billing
 exposure. A free-tier Groq key has no spend surface at all.
@@ -393,12 +410,18 @@ message allowance. Cached explanations still avoid a new model call.
   count, words per sentence, which tenses/conjunctions are allowed), not
   prose description — a vaguer version of this under-constrained gpt-oss at
   low reasoning effort (see `evals/reply-level-cases.ts`, §9).
-- **`buildTurnGuidance(previousReply)`**: appended to the system prompt only
-  when the persona's own previous reply ended in a question — "this reply
-  must not contain a question." The prompt alone couldn't reliably keep the
-  question rate down (the model can't count across turns within one call);
-  this makes the one-questions-every-other-turn rule a per-call decision in
-  code instead of a hope in the prompt text.
+- **`buildTurnGuidance(previousReply, replyBeforePrevious)`**: appended to the
+  system prompt only when the persona's **last two** replies both ended in a
+  question — "respond with a statement instead of asking another question."
+  `runChatTurn` passes the two most recent assistant replies (newest first).
+  An earlier version fired after any single question-ending reply, which also
+  blocked an ordinary one-question follow-up; a two-reply streak still gets a
+  break so the chat doesn't turn into a string of questions. The prompt alone
+  couldn't reliably keep the question rate down (the model can't count across
+  turns within one call), so this stays a per-call decision in code. The
+  persona section also now treats bio details (e.g. Rhine walks) as
+  occasional, not a default topic to revisit every turn — see
+  [AI_PROMPT_AUDIT.md](AI_PROMPT_AUDIT.md).
 - **`buildCorrectionSystemPrompt(level)`**: level-based leniency/category logic
   (`STRICTNESS_BY_LEVEL[level]`, the "decide hasMistake as if the category
   list didn't exist" instruction, category tie-break rules), plus a new
@@ -696,14 +719,30 @@ sources of truth while allowing them to change independently.
   native modal dialog; its chevron closes it. For anonymous visitors, the tab
   opens the shared native confirmation dialog and "Create account" navigates
   to `/login?mode=signup`. Ask and Translate enforce the same boundary server-side.
-  The panel has Ask, Words, and Translate views. Ask reads the `/api/ask` text stream using
-  `fetch` and keeps its turns in React state for the current page visit; Words
-  filters existing reply and correction glosses without a model call. Translate
-  sends up to 200 characters to `/api/translate`, using Azure Dictionary Lookup
-  for isolated words and Text Translate for phrases or fallback. A swap button
-  changes German ↔ English. The route consumes separate atomic counters in
-  `daily_usage` through `consume_translation` (migration `0008`): 50 per signed-in
-  user and 300 app-wide per UTC day. The Azure key and region remain server-only.
+  The panel has **Ask and Translate** views only — the earlier "Words" tab
+  (listing every lemma seen so far in the thread, filterable, no model call)
+  was removed; word-saving now lives inside Translate itself (below) or on
+  `/vocab` via `AddWord`. `app.chat.tsx` can open the panel pre-set to a given
+  view (`openOnView`), used by the quota takeover card's "Translate" CTA.
+  Ask reads the `/api/ask` text stream using `fetch` and keeps its turns in
+  React state for the current page visit. Translate sends up to 200 characters
+  to `/api/translate`, using Azure Dictionary Lookup for isolated words and
+  Text Translate for phrases or fallback. A swap button changes German ↔
+  English. The route consumes separate atomic counters in `daily_usage`
+  through `consume_translation` (migration `0008`): 50 per signed-in user and
+  300 app-wide per UTC day. The Azure key and region remain server-only.
+  - **Saving words from a translation result** differs by direction. German→
+    English keeps `TranslationWords` (`app/components/chat/translation-words.tsx`):
+    a "save words ↓" button calls the new `POST /api/translate/words`, which
+    glosses the German source text (`glossText`, spending the same translation
+    counters) and returns `groupGlossIntoUnits(gloss.words)` (`lib/word-units.ts`)
+    for per-unit **+ save** buttons. English→German instead renders
+    `TranslatableResult` (`app/components/chat/translatable-result.tsx`), which
+    fetches the same `/api/translate/words` route for the **German** result text
+    and maps its units back onto the rendered translation's own word spans
+    (token-matched, punctuation-stripped), so each German word/phrase in the
+    translated sentence itself is tappable to save — rather than a separate list
+    below it.
 - **Persona avatar:** `PersonaAvatar` (`app/components/persona-avatar.tsx`)
   renders next to each of the persona's replies and on the empty-chat screen.
   It shows an image from `avatar_url` when set, or an initial badge when not
@@ -778,6 +817,28 @@ sources of truth while allowing them to change independently.
   entry and the trigger makes its cards. Skips are kept in browser
   `localStorage`. The source-list licence remains unresolved (§12), so this
   entry point must not be published until permission or replacement is secured.
+- **`AddWord`** (`app/vocab/add-word.tsx`): a standalone combobox on `/vocab`
+  for adding a word by typing, independent of chat or the Translate tab. It
+  searches the starter word lists (`searchStarterWordsAction`) as the learner
+  types, previews a generated meaning on selection (`previewStarterWordAction`,
+  editable before saving), and saves through `addStarterWordAction`. Full
+  keyboard support (arrow keys, Enter, Escape) and an `aria-live` results count.
+  Limited to the starter-list vocabulary (§12's licence caveat applies here
+  too); a word outside that list has to go through the chat panel's Translate
+  tab instead.
+- **Quota takeover card:** once the learner's own daily cap is hit (not the
+  global cap or a counter outage), `QuotaBanner` renders a full card
+  (`OutOfMessagesCard` signed in, `OutOfMessagesGuestCard` anonymous) that
+  replaces the composer entirely (`ChatComposer`'s `hideInput`) rather than
+  sitting disabled above it, showing the persona, the due-review count, the
+  reset time, and a CTA straight into the Translate tab. The side panel keeps
+  passing `compact`, which always renders the older one-line banner instead,
+  since the panel has no room for the full card.
+- **Auth pages are now English throughout** (`app/login/page.tsx` and
+  `app/login/reset/`), matching the rest of the UI — the original German copy
+  ("Willkommen zurück.", "Anmelden", etc.) was swapped for English during the
+  redesign. A shared `PasswordInput` (`app/components/password-input.tsx`)
+  backs both the login and reset-password forms.
 - **Starter data:** `scripts/import-wordlist.ts` parses the Goethe-Institut
   TSV lists (github.com/ilkermeliksitki/goethe-institute-wordlist) into the
   JSON files: cleaned lemma ("die Adresse,-en" → "die Adresse"), one entry
@@ -795,11 +856,15 @@ sources of truth while allowing them to change independently.
 model (via `lib/reply.ts`'s `replySettings()`) and Ask (via `lib/ask.ts`'s
 `askSettings()`) directly. The shared Ask settings let evals use the same
 prompt and generation parameters without logging eval usage to `token_usage`.
+Separately, `npm run test:ui` runs Vitest + React Testing Library component
+tests (quota banner, site header, vocab browser, add-word, translation
+words, translatable-result) — these are ordinary assertions against rendered
+output, not model evals, and run without a Groq key.
 
 | Suite | Cases | Pass rule | Expected |
 |---|---|---|---|
 | correction (`evals/cases.ts`) | 27 | `hasMistake` matches, `mistakeType` matches when specified, and `usedEnglish` matches when specified. Includes clean sentences, A1-vs-C1 pairs, English stand-ins, and capitalization/keyboard-spelling controls. | Earlier 24-case baseline: 19–20/20 of the original 20 (`auxiliary-verb-1` flips between runs); the 4 English cases passed steadily. The 3 new spelling cases await a live run. |
-| gloss (`evals/gloss-cases.ts`) | 17 | Each listed word gets an accepted lemma (case- and whitespace-insensitive) in **all 3 runs**; every run's sentence `translation` must be non-empty | all pass |
+| gloss (`evals/gloss-cases.ts`) | 19 | Each listed word gets an accepted lemma (case- and whitespace-insensitive) in **all 3 runs**; every run's sentence `translation` must be non-empty | all pass |
 | reply (`evals/reply-level-cases.ts`) | 12 reply cases + 1 scripted 8-turn conversation | Per case: A1/A2 replies stay within their sentence-count/length/tense limits (`REPLY_LIMITS`), no helper phrasing (`HELPER_PHRASES`), and an English stand-in comes back used in German (`expectContains`). Across the scripted conversation: at most half the replies end in a question (`MAX_QUESTION_SHARE`), checked turn-by-turn against the real `buildTurnGuidance()` behavior, not just a static sample. | all pass as of the prompt in `lib/prompts.ts` as of 2026-09-30 |
 | ask (`evals/ask-cases.ts`) | 8 sentence/question cases | Two-line format for bare phrases, direct-answer format for questions, required translation/rule fragments, and rejection of known wrong case/tense claims. Prints every answer for manual German review; one run is not a reliability estimate. | 20B repeatedly failed the `auf das Wochenende` case; 120B scored 7–8/8 across two runs but once called mixed adjective inflection "weak" |
 
@@ -941,6 +1006,20 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
   un-suspend, so it ships with that UI.
 - **A session is the whole queue** (up to `NEW_PER_DAY` new + due reviews,
   capped at `REVIEWS_PER_DAY`), not a fixed-size batch.
+- **Only the main chat reply sets Groq's `reasoningFormat: 'hidden'`.** Ask
+  (`lib/ask.ts`) and the on-demand grammar explanation (`lib/explain.ts`)
+  stream without it, so either could leak raw reasoning tokens into what the
+  learner reads. No regression case catches this yet. See
+  [AI_PROMPT_AUDIT.md](AI_PROMPT_AUDIT.md), priority 1.
+- **`/api/explain` has no request-rate or cost guard.** It deliberately
+  doesn't spend chat-message allowance, but accepts anonymous requests and
+  makes an uncapped 120B call per nonempty request.
+- **Evals check structure, not accuracy.** The correction eval only checks
+  `hasMistake`/`mistakeType`/`usedEnglish`, not whether the corrected text,
+  explanation, translation, or gloss are actually right; the gloss eval
+  doesn't check the full sentence translation or every word. Mistake types
+  recorded this way will drive tutor personalization, so an unreviewed
+  mislabel can get amplified. See [AI_PROMPT_AUDIT.md](AI_PROMPT_AUDIT.md).
 - **`docs/TECHNICAL.md` and `ROADMAP.md` can lag the code.** `npm run
   docs:status` (also run in CI on every push) lists the code commits made
   since each was last updated, but it only warns. Someone still has to write the update. The check

@@ -72,7 +72,7 @@ export function ChatSidePanel({
   const [turns, setTurns] = useState<PanelTurn[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [translationDirection, setTranslationDirection] = useState<TranslationDirection>('de-en');
+  const [translationDirection, setTranslationDirection] = useState<TranslationDirection>('en-de');
   const [translationDraft, setTranslationDraft] = useState('');
   const [translationResult, setTranslationResult] = useState('');
   const [translationError, setTranslationError] = useState('');
@@ -251,7 +251,7 @@ export function ChatSidePanel({
         aria-label="German learning tools"
         onCancel={(event) => { event.preventDefault(); onClose(); }}
         onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-        className="border-line bg-paper text-ink fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-[min(94vw,420px)] max-w-none border-0 border-l-2 p-0 backdrop:bg-black/40"
+        className="border-line bg-paper text-ink fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-none border-0 p-0 sm:w-[min(90vw,480px)] sm:border-l-2 backdrop:bg-black/40"
       >
         <div className="flex h-full min-h-0 flex-col">
         <div className="border-hair flex items-center gap-3 border-b-2 px-4 py-3">

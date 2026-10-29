@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/app/components/button';
@@ -8,6 +8,7 @@ import { notifyError } from '@/app/components/toaster';
 import { discoverWordsAction, startSessionAction, type DiscoverCard, type SessionPayload } from '@/app/vocab/actions';
 import { FlashcardSession } from '@/app/vocab/flashcard-session';
 import { DiscoverWords } from '@/app/vocab/discover-words';
+import { AddWord } from '@/app/vocab/add-word';
 import type { ReviewSummary } from '@/lib/review-session';
 import { VocabGrid } from '@/app/vocab/vocab-grid';
 import type { VocabEntry } from '@/lib/types/db';
@@ -62,6 +63,8 @@ export function VocabBrowser({
   const [round, setRound] = useState(0);
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
   const [notice, setNotice] = useState('');
+  const [adding, setAdding] = useState(false);
+  const savedLemmas = useMemo(() => new Set(entries.map((entry) => entry.lemma.toLowerCase())), [entries]);
   const noticeRef = useRef<HTMLDivElement>(null);
   const startingRef = useRef(false);
 
@@ -145,11 +148,15 @@ export function VocabBrowser({
           </> : <p>{notice}</p>}
         </div>
       )}
+      {adding && <AddWord savedLemmas={savedLemmas} onAdded={() => router.refresh()} onClose={() => setAdding(false)} />}
       {entries.length === 0 ? (
         <div className="border-hair bg-panel flex flex-col items-start gap-3 rounded-2xl border-2 p-6">
           <h2 className="font-display text-2xl">Your vocabulary starts with one word</h2>
-          <p className="text-ink-2">In a chat, tap a German word and choose + to save it here for review.</p>
-          <Button variant="primary" href="/?c=new">Start a chat →</Button>
+          <p className="text-ink-2">In a chat, tap a German word and choose + to save it here, or add one yourself.</p>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="primary" href="/?c=new">Start a chat →</Button>
+            <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => setAdding(true)}>Add a word</Button>
+          </div>
         </div>
       ) : (
         <>
@@ -164,6 +171,7 @@ export function VocabBrowser({
               </Button>
               <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void start('practice')}>{starting === 'practice' ? 'Loading…' : 'Extra practice'}</Button>
               <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void discover()}>{starting === 'discover' ? 'Loading…' : 'Discover words'}</Button>
+              <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => setAdding(true)}>Add a word</Button>
             </div>
           </div>
           <VocabGrid entries={entries} dueWordIds={dueWordIds} />

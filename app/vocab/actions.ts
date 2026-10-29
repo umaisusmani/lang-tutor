@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 import { getPracticeQueue, getReviewQueue, recordReview, type RecordReviewResult } from '@/lib/services/card.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
 import { deleteVocabEntry, listVocab, saveVocabEntry } from '@/lib/services/vocab.service';
-import { findStarterWord, pickStarterWords } from '@/lib/starter-vocab';
+import { findStarterWord, pickStarterWords, searchStarterWords } from '@/lib/starter-vocab';
 import { translateStarterWord } from '@/lib/starter-vocab/translate';
 import type { Grade } from '@/lib/srs';
 import type { CardDirection, CardSchedule, ReviewSurface, VocabSource } from '@/lib/types/db';
@@ -66,6 +66,13 @@ export type SessionCard = {
 
 /** A word from the starter list, offered mid-session with an "Add" button. */
 export type DiscoverCard = { lemma: string; example: string; exampleTranslation: string };
+
+export async function searchStarterWordsAction(query: string): Promise<DiscoverCard[]> {
+  if (typeof query !== 'string') return [];
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
+  return searchStarterWords(query, 8);
+}
 
 export type SessionPayload = {
   cards: SessionCard[];

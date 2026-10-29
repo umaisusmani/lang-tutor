@@ -84,6 +84,12 @@ export const GLOSS_EVAL_CASES: GlossEvalCase[] = [
     note: '"Hause" only exists in these phrases. Also checks "Wir" isn\'t lemmatized to "ich".',
   },
   {
+    id: 'fixed-zum-beispiel',
+    input: 'Ich mag Obst, zum Beispiel Äpfel.',
+    expectLemmas: { zum: 'zum Beispiel', Beispiel: 'zum Beispiel' },
+    note: 'The contraction belongs to the fixed phrase, so both words share its lemma.',
+  },
+  {
     id: 'phrase-auf-jeden-fall',
     input: 'Auf jeden Fall komme ich mit.',
     expectLemmas: {
@@ -116,6 +122,12 @@ export const GLOSS_EVAL_CASES: GlossEvalCase[] = [
     input: 'Ich war gestern beim Arzt.',
     expectLemmas: { beim: 'bei', Arzt: 'der Arzt' },
     note: 'Preposition + article contraction saves as the preposition.',
+  },
+  {
+    id: 'contraction-zum',
+    input: 'Ich gehe zum Arzt.',
+    expectLemmas: { zum: 'zu', Arzt: 'der Arzt' },
+    note: 'An ordinary contraction must not become a phrase.',
   },
 
   // --- Controls: ordinary words must NOT be merged into a phrase ---

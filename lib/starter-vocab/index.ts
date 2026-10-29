@@ -25,6 +25,37 @@ const BY_LEMMA = new Map<string, StarterWord>(
   ORDER.flatMap((level) => LISTS[level]).map((w) => [w.lemma.toLowerCase(), w]),
 );
 
+function searchKey(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
+    .replace(/^(?:der|die|das)\s+(?=\S)/, '')
+    .replace(/^sich\s+(?=\S)/, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/ß/g, 'ss');
+}
+
+const SEARCH_INDEX = [...BY_LEMMA.values()].map((word) => {
+  const key = searchKey(word.lemma);
+  return { word, key, tokens: key.split(' ') };
+});
+
+/** Finds starter words by their German lemma, regardless of article or diacritics. */
+export function searchStarterWords(query: string, limit = 8): StarterWord[] {
+  const key = searchKey(query);
+  if (!key || key.length > 50 || !Number.isFinite(limit) || limit <= 0) return [];
+
+  const ranked = SEARCH_INDEX.flatMap((entry) => {
+    const rank = entry.key === key ? 0
+      : entry.key.startsWith(key) ? 1
+        : entry.tokens.some((token) => token.startsWith(key)) ? 2
+          : entry.key.includes(key) ? 3 : -1;
+    return rank < 0 ? [] : [{ ...entry, rank }];
+  });
+  ranked.sort((a, b) => a.rank - b.rank
+    || a.word.lemma.length - b.word.lemma.length
+    || a.word.lemma.localeCompare(b.word.lemma, 'de'));
+  return ranked.slice(0, limit).map(({ word }) => word);
+}
+
 /** Looks a word up by lemma; the server uses this so it never trusts a
  * client-sent example or translation. */
 export function findStarterWord(lemma: string): StarterWord | null {

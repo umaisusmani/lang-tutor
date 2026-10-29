@@ -162,8 +162,10 @@ SAME lemma: the unit's full dictionary form.
   requires all get the "sich ..." form ("Ich freue mich auf das Wochenende":
   "freue", "mich" and "auf" -> "sich freuen auf").
 - Fixed phrases whose words don't carry the meaning on their own, such as "ein
-  bisschen", "es gibt", "nach Hause", "zu Hause", "auf jeden Fall": each word
-  gets the whole phrase.
+  bisschen", "es gibt", "nach Hause", "zu Hause", "auf jeden Fall", "zum Beispiel": each word
+  gets the whole phrase. When a contracted preposition is part of a fixed phrase,
+  the whole phrase is the lemma ("zum Beispiel": both words -> "zum Beispiel");
+  an ordinary contraction like "zum Arzt" / "beim Arzt" still reduces to "zu" / "bei".
 Only do this when the unit really is in this sentence. Words that merely sit
 next to each other keep their own lemmas: "ein" in "ein Auto" is "ein", "Fall"
 in "in diesem Fall" is "der Fall", "auf" in "auf dem Tisch" is "auf".

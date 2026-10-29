@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/app/components/button';
 import { Pill } from '@/app/components/pill';
 import { QuotaBanner } from '@/app/components/quota-banner';
+import { TranslationWords } from '@/app/components/chat/translation-words';
 import { isQuotaStatus, quotaFromResponse, type QuotaStatus } from '@/lib/quota';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { WordGloss } from '@/lib/gloss';
@@ -115,6 +116,7 @@ export function ChatSidePanel({
   const [translationRemaining, setTranslationRemaining] = useState<number | null>(null);
   const [translating, setTranslating] = useState(false);
   const translationRequestRef = useRef<AbortController | null>(null);
+  const germanSide = translationDirection === 'de-en' ? translationDraft.trim() : translationResult;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const blocked = quota.reason !== null || remaining === 0;
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -567,6 +569,17 @@ export function ChatSidePanel({
                   <p className="text-ink-3 mt-2 text-sm">{translating ? 'Translating…' : 'Your translation appears here.'}</p>
                 )}
               </div>
+              {translationResult && !translating && (
+                <TranslationWords
+                  key={`${translationDirection}:${germanSide}`}
+                  germanText={germanSide}
+                  canSave={canSave}
+                  isSaved={isSaved}
+                  onSaveWord={onSaveWord}
+                  onRemaining={setTranslationRemaining}
+                  onAuthRequired={onAuthRequired}
+                />
+              )}
               {translationError && <p role="alert" className="text-ink text-sm">{translationError}</p>}
               {translationRemaining !== null && (
                 <p className="text-ink-3 font-mono text-[10px]">

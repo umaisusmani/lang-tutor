@@ -52,7 +52,7 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
     <div className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
         <label className="flex flex-col gap-1 text-sm">
-          Find a word
+          Search your words
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}
             placeholder="German, English, or an example…" className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
         </label>

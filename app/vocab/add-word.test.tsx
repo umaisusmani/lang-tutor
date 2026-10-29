@@ -29,7 +29,7 @@ beforeEach(() => {
 function setup(savedLemmas: ReadonlySet<string> = new Set()) {
   const onAdded = vi.fn();
   const user = userEvent.setup();
-  render(<AddWord savedLemmas={savedLemmas} onAdded={onAdded} onClose={vi.fn()} />);
+  render(<AddWord savedLemmas={savedLemmas} onAdded={onAdded} />);
   return { user, onAdded, input: screen.getByRole('combobox', { name: 'Add a word' }) };
 }
 

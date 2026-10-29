@@ -1,12 +1,11 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/app/components/button';
-import { Pill } from '@/app/components/pill';
 import { QuotaBanner } from '@/app/components/quota-banner';
 import { TranslationWords } from '@/app/components/chat/translation-words';
+import { TranslatableResult } from '@/app/components/chat/translatable-result';
 import { isQuotaStatus, quotaFromResponse, type QuotaStatus } from '@/lib/quota';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { WordGloss } from '@/lib/gloss';
@@ -14,15 +13,10 @@ import type { CefrLevel } from '@/lib/prompts';
 import type { VocabSource } from '@/lib/types/db';
 import type { TranslationDirection } from '@/lib/translator';
 
-type ToolView = 'ask' | 'words' | 'translate';
-const toolViews: ToolView[] = ['ask', 'words', 'translate'];
-const toolViewLabels: Record<ToolView, string> = { ask: 'ask', words: 'vocabulary', translate: 'translate' };
+type ToolView = 'ask' | 'translate';
+const toolViews: ToolView[] = ['ask', 'translate'];
+const toolViewLabels: Record<ToolView, string> = { ask: 'ask', translate: 'translate' };
 type PanelTurn = { role: 'user' | 'assistant'; content: string };
-type PanelWord = {
-  entry: WordGloss[number];
-  source: VocabSource;
-  sourceText: string;
-};
 
 function messageText(message: LangTutorUIMessage): string {
   return message.parts
@@ -30,36 +24,6 @@ function messageText(message: LangTutorUIMessage): string {
     .map((part) => part.text)
     .join('\n')
     .trim();
-}
-
-function collectWords(messages: LangTutorUIMessage[]): PanelWord[] {
-  const byLemma = new Map<string, PanelWord>();
-
-  for (const message of messages) {
-    const text = messageText(message);
-    for (const part of message.parts) {
-      if (part.type === 'data-gloss') {
-        for (const entry of part.data.words ?? []) {
-          if (entry.lemma && !byLemma.has(entry.lemma.toLowerCase())) {
-            byLemma.set(entry.lemma.toLowerCase(), { entry, source: 'new_word', sourceText: text });
-          }
-        }
-      } else if (part.type === 'data-correction' && part.data.correctionGloss) {
-        const correctionText = part.data.correction ?? text;
-        for (const entry of part.data.correctionGloss) {
-          if (entry.lemma && !byLemma.has(entry.lemma.toLowerCase())) {
-            byLemma.set(entry.lemma.toLowerCase(), {
-              entry,
-              source: 'mistake',
-              sourceText: correctionText,
-            });
-          }
-        }
-      }
-    }
-  }
-
-  return [...byLemma.values()];
 }
 
 export function ChatSidePanel({
@@ -108,7 +72,6 @@ export function ChatSidePanel({
   const [turns, setTurns] = useState<PanelTurn[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [wordFilter, setWordFilter] = useState('');
   const [translationDirection, setTranslationDirection] = useState<TranslationDirection>('de-en');
   const [translationDraft, setTranslationDraft] = useState('');
   const [translationResult, setTranslationResult] = useState('');
@@ -120,16 +83,6 @@ export function ChatSidePanel({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const blocked = quota.reason !== null || remaining === 0;
   const transcriptRef = useRef<HTMLDivElement>(null);
-  const words = useMemo(() => collectWords(messages), [messages]);
-  const visibleWords = useMemo(() => {
-    const query = wordFilter.trim().toLocaleLowerCase();
-    if (!query) return words;
-    return words.filter(({ entry }) =>
-      `${entry.word} ${entry.lemma} ${entry.lemmaTranslation} ${entry.translation}`
-        .toLocaleLowerCase()
-        .includes(query),
-    );
-  }, [wordFilter, words]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -341,7 +294,7 @@ export function ChatSidePanel({
                 view === tab ? 'bg-yellow text-on-bright font-bold' : 'text-ink-2 hover:bg-soft'
               }`}
             >
-              {toolViewLabels[tab]}{tab === 'words' ? ` · ${words.length}` : ''}
+              {toolViewLabels[tab]}
             </button>
           ))}
         </div>
@@ -432,67 +385,6 @@ export function ChatSidePanel({
               </div>
             </form>
           </section>
-        ) : view === 'words' ? (
-          <section
-            id="tools-view-words"
-            role="tabpanel"
-            aria-labelledby="tools-tab-words"
-            className="flex min-h-0 flex-1 flex-col"
-          >
-            <div className="border-hair flex items-center gap-2 border-b p-3">
-              <input
-                value={wordFilter}
-                onChange={(event) => setWordFilter(event.target.value)}
-                type="search"
-                aria-label="Filter conversation words"
-                placeholder="Find a word…"
-                className="border-hair bg-panel text-ink placeholder:text-ink-3 focus:border-line w-full rounded-xl border-2 px-3 py-2 text-sm outline-none"
-              />
-              <Link
-                href="/vocab"
-                onClick={onClose}
-                className="text-ink-2 hover:text-ink flex min-h-11 flex-none items-center font-mono text-[11px] underline underline-offset-[3px]"
-              >
-                open vocabulary →
-              </Link>
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
-              {visibleWords.length === 0 ? (
-                <p className="text-ink-3 m-auto max-w-[26ch] text-center text-sm leading-relaxed">
-                  {words.length === 0
-                    ? 'Words explained by the tutor will show up here.'
-                    : 'No words match that search.'}
-                </p>
-              ) : (
-                visibleWords.map(({ entry, source, sourceText }, index) => (
-                  <article key={`${entry.lemma}-${index}`} className="border-hair bg-panel rounded-xl border-2 px-3 py-2.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-ink font-semibold">{entry.word}</p>
-                        <p className="text-ink-2 mt-0.5 text-sm">{entry.translation}</p>
-                        {entry.lemma && entry.lemma.toLowerCase() !== entry.word.toLowerCase() && (
-                          <p className="text-ink-3 mt-1 font-mono text-[10px]">
-                            {entry.lemma} · {entry.lemmaTranslation || entry.translation}
-                          </p>
-                        )}
-                      </div>
-                      {entry.lemma && (
-                        <Pill
-                          size="sm"
-                          muted={!canSave || isSaved(entry.lemma)}
-                          disabled={!canSave || isSaved(entry.lemma)}
-                          onClick={() => onSaveWord(entry, source, sourceText)}
-                          className="min-h-11 min-w-11 flex-none"
-                        >
-                          {!canSave ? 'sign in' : isSaved(entry.lemma) ? '✓ saved' : '+ save'}
-                        </Pill>
-                      )}
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
         ) : (
           <section
             id="tools-view-translate"
@@ -563,13 +455,23 @@ export function ChatSidePanel({
                 <p className="text-ink-3 font-mono text-[10px] uppercase tracking-wide">
                   {translationDirection === 'de-en' ? 'English' : 'German'}
                 </p>
-                {translationResult ? (
+                {translationDirection === 'en-de' && translationResult && !translating ? (
+                  <TranslatableResult
+                    key={germanSide}
+                    text={germanSide}
+                    canSave={canSave}
+                    isSaved={isSaved}
+                    onSaveWord={onSaveWord}
+                    onRemaining={setTranslationRemaining}
+                    onAuthRequired={onAuthRequired}
+                  />
+                ) : translationResult ? (
                   <p className="text-ink mt-2 text-lg leading-relaxed break-words">{translationResult}</p>
                 ) : (
                   <p className="text-ink-3 mt-2 text-sm">{translating ? 'Translating…' : 'Your translation appears here.'}</p>
                 )}
               </div>
-              {translationResult && !translating && (
+              {translationDirection === 'de-en' && translationResult && !translating && (
                 <TranslationWords
                   key={`${translationDirection}:${germanSide}`}
                   germanText={germanSide}

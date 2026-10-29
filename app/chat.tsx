@@ -73,7 +73,7 @@ export default function Chat({
   // of messages" card's Translate button) can land on that tab instead of
   // the default "ask" view. Left alone otherwise, so the panel keeps
   // whichever tab the learner was already on.
-  const [toolsView, setToolsView] = useState<'ask' | 'words' | 'translate' | undefined>();
+  const [toolsView, setToolsView] = useState<'ask' | 'translate' | undefined>();
   // Which translation panels are open, keyed `${message.id}-reply` / `-corr`.
   const [openPanel, setOpenPanel] = useState<Record<string, boolean>>({});
   // Grammar explanations fetched this session (same keys), and which are
@@ -288,7 +288,7 @@ export default function Chat({
     if (signUp) router.push('/login?mode=signup');
   }
 
-  function openLearningPanel(view?: 'ask' | 'words' | 'translate') {
+  function openLearningPanel(view?: 'ask' | 'translate') {
     if (userEmail === null) {
       void promptToolsSignUp();
       return;

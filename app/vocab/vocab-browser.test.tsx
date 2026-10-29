@@ -39,18 +39,16 @@ test('discovering words only changes the Discover words loading label', () => {
   expect(reviewButton).toHaveTextContent('Review due words');
 });
 
-test('the action bar opens the add-word field', () => {
+test('the add-word field is visible with saved entries', () => {
   const entry: VocabEntry = {
     id: 'word-1', user_id: 'user-1', term: 'Haus', lemma: 'Haus', translation: 'house',
     example_sentence: null, source: 'new_word', created_at: '2026-01-01T00:00:00.000Z',
   };
   render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Add a word' }));
   expect(screen.getByRole('combobox', { name: 'Add a word' })).toBeInTheDocument();
 });
 
-test('an empty vocabulary can open the add-word field', () => {
+test('the add-word field is visible with an empty vocabulary', () => {
   render(<VocabBrowser entries={[]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Add a word' }));
   expect(screen.getByRole('combobox', { name: 'Add a word' })).toBeInTheDocument();
 });

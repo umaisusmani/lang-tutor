@@ -5,10 +5,9 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/app/components/button';
 import { addStarterWordAction, previewStarterWordAction, searchStarterWordsAction, type DiscoverCard } from '@/app/vocab/actions';
 
-export function AddWord({ savedLemmas, onAdded, onClose }: {
+export function AddWord({ savedLemmas, onAdded }: {
   savedLemmas: ReadonlySet<string>;
   onAdded: () => void;
-  onClose: () => void;
 }) {
   const inputId = useId();
   const listboxId = useId();
@@ -153,7 +152,6 @@ export function AddWord({ savedLemmas, onAdded, onClose }: {
     <section className="border-line bg-panel flex flex-col gap-3 rounded-2xl border-2 p-4">
       <div className="flex items-center justify-between gap-3">
         <label htmlFor={inputId} className="font-display text-xl">Add a word</label>
-        <button type="button" onClick={onClose} className="text-ink-2 min-h-11 font-mono text-xs underline">close</button>
       </div>
       <div className="relative">
         <input ref={inputRef} id={inputId} type="text" value={query}

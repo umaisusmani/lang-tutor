@@ -8,6 +8,7 @@ import type { VocabSource } from '@/lib/types/db';
 
 export function TranslationWords({
   germanText,
+  initialUnits,
   canSave,
   isSaved,
   onSaveWord,
@@ -15,13 +16,14 @@ export function TranslationWords({
   onAuthRequired,
 }: {
   germanText: string;
+  initialUnits?: WordGloss;
   canSave: boolean;
   isSaved: (lemma: string) => boolean;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
   onRemaining: (remaining: number) => void;
   onAuthRequired: () => void;
 }) {
-  const [units, setUnits] = useState<WordGloss | null>(null);
+  const [units, setUnits] = useState<WordGloss | null>(initialUnits ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const requestRef = useRef<AbortController | null>(null);
@@ -76,13 +78,14 @@ export function TranslationWords({
           breaking it down…
         </p>
       ) : (
-        <button
+        <Pill
           type="button"
           onClick={() => void breakDown()}
-          className="text-ink-3 hover:text-ink flex min-h-11 items-center cursor-pointer p-0 text-left font-mono text-[10px] whitespace-nowrap transition-colors duration-150"
+          hitArea
+          className="whitespace-nowrap"
         >
           save words ↓
-        </button>
+        </Pill>
       ))}
       {error && <p role="alert" className="text-ink text-sm">{error}</p>}
       {units !== null && (units.length === 0 ? (
@@ -99,10 +102,11 @@ export function TranslationWords({
                 </div>
                 <Pill
                   size="sm"
+                  hitArea
                   muted={!canSave || saved}
                   disabled={!canSave || saved}
                   onClick={() => onSaveWord(unit, 'new_word', germanText)}
-                  className="min-h-11 min-w-11 flex-none"
+                  className="flex-none"
                 >
                   {!canSave ? 'sign in' : saved ? '✓ saved' : '+ save'}
                 </Pill>

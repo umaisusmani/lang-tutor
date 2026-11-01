@@ -2,6 +2,7 @@
 
 import type { ChatStatus } from 'ai';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/app/components/button';
 import { GlossedText } from '@/app/components/glossed-text';
@@ -16,6 +17,7 @@ import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import type { PersonaProfile } from '@/lib/personas';
 import type { CefrLevel } from '@/lib/prompts';
 import { changedWordIndices } from '@/lib/text';
+import type { Correction } from '@/lib/tutor';
 import type { VocabSource } from '@/lib/types/db';
 
 const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
@@ -156,7 +158,7 @@ export function ChatThread({
         if (message.role === 'user') {
           return (
             <div key={message.id} className="flex justify-end">
-              <div className="border-line bg-accent text-on-accent max-w-[82%] rounded-[18px_18px_5px_18px] border-2 px-4 py-[11px] text-[17px] leading-[1.45] break-words whitespace-pre-wrap shadow-[3px_3px_0_var(--line)]">
+              <div className="border-line bg-accent text-on-accent max-w-[82%] animate-[fade-from-right_180ms_ease-out] rounded-[18px_18px_5px_18px] border-2 px-4 py-[11px] text-[17px] leading-[1.45] break-words whitespace-pre-wrap shadow-[3px_3px_0_var(--line)]">
                 {text}
               </div>
             </div>
@@ -196,7 +198,7 @@ export function ChatThread({
           !correctionPart.data.usedEnglish;
 
         return (
-          <div key={message.id} className="flex max-w-[92%] items-start gap-3">
+          <div key={message.id} className="flex max-w-[92%] animate-[fade-rise_180ms_ease-out] items-start gap-3">
             <PersonaAvatar persona={persona} size={32} className="mt-[3px]" />
 
             <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -270,63 +272,23 @@ export function ChatThread({
               )}
 
               {correction?.correction && (
-                <div className="border-line bg-panel relative animate-[fade-rise_240ms_ease-out] rounded-[14px] border-2 px-4 pt-[18px] pb-3.5 shadow-[3px_3px_0_var(--line)]">
-                  <span
-                    className={`border-line text-on-bright font-display absolute -top-[11px] left-3.5 rounded-md border-2 px-2 py-px text-[13px] tracking-[0.1em] uppercase ${
-                      correction.hasMistake ? 'bg-orange' : 'bg-yellow'
-                    }`}
-                  >
-                    {correction.hasMistake
-                      ? correction.mistakeType
-                        ? MISTAKE_TYPE_LABELS[correction.mistakeType]
-                        : 'grammar'
-                      : 'in German'}
-                  </span>
-
-                  <div className="flex items-start gap-3">
-                    <GlossedText
-                      className="flex-1 text-[18px] leading-[1.6]"
-                      text={correction.correction}
-                      words={correction.correctionGloss ?? undefined}
-                      highlight={changedWordIndices(priorUserText, correction.correction)}
-                      canSave={canSave}
-                      isSaved={isSaved}
-                      onSave={(entry) => onSaveWord(entry, 'mistake', correction.correction ?? '')}
-                    />
-                    <div className="flex flex-none items-start gap-1.5">
-                      <TranslateButton
-                        open={correctionOpen}
-                        onToggle={() => onTogglePanel(correctionKey)}
-                        className="mt-[3px]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <TranslationPanel
-                      open={correctionOpen}
-                      translation={correction.correctionTranslation ?? null}
-                      explanation={
-                        explanations[correctionKey] ??
-                        storedExplanations?.correction ??
-                        undefined
-                      }
-                      explaining={explaining[correctionKey] ?? false}
-                      onExplain={() =>
-                        onExplain(correctionKey, {
-                          kind: 'correction',
-                          messageId: dbIds?.user ?? null,
-                          text: correction.correction ?? '',
-                          original: priorUserText,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <p className="text-explain-ink mt-3 font-mono text-[12.5px] leading-[1.6]">
-                    {correction.explanation}
-                  </p>
-                </div>
+                <CorrectionCard
+                  correction={correction}
+                  priorUserText={priorUserText}
+                  translationOpen={correctionOpen}
+                  explanation={explanations[correctionKey] ?? storedExplanations?.correction ?? undefined}
+                  explaining={explaining[correctionKey] ?? false}
+                  canSave={canSave}
+                  isSaved={isSaved}
+                  onToggleTranslation={() => onTogglePanel(correctionKey)}
+                  onSaveWord={onSaveWord}
+                  onExplain={() => onExplain(correctionKey, {
+                    kind: 'correction',
+                    messageId: dbIds?.user ?? null,
+                    text: correction.correction ?? '',
+                    original: priorUserText,
+                  })}
+                />
               )}
             </div>
           </div>
@@ -348,6 +310,100 @@ export function ChatThread({
         </p>
       )}
     </main>
+  );
+}
+
+function CorrectionCard({
+  correction,
+  priorUserText,
+  translationOpen,
+  explanation,
+  explaining,
+  canSave,
+  isSaved,
+  onToggleTranslation,
+  onSaveWord,
+  onExplain,
+}: {
+  correction: Correction;
+  priorUserText: string;
+  translationOpen: boolean;
+  explanation: string | undefined;
+  explaining: boolean;
+  canSave: boolean;
+  isSaved: (lemma: string) => boolean;
+  onToggleTranslation: () => void;
+  onSaveWord: ChatThreadProps['onSaveWord'];
+  onExplain: () => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const corrected = correction.correction ?? '';
+  const changed = changedWordIndices(priorUserText, corrected);
+  const count = changed.size;
+  const summary = count === 0
+    ? '1 correction'
+    : `${count} ${count === 1 ? 'word' : 'words'} ${correction.hasMistake ? 'fixed' : 'in German'}`;
+
+  return (
+    <div className="border-line bg-panel relative animate-[fade-rise_240ms_ease-out] rounded-[14px] border-2 px-4 shadow-[3px_3px_0_var(--line)]">
+      <span
+        className={`border-line text-on-bright font-display absolute -top-[11px] left-3.5 rounded-md border-2 px-2 py-px text-[13px] tracking-[0.1em] uppercase ${
+          correction.hasMistake ? 'bg-orange' : 'bg-yellow'
+        }`}
+      >
+        {correction.hasMistake
+          ? correction.mistakeType
+            ? MISTAKE_TYPE_LABELS[correction.mistakeType]
+            : 'grammar'
+          : 'in German'}
+      </span>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={open ? 'Hide correction' : 'Show correction'}
+        onClick={() => setOpen((current) => !current)}
+        className="text-ink-3 hover:text-ink absolute top-0 right-0 z-10 flex min-h-11 min-w-11 cursor-pointer items-center justify-center text-base"
+      >
+        <span aria-hidden="true" className={`inline-block transition-transform duration-[160ms] ease-out ${open ? '' : '-rotate-90'}`}>▾</span>
+      </button>
+      {!open && <div className="text-ink-2 flex min-h-11 animate-[fade-rise_160ms_ease-out] items-center pr-10 font-mono text-[11px]">{summary}</div>}
+      <div className="gloss-panel" data-open={open} inert={!open}>
+        <div className="pt-[18px] pb-3.5">
+          <div className="flex items-start gap-3 pr-8">
+            <GlossedText
+              className="flex-1 text-[18px] leading-[1.6]"
+              text={corrected}
+              words={correction.correctionGloss ?? undefined}
+              highlight={changed}
+              canSave={canSave}
+              isSaved={isSaved}
+              onSave={(entry) => onSaveWord(entry, 'mistake', corrected)}
+            />
+            <div className="flex flex-none items-start gap-1.5">
+              <TranslateButton
+                open={translationOpen}
+                onToggle={onToggleTranslation}
+                className="mt-[3px]"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <TranslationPanel
+              open={translationOpen}
+              translation={correction.correctionTranslation ?? null}
+              explanation={explanation}
+              explaining={explaining}
+              onExplain={onExplain}
+            />
+          </div>
+
+          <p className="text-explain-ink mt-3 font-mono text-[12.5px] leading-[1.6]">
+            {correction.explanation}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 

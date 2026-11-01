@@ -62,6 +62,7 @@ export function VocabBrowser({
   const [starting, setStarting] = useState<'due' | 'practice' | 'discover' | null>(null);
   const [round, setRound] = useState(0);
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
+  const [summaryMode, setSummaryMode] = useState<'due' | 'practice'>('due');
   const [notice, setNotice] = useState('');
   const savedLemmas = useMemo(() => new Set(entries.map((entry) => entry.lemma.toLowerCase())), [entries]);
   const noticeRef = useRef<HTMLDivElement>(null);
@@ -74,14 +75,14 @@ export function VocabBrowser({
     startingRef.current = true;
     setStarting(mode);
     try {
-      const loaded = await startSessionAction(mode);
+      const loaded = await startSessionAction(mode, readSkipped());
       if (!loaded) throw new Error('Session unavailable');
       setSummary(null);
       if (loaded.cards.length === 0) {
         setCards(null);
         setNotice(mode === 'due'
           ? 'No words are ready for review right now. You’re all caught up for this round.'
-          : 'No extra words are available right now. Words reviewed today are saved for later.');
+          : 'No practice cards are available right now. Words reviewed today are saved for later.');
         router.refresh();
       } else {
         setNotice('');
@@ -113,11 +114,13 @@ export function VocabBrowser({
   }
 
   if (cards) {
-    return <FlashcardSession key={round} initialCards={cards.cards} extra={cards.extra}
+    return <FlashcardSession key={round} initialCards={cards.cards} discover={cards.discover} extra={cards.extra}
+      onSkip={rememberSkipped} onKeepPractising={() => void start('practice')} keepingGoing={starting === 'practice'}
       onReload={() => void start(cards.extra ? 'practice' : 'due')}
       onFinish={(result) => {
         setCards(null);
         setSummary(result);
+        setSummaryMode(cards.extra ? 'practice' : 'due');
         setNotice('');
         router.refresh();
       }} />;
@@ -139,8 +142,9 @@ export function VocabBrowser({
         <div ref={noticeRef} tabIndex={-1} role="status"
           className={`border-line rounded-2xl border-2 p-5 outline-none ${summary ? 'bg-panel text-ink' : 'bg-yellow text-on-bright'}`}>
           {summary ? <>
-            <h2 className="font-display text-2xl">Review <span className="text-accent">{summary.complete ? 'complete' : 'ended'}</span></h2>
+            <h2 className="font-display text-2xl">{summaryMode === 'practice' ? 'Practice' : 'Review'} <span className="text-accent">{summary.complete ? 'complete' : 'ended'}</span></h2>
             <p className="mt-1">{summary.reviewed} {summary.reviewed === 1 ? 'word' : 'words'} reviewed and saved.</p>
+            {summary.added > 0 && <p className="mt-1">{summary.added} new {summary.added === 1 ? 'word' : 'words'} added.</p>}
             {summary.scheduledLater > 0 && <p className="mt-1 text-sm">
               {summary.scheduledLater} {summary.scheduledLater === 1 ? 'word is' : 'words are'} scheduled for another review.
               {summary.nextReviewAt && ` The next is ready at ${new Date(summary.nextReviewAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`}
@@ -164,10 +168,9 @@ export function VocabBrowser({
               <p className="text-ink-2 mt-1 max-w-[48ch] text-sm">One direction per word in each round. The other direction waits until another day.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" type="button" disabled={starting !== null || dueCount === 0} onClick={() => void start('due')}>
-                {starting === 'due' ? 'Loading…' : 'Review due words'}
+              <Button variant="primary" type="button" disabled={starting !== null} onClick={() => void start(dueCount > 0 ? 'due' : 'practice')}>
+                {starting === 'due' || starting === 'practice' ? 'Loading…' : dueCount > 0 ? `Review ${dueCount} due ${dueCount === 1 ? 'word' : 'words'}` : 'Practice'}
               </Button>
-              <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void start('practice')}>{starting === 'practice' ? 'Loading…' : 'Extra practice'}</Button>
               <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void discover()}>{starting === 'discover' ? 'Loading…' : 'Discover words'}</Button>
             </div>
           </div>

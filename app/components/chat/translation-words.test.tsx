@@ -67,6 +67,17 @@ test('saves a unit with its German source text', async () => {
   expect(props.onSaveWord).toHaveBeenCalledWith(unit, 'new_word', 'Ich mag Obst, zum Beispiel Äpfel.');
 });
 
+test('initial dictionary units show a save chip without another request', async () => {
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+  const props = setup({ germanText: 'zum Beispiel', initialUnits: [unit] });
+  expect(screen.getByRole('list', { name: 'Words to save' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'save words ↓' })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: '+ save' }));
+  expect(props.onSaveWord).toHaveBeenCalledWith(unit, 'new_word', 'zum Beispiel');
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
 test('shows saved units as disabled', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ units: [unit] })));
   setup({ isSaved: (lemma) => lemma === 'zum Beispiel' });

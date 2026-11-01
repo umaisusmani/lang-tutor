@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import { Pill } from '@/app/components/pill';
+import { WordPopover } from '@/app/components/word-popover';
 import type { WordGloss } from '@/lib/gloss';
 import { stripPunctuation } from '@/lib/text';
 
@@ -28,20 +29,26 @@ function WordMenu({
   canSave,
   saved,
   onSave,
+  anchorRef,
+  popoverRef,
 }: {
   entry: GlossEntry;
   canSave: boolean;
   saved: boolean;
   onSave: () => void;
+  anchorRef: RefObject<HTMLElement | null>;
+  popoverRef: RefObject<HTMLDivElement | null>;
 }) {
   const word = stripPunctuation(entry.word);
   const showLemma = !!entry.lemma && entry.lemma.toLowerCase() !== word.toLowerCase();
 
   return (
-    <span
+    <WordPopover
+      anchorRef={anchorRef}
+      popoverRef={popoverRef}
       role="dialog"
       aria-label={`${word}: ${entry.translation}`}
-      className="border-line bg-panel text-ink absolute top-[calc(100%+7px)] left-1/2 z-20 flex w-max max-w-[240px] -translate-x-1/2 animate-[fade-rise_140ms_ease-out] flex-col gap-1.5 rounded-xl border-2 px-3 py-2.5 text-left text-sm leading-snug shadow-[3px_3px_0_var(--line)]"
+      className="border-line bg-panel text-ink z-[100] flex w-max max-w-[min(240px,calc(100vw-16px))] animate-[fade-rise_140ms_ease-out] flex-col gap-1.5 rounded-xl border-2 px-3 py-2.5 text-left text-sm leading-snug shadow-[3px_3px_0_var(--line)]"
     >
       <span className="flex items-baseline gap-2">
         <span className="font-semibold">{word}</span>
@@ -61,6 +68,7 @@ function WordMenu({
         (canSave ? (
           <Pill
             size="sm"
+            hitArea
             muted={saved}
             onClick={onSave}
             disabled={saved}
@@ -73,7 +81,7 @@ function WordMenu({
             sign in to save words
           </Link>
         ))}
-    </span>
+    </WordPopover>
   );
 }
 
@@ -108,12 +116,16 @@ export function GlossedText({
   onSave: (entry: GlossEntry) => void;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuAnchorRef = useRef<HTMLElement>(null);
+  const previewAnchorRef = useRef<HTMLElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (openIndex === null) return;
     function onPointerDown(e: PointerEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpenIndex(null);
+      if (!rootRef.current?.contains(e.target as Node) && !popoverRef.current?.contains(e.target as Node)) setOpenIndex(null);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpenIndex(null);
@@ -146,30 +158,41 @@ export function GlossedText({
 
         const open = openIndex === i;
         return (
-          <span key={i} className="relative">
+          <span
+            key={i}
+            className="relative"
+            onPointerEnter={(event) => { previewAnchorRef.current = event.currentTarget; setPreviewIndex(i); }}
+            onPointerLeave={() => setPreviewIndex((current) => current === i ? null : current)}
+            onFocus={(event) => { previewAnchorRef.current = event.currentTarget; setPreviewIndex(i); }}
+            onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPreviewIndex(null); }}
+          >
             <button
               type="button"
               aria-expanded={open}
-              onClick={() => setOpenIndex(open ? null : i)}
+              onClick={(event) => { menuAnchorRef.current = event.currentTarget; setOpenIndex(open ? null : i); }}
               className={`group cursor-pointer border-b-2 border-dashed text-left ${
                 open ? 'border-accent-ink' : 'border-transparent hover:border-accent-ink'
               }`}
             >
               {body}
-              {/* Hover preview. Hidden while the menu is open, which says the
-                  same thing and more. */}
-              {!open && (
-                <span className="bg-ink text-paper pointer-events-none absolute bottom-[calc(100%+7px)] left-1/2 z-10 -translate-x-1/2 rounded-[7px] px-[9px] py-[3px] font-mono text-xs font-normal whitespace-nowrap opacity-0 transition-opacity duration-100 group-hover:opacity-100">
-                  {entry.translation}
-                </span>
-              )}
             </button>
+            {!open && previewIndex === i && (
+              <WordPopover
+                anchorRef={previewAnchorRef}
+                preferAbove
+                className="bg-ink text-paper pointer-events-none z-[100] rounded-[7px] px-[9px] py-[3px] font-mono text-xs font-normal whitespace-nowrap"
+              >
+                {entry.translation}
+              </WordPopover>
+            )}
             {open && (
               <WordMenu
                 entry={entry}
                 canSave={canSave}
                 saved={!!entry.lemma && isSaved(entry.lemma)}
                 onSave={() => onSave(entry)}
+                anchorRef={menuAnchorRef}
+                popoverRef={popoverRef}
               />
             )}
           </span>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
 import { Button } from '@/app/components/button';
+import { Pill, pillClassName } from '@/app/components/pill';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
 import type { PersonaProfile } from '@/lib/personas';
 import type { QuotaStatus } from '@/lib/quota';
@@ -66,7 +67,7 @@ export function QuotaBanner({
         <p className="font-semibold">You’ve reached your daily limit</p>
         <p className="text-sm">Messages reset on {resetLabel}.</p>
         {!signedIn && (
-          <Link href="/login" className="self-start text-sm font-bold underline">
+          <Link href="/login" className={pillClassName({ className: 'self-start min-h-11' })}>
             Sign in for 35 messages a day →
           </Link>
         )}
@@ -85,9 +86,9 @@ export function QuotaBanner({
           {unavailable ? 'Please check again in a moment.' : `Messages reset on ${resetLabel}.`}
         </p>
         {unavailable && (
-          <button type="button" onClick={onRetry} className="self-start text-sm font-bold underline">
+          <Pill type="button" onClick={onRetry} hitArea className="self-start">
             Check again
-          </button>
+          </Pill>
         )}
       </div>
     );

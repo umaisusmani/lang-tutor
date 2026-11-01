@@ -38,10 +38,17 @@ test('uses dictionary for German to English and English to German words', async 
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     urls.push(String(url));
     assert.equal((init?.headers as Record<string, string>)['Ocp-Apim-Subscription-Region'], 'eastus');
-    return Response.json([{ translations: [{ displayTarget: String(url).includes('from=en') ? 'Haus' : 'house' }] }]);
+    return Response.json([{
+      displaySource: String(url).includes('from=en') ? 'house' : 'Haus',
+      translations: [{ displayTarget: String(url).includes('from=en') ? 'Haus' : 'house', posTag: 'NOUN' }],
+    }]);
   }) as typeof fetch;
-  assert.equal(await translateWithAzure('Haus', 'de-en', fetcher), 'house');
-  assert.equal(await translateWithAzure('house', 'en-de', fetcher), 'Haus');
+  assert.deepEqual(await translateWithAzure('Haus', 'de-en', fetcher), {
+    translation: 'house', dictionary: { source: 'Haus', target: 'house', posTag: 'NOUN' },
+  });
+  assert.deepEqual(await translateWithAzure('house', 'en-de', fetcher), {
+    translation: 'Haus', dictionary: { source: 'house', target: 'Haus', posTag: 'NOUN' },
+  });
   assert.match(urls[0], /dictionary\/lookup\?api-version=3\.0&from=de&to=en$/);
   assert.match(urls[1], /dictionary\/lookup\?api-version=3\.0&from=en&to=de$/);
 });
@@ -54,7 +61,7 @@ test('sends a sentence straight to text translation', async () => {
     assert.deepEqual(JSON.parse(String(init?.body)), [{ Text: 'Guten Morgen' }]);
     return Response.json([{ translations: [{ text: 'Good morning' }] }]);
   }) as typeof fetch;
-  assert.equal(await translateWithAzure('Guten Morgen', 'de-en', fetcher), 'Good morning');
+  assert.deepEqual(await translateWithAzure('Guten Morgen', 'de-en', fetcher), { translation: 'Good morning' });
   assert.equal(calls, 1);
 });
 
@@ -66,7 +73,7 @@ test('falls back once when dictionary has no result', async () => {
       ? [{ translations: [] }]
       : [{ translations: [{ text: 'went' }] }]);
   }) as typeof fetch;
-  assert.equal(await translateWithAzure('ging', 'de-en', fetcher), 'went');
+  assert.deepEqual(await translateWithAzure('ging', 'de-en', fetcher), { translation: 'went' });
   assert.equal(paths.length, 2);
   assert.match(paths[0], /dictionary\/lookup/);
   assert.match(paths[1], /\/translate\?/);

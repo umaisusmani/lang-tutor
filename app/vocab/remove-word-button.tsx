@@ -4,6 +4,7 @@ import { useTransition } from 'react';
 
 import { useConfirm } from '@/app/components/confirm-modal';
 import { notifyError } from '@/app/components/toaster';
+import { Pill } from '@/app/components/pill';
 import { deleteVocabAction } from '@/app/vocab/actions';
 
 /**
@@ -45,14 +46,15 @@ export function RemoveWordButton({ entryId, lemma }: { entryId: string; lemma: s
   }
 
   return (
-    <button
+    <Pill
       type="button"
       onClick={handleClick}
       disabled={pending}
+      muted={pending}
+      hitArea
       aria-label={`Remove ${lemma}`}
-      className="text-ink-3 hover:text-ink cursor-pointer font-mono text-[11px] underline underline-offset-[3px] disabled:cursor-default disabled:opacity-50"
     >
       {pending ? 'removing…' : 'remove'}
-    </button>
+    </Pill>
   );
 }

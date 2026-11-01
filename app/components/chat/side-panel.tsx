@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/app/components/button';
+import { Pill } from '@/app/components/pill';
 import { QuotaBanner } from '@/app/components/quota-banner';
 import { TranslationWords } from '@/app/components/chat/translation-words';
 import { TranslatableResult } from '@/app/components/chat/translatable-result';
@@ -75,10 +76,12 @@ export function ChatSidePanel({
   const [translationDirection, setTranslationDirection] = useState<TranslationDirection>('en-de');
   const [translationDraft, setTranslationDraft] = useState('');
   const [translationResult, setTranslationResult] = useState('');
+  const [translationEntry, setTranslationEntry] = useState<WordGloss[number] | null>(null);
   const [translationError, setTranslationError] = useState('');
   const [translationRemaining, setTranslationRemaining] = useState<number | null>(null);
   const [translating, setTranslating] = useState(false);
   const translationRequestRef = useRef<AbortController | null>(null);
+  const translationTextareaRef = useRef<HTMLTextAreaElement>(null);
   const germanSide = translationDirection === 'de-en' ? translationDraft.trim() : translationResult;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const blocked = quota.reason !== null || remaining === 0;
@@ -127,7 +130,17 @@ export function ChatSidePanel({
     cancelTranslation();
     setTranslationDirection((current) => current === 'de-en' ? 'en-de' : 'de-en');
     setTranslationResult('');
+    setTranslationEntry(null);
     setTranslationError('');
+  }
+
+  function clearTranslation() {
+    cancelTranslation();
+    setTranslationDraft('');
+    setTranslationResult('');
+    setTranslationEntry(null);
+    setTranslationError('');
+    translationTextareaRef.current?.focus();
   }
 
   async function translate() {
@@ -137,6 +150,7 @@ export function ChatSidePanel({
     translationRequestRef.current = controller;
     setTranslating(true);
     setTranslationResult('');
+    setTranslationEntry(null);
     setTranslationError('');
 
     try {
@@ -158,6 +172,7 @@ export function ChatSidePanel({
         return;
       }
       setTranslationResult(payload.translation);
+      setTranslationEntry(payload.entry ?? null);
     } catch {
       if (translationRequestRef.current === controller) {
         setTranslationError('Could not connect. Please try again.');
@@ -420,11 +435,13 @@ export function ChatSidePanel({
                 className="flex flex-col gap-3"
               >
                 <textarea
+                  ref={translationTextareaRef}
                   value={translationDraft}
                   onChange={(event) => {
                     cancelTranslation();
                     setTranslationDraft(event.target.value);
                     setTranslationResult('');
+                    setTranslationEntry(null);
                     setTranslationError('');
                   }}
                   onKeyDown={(event) => {
@@ -440,7 +457,17 @@ export function ChatSidePanel({
                   className="border-hair bg-panel text-ink placeholder:text-ink-3 focus:border-line w-full resize-none rounded-xl border-2 px-3 py-2.5 text-sm outline-none"
                 />
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-ink-3 font-mono text-[10px]">{translationDraft.length}/200</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-ink-3 font-mono text-[10px]">{translationDraft.length}/200</span>
+                    <Pill
+                      hitArea
+                      muted={!translationDraft && !translationResult && !translationError && !translating}
+                      disabled={!translationDraft && !translationResult && !translationError && !translating}
+                      onClick={clearTranslation}
+                    >
+                      clear
+                    </Pill>
+                  </div>
                   <Button
                     variant="dark"
                     type="submit"
@@ -459,6 +486,7 @@ export function ChatSidePanel({
                   <TranslatableResult
                     key={germanSide}
                     text={germanSide}
+                    initialUnits={translationEntry ? [translationEntry] : undefined}
                     canSave={canSave}
                     isSaved={isSaved}
                     onSaveWord={onSaveWord}
@@ -475,6 +503,7 @@ export function ChatSidePanel({
                 <TranslationWords
                   key={`${translationDirection}:${germanSide}`}
                   germanText={germanSide}
+                  initialUnits={translationEntry ? [translationEntry] : undefined}
                   canSave={canSave}
                   isSaved={isSaved}
                   onSaveWord={onSaveWord}

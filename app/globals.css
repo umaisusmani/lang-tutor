@@ -119,8 +119,8 @@
 }
 
 /*
- * Entrance for attachments that arrive ONCE, after the reply has finished
- * streaming -- the correction panel and the pending-label row.
+ * Entrance for content that mounts once, including reply attachments, cards,
+ * and dropdowns.
  *
  * Deliberately not applied to reply text: the handoff calls that out, and it's
  * right. Streaming text mounts token by token, so a per-mount entrance
@@ -135,6 +135,11 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes fade-from-right {
+  from { opacity: 0; transform: translateX(6px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes learning-tools-enter {
@@ -198,6 +203,7 @@
 
 /* Keep the chat history scrollable without drawing a scrollbar beside it. */
 .chat-scroll-area {
+  overflow-anchor: none;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }

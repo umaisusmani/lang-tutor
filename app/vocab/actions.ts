@@ -7,7 +7,7 @@ import { getPracticeQueue, getReviewQueue, recordReview, type RecordReviewResult
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
 import { deleteVocabEntry, listVocab, saveVocabEntry } from '@/lib/services/vocab.service';
 import { findStarterWord, pickStarterWords, searchStarterWords } from '@/lib/starter-vocab';
-import { translateStarterWord } from '@/lib/starter-vocab/translate';
+import { translateStarterWord, translateStarterWords } from '@/lib/starter-vocab/translate';
 import type { Grade } from '@/lib/srs';
 import type { CardDirection, CardSchedule, ReviewSurface, VocabSource } from '@/lib/types/db';
 
@@ -76,12 +76,23 @@ export async function searchStarterWordsAction(query: string): Promise<DiscoverC
 
 export type SessionPayload = {
   cards: SessionCard[];
+  discover: DiscoverCard[];
   /** True when these are extra cards that aren't due yet. */
   extra: boolean;
 };
 
 /** New words offered per session. */
-const DISCOVER_PER_SESSION = 3;
+const DISCOVER_PER_SESSION = 10;
+
+async function pickUnseenWords(userId: string, skippedLemmas: string[], count: number): Promise<DiscoverCard[]> {
+  if (!count) return [];
+  const level = await resolveCefrLevel(userId, (await cookies()).get('cefr_level')?.value);
+  const saved = new Set((await listVocab(userId)).map((e) => e.lemma.toLowerCase()));
+  for (const lemma of skippedLemmas.slice(0, 1000)) {
+    if (typeof lemma === 'string') saved.add(lemma.toLowerCase());
+  }
+  return pickStarterWords(level, saved, count);
+}
 
 /**
  * Loads the queue for a "Start session" click ('due'), or a round of extra
@@ -90,6 +101,7 @@ const DISCOVER_PER_SESSION = 3;
  */
 export async function startSessionAction(
   mode: 'due' | 'practice' = 'due',
+  skippedLemmas: string[] = [],
 ): Promise<SessionPayload | null> {
   const userId = await getCurrentUserId();
   if (!userId) return null;
@@ -131,17 +143,27 @@ export async function startSessionAction(
     });
   }
 
-  return { cards, extra };
+  const discoverCount = cards.length < 2 ? 0 : Math.min(10, Math.max(1, Math.round(cards.length / 3)));
+  const discover = await pickUnseenWords(userId, Array.isArray(skippedLemmas) ? skippedLemmas : [], discoverCount);
+  return { cards, discover, extra };
 }
 
 /** Discovery is optional and separate from a completed review. */
 export async function discoverWordsAction(skippedLemmas: string[] = []): Promise<DiscoverCard[]> {
   const userId = await getCurrentUserId();
   if (!userId) throw new Error('Sign in to discover words.');
-  const level = await resolveCefrLevel(userId, (await cookies()).get('cefr_level')?.value);
-  const saved = new Set((await listVocab(userId)).map((e) => e.lemma.toLowerCase()));
-  for (const lemma of skippedLemmas.slice(0, 1000)) saved.add(String(lemma).toLowerCase());
-  return pickStarterWords(level, saved, DISCOVER_PER_SESSION);
+  return pickUnseenWords(userId, Array.isArray(skippedLemmas) ? skippedLemmas : [], DISCOVER_PER_SESSION);
+}
+
+export async function previewStarterWordsAction(lemmas: string[]): Promise<Record<string, string>> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Sign in to discover words.');
+  if (!Array.isArray(lemmas) || lemmas.length > 10 || lemmas.some((lemma) => typeof lemma !== 'string')) {
+    throw new Error('Invalid starter words.');
+  }
+  const words = lemmas.map((lemma) => findStarterWord(lemma));
+  if (words.some((word) => !word)) throw new Error('Unknown starter word.');
+  return translateStarterWords(words as NonNullable<(typeof words)[number]>[], { userId });
 }
 
 export async function previewStarterWordAction(lemma: string): Promise<{ translation: string } | null> {

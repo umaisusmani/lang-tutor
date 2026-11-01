@@ -2,38 +2,38 @@
   Supabase → Authentication → Emails → "Confirm signup".
 
   Paste this whole file into the template body. Subject line:
-    Dein Zauberwort ✦ Starvogel
+    Your Starvogel confirmation code
 
   Code only, no link, on purpose: a link can be opened (and spent) by an email
   scanner before the person sees it, and the code works from any device. The
   login screen's "enter the code" step is app/login/page.tsx -> ConfirmCodeScreen.
 
   The code is dressed as one of the app's own flashcards (word on the front,
-  meaning underneath), and Ramanath is the persona, so the tone matches the chat.
+  meaning underneath).
 
-  Colours are the tokens in app/globals.css converted to sRGB hex (email
-  clients don't do oklch or CSS variables). Fonts fall back to system ones
-  because most clients won't load Archivo / DM Mono.
+  Colours are the tokens in app/globals.css as hex (email clients don't do CSS
+  variables). Fonts fall back to system ones because most clients won't load
+  Londrina Solid / Bricolage Grotesque / DM Mono.
 -->
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <meta name="supported-color-schemes" content="light dark" />
-    <title>Dein Zauberwort — Starvogel</title>
+    <title>Your confirmation code — Starvogel</title>
     <style>
       /* Dark mode: Apple Mail and a few others honour this. Gmail ignores it
-         and does its own inversion, which the dark-safe colours below survive. */
+         and does its own inversion, which the colours below survive. */
       @media (prefers-color-scheme: dark) {
-        .bg-paper { background-color: #191926 !important; }
-        .bg-panel { background-color: #252534 !important; }
-        .bg-soft { background-color: #2f2f42 !important; }
-        .bd-line { border-color: #565669 !important; }
-        .bd-hair { border-color: #3a3a4d !important; }
-        .tx-ink { color: #f4f2ea !important; }
-        .tx-ink2 { color: #a9a9b7 !important; }
+        .bg-paper { background-color: #141414 !important; }
+        .bg-panel { background-color: #1e1e1e !important; }
+        .bg-soft { background-color: #252525 !important; }
+        .bd-line { border-color: #303030 !important; }
+        .bd-hair { border-color: #242424 !important; }
+        .tx-ink { color: #e8e8e8 !important; }
+        .tx-ink2 { color: #888888 !important; }
         /* Yellow and the text on it stay put, same rule as the app. */
       }
       @media only screen and (max-width: 480px) {
@@ -44,11 +44,11 @@
   </head>
   <body
     class="bg-paper"
-    style="margin:0;padding:0;background-color:#f7f5ea;-webkit-text-size-adjust:100%;"
+    style="margin:0;padding:0;background-color:#f7efe4;-webkit-text-size-adjust:100%;"
   >
     <!-- Preheader: the inbox preview line. -->
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
-      Ramanath already has the Kaffee on. Your code is {{ .Token }}.
+      Your Starvogel confirmation code is {{ .Token }}.
     </div>
 
     <table
@@ -58,7 +58,7 @@
       cellspacing="0"
       border="0"
       class="bg-paper"
-      style="background-color:#f7f5ea;"
+      style="background-color:#f7efe4;"
     >
       <tr>
         <td align="center" style="padding:32px 16px;">
@@ -76,18 +76,17 @@
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td
-                      class="bd-line"
                       width="34"
                       height="34"
                       align="center"
                       valign="middle"
-                      style="width:34px;height:34px;background-color:#f2dd5a;border:2px solid #1c1e2d;border-radius:10px;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:16px;font-weight:800;line-height:34px;color:#1c1e2d;"
+                      style="width:34px;height:34px;background-color:#f5c842;border:2px solid #2c1a0e;border-radius:10px;font-family:'Londrina Solid','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:20px;font-weight:900;line-height:34px;letter-spacing:0.04em;color:#2c1a0e;"
                     >
-                      s
+                      S
                     </td>
                     <td
                       class="tx-ink"
-                      style="padding-left:10px;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:28px;font-weight:800;letter-spacing:-0.03em;line-height:34px;color:#1c1e2d;"
+                      style="padding-left:10px;font-family:'Londrina Solid','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:900;letter-spacing:0.04em;line-height:34px;color:#2c1a0e;"
                     >
                       Starvogel
                     </td>
@@ -100,26 +99,25 @@
             <tr>
               <td
                 class="card bg-panel bd-line"
-                style="background-color:#ffffff;border:2px solid #1c1e2d;border-radius:18px;padding:32px 28px;box-shadow:4px 4px 0 #1c1e2d;"
+                style="background-color:#fdf8f2;border:2px solid #2c1a0e;border-radius:18px;padding:32px 28px;box-shadow:4px 4px 0 #2c1a0e;"
               >
                 <p
                   class="tx-ink2"
-                  style="margin:0 0 10px 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;line-height:1.4;color:#65677a;"
+                  style="margin:0 0 10px 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;line-height:1.4;color:#7a6a58;"
                 >
-                  &#10022; post für dich &#10022;
+                  Confirm your email
                 </p>
                 <h1
                   class="tx-ink"
-                  style="margin:0 0 12px 0;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:32px;font-weight:800;letter-spacing:-0.025em;line-height:1.08;color:#1c1e2d;"
+                  style="margin:0 0 12px 0;font-family:'Londrina Solid','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:34px;font-weight:900;letter-spacing:0.02em;line-height:1.05;color:#2c1a0e;"
                 >
-                  Hallo, Neuling!
+                  Welcome to Starvogel
                 </h1>
                 <p
                   class="tx-ink2"
-                  style="margin:0 0 26px 0;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#65677a;"
+                  style="margin:0 0 26px 0;font-family:'Bricolage Grotesque','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#7a6a58;"
                 >
-                  Ramanath has put the Kaffee on and saved you the good chair. One
-                  secret word and you&rsquo;re in. Whisper it to the sign-up screen:
+                  Enter this code on the sign-up screen to confirm your email address.
                 </p>
 
                 <!-- The code, dressed as one of the app's own flashcards. -->
@@ -134,23 +132,23 @@
                   <tr>
                     <td
                       align="center"
-                      style="background-color:#f2dd5a;border:2px solid #1c1e2d;border-radius:14px;padding:20px 12px 18px 12px;box-shadow:4px 4px 0 #1c1e2d;"
+                      style="background-color:#f5c842;border:2px solid #2c1a0e;border-radius:14px;padding:20px 12px 18px 12px;box-shadow:4px 4px 0 #2c1a0e;"
                     >
                       <div
-                        style="margin:0 0 10px 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;line-height:1.4;color:#1c1e2d;"
+                        style="margin:0 0 10px 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;line-height:1.4;color:#2c1a0e;"
                       >
-                        das Zauberwort &middot; n.
+                        dein Code &middot; n.
                       </div>
                       <span
                         class="code"
-                        style="font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:36px;font-weight:500;letter-spacing:0.25em;line-height:1;color:#1c1e2d;"
+                        style="font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:36px;font-weight:500;letter-spacing:0.25em;line-height:1;color:#2c1a0e;"
                       >
                         {{ .Token }}
                       </span>
                       <div
-                        style="margin:14px 0 0 0;font-family:'Archivo','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-style:italic;line-height:1.4;color:#1c1e2d;"
+                        style="margin:14px 0 0 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:11px;line-height:1.4;color:#2c1a0e;"
                       >
-                        <em>(English: &ldquo;open sesame&rdquo;)</em>
+                        (English: your code)
                       </div>
                     </td>
                   </tr>
@@ -158,10 +156,10 @@
 
                 <p
                   class="tx-ink2"
-                  style="margin:26px 0 0 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:11px;line-height:1.7;color:#65677a;"
+                  style="margin:26px 0 0 0;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:11px;line-height:1.7;color:#7a6a58;"
                 >
-                  Good for about an hour, then it turns back into a pumpkin. If the
-                  screen got closed, sign in again and we&rsquo;ll send a fresh one.
+                  The code expires in 1 hour. If you closed the sign-up screen, sign
+                  in again and we&rsquo;ll send a new code.
                 </p>
               </td>
             </tr>
@@ -170,10 +168,10 @@
             <tr>
               <td
                 class="tx-ink2"
-                style="padding:20px 4px 0 4px;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:11px;line-height:1.7;color:#717383;"
+                style="padding:20px 4px 0 4px;font-family:'DM Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:11px;line-height:1.7;color:#7a6a58;"
               >
-                Didn&rsquo;t knock? Then a bird mistyped an address. Ignore this
-                email and nothing happens without the word.
+                Didn&rsquo;t sign up for Starvogel? You can ignore this email &mdash;
+                nothing happens without the code.
               </td>
             </tr>
           </table>

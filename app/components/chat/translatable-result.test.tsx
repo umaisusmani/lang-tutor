@@ -44,6 +44,7 @@ test('starts with clickable tokens and no lookup', () => {
   vi.stubGlobal('fetch', fetchMock);
   setup();
   expect(screen.getByRole('button', { name: 'Haus' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Haus' })).toHaveClass('border-accent-ink/40');
   expect(screen.getByRole('button', { name: 'Garten' })).toBeInTheDocument();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(fetchMock).not.toHaveBeenCalled();
@@ -55,7 +56,7 @@ test('looks up the full sentence on click, then opens the clicked word', async (
   vi.stubGlobal('fetch', fetchMock);
   const props = setup();
   await userEvent.click(screen.getByRole('button', { name: 'Haus' }));
-  expect(screen.getByText('looking up…')).toBeInTheDocument();
+  expect(within(screen.getByRole('dialog', { name: 'Looking up Haus' })).getByText('looking up…')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledWith('/api/translate/words', expect.objectContaining({
     method: 'POST',
     body: JSON.stringify({ text: 'Haus Garten' }),
@@ -106,6 +107,18 @@ test('saving sends the grouped unit and full source text', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Beispiel' }));
   await userEvent.click(await screen.findByRole('button', { name: '+ save' }));
   expect(props.onSaveWord).toHaveBeenCalledWith(phrase, 'new_word', 'zum Beispiel');
+  expect(screen.getByRole('dialog', { name: 'zum Beispiel: for example' })).toBeInTheDocument();
+});
+
+test('initial dictionary units can be saved immediately without another request', async () => {
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+  const props = setup({ text: 'Haus', initialUnits: [house] });
+  await userEvent.click(screen.getByRole('button', { name: 'Haus' }));
+  await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '+ save' }));
+  expect(props.onSaveWord).toHaveBeenCalledWith(house, 'new_word', 'Haus');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(fetchMock).not.toHaveBeenCalled();
 });
 
 test('saved words have a disabled save button', async () => {
@@ -129,8 +142,9 @@ test('an error leaves tokens clickable for a retry', async () => {
   vi.stubGlobal('fetch', fetchMock);
   setup();
   await userEvent.click(screen.getByRole('button', { name: 'Haus' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Try again later.');
-  await userEvent.click(screen.getByRole('button', { name: 'Haus' }));
+  const popup = await screen.findByRole('dialog', { name: 'Looking up Haus' });
+  expect(within(popup).getByRole('alert')).toHaveTextContent('Try again later.');
+  await userEvent.click(within(popup).getByRole('button', { name: 'try again' }));
   expect(await screen.findByRole('dialog', { name: 'Haus: house' })).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });

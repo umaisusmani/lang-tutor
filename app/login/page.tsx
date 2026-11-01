@@ -93,7 +93,7 @@ function LoginForm() {
               {mode === 'signin' ? (
                 <>Welcome <span className="text-accent">back</span>.</>
               ) : (
-                <>Let&apos;s <span className="text-accent">go</span>.</>
+                <>Los <span className="text-accent">geht&apos;s</span>.</>
               )}
             </h1>
             <p className="text-ink-2 font-mono text-[12.5px] leading-relaxed">
@@ -352,7 +352,7 @@ function ConfirmCodeScreen({
               />
             </div>
             <p className="text-ink-3 text-center font-mono text-[10px]">
-              Paste works. It sends by itself once the last digit is in.
+              Enter or paste your 8-digit code.
             </p>
 
             {shownError && <Callout tone="error" label="That didn’t work">{shownError}</Callout>}

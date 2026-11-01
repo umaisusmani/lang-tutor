@@ -135,3 +135,37 @@ test('a slow earlier search cannot replace later results', async () => {
   await act(async () => { resolveFirst([bahnhof]); });
   expect(within(list).queryByRole('option', { name: 'der Bahnhof' })).not.toBeInTheDocument();
 });
+
+test('search shows a loader from typing through the pending request', async () => {
+  let resolveSearch!: (words: typeof bahnhof[]) => void;
+  search.mockReturnValue(new Promise((resolve) => { resolveSearch = resolve; }));
+  const { user, input } = setup();
+  await user.type(input, 'bahn');
+  expect(input).toHaveAttribute('aria-busy', 'true');
+  expect(screen.getByRole('status', { name: 'Searching suggestions' })).toBeInTheDocument();
+  await waitFor(() => expect(search).toHaveBeenCalled());
+  await act(async () => { resolveSearch([bahnhof]); });
+  expect(input).toHaveAttribute('aria-busy', 'false');
+  expect(screen.queryByRole('status', { name: 'Searching suggestions' })).not.toBeInTheDocument();
+});
+
+test('Add stays beside the search and enables after the selected meaning loads; Enter adds', async () => {
+  let resolvePreview!: (value: { translation: string }) => void;
+  preview.mockReturnValue(new Promise((resolve) => { resolvePreview = resolve; }));
+  const { user, input } = setup();
+  const addButton = screen.getByRole('button', { name: 'Add' });
+  expect(addButton).toBeDisabled();
+  await typeAndWait(user, input);
+  expect(addButton).toBeDisabled();
+  await user.keyboard('{ArrowDown}{Enter}');
+  expect(addButton).toBeDisabled();
+  expect(screen.getByPlaceholderText('Looking up the meaning…')).toBeInTheDocument();
+  await act(async () => { resolvePreview({ translation: 'station' }); });
+  expect(addButton).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Clear selected word' })).toBeInTheDocument();
+  const meaning = screen.getByRole('textbox', { name: 'Meaning' });
+  await user.click(meaning);
+  await user.keyboard('{Enter}');
+  await waitFor(() => expect(add).toHaveBeenCalledWith('der Bahnhof', 'station'));
+  expect(addButton).toBeDisabled();
+});

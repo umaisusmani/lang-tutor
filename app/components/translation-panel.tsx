@@ -1,5 +1,7 @@
 'use client';
 
+import { Pill } from '@/app/components/pill';
+
 /**
  * The button that opens a TranslationPanel. Labeled "explain" rather than
  * "translate" -- the translation is the first thing it reveals, not the only
@@ -23,24 +25,18 @@ export function TranslateButton({
   className?: string;
 }) {
   return (
-    <button
+    <Pill
       type="button"
       onClick={onToggle}
       disabled={pending}
+      muted={pending}
+      hitArea
       aria-expanded={pending ? undefined : open}
       title={pending ? 'Explaining…' : undefined}
-      className={`group flex min-h-11 min-w-11 flex-none items-center justify-center ${
-        pending ? 'cursor-default' : 'cursor-pointer'
-      } ${className ?? ''}`}
+      className={`flex-none ${pending ? 'animate-pulse' : ''} ${className ?? ''}`}
     >
-      <span className={`border-line text-ink-2 rounded-full border-2 px-3 py-1 font-mono text-[11px] leading-none transition-colors duration-150 ${
-        pending
-          ? 'animate-pulse opacity-60'
-          : 'group-hover:bg-yellow group-hover:text-on-bright group-active:translate-x-px group-active:translate-y-px'
-      }`}>
-        {open && !pending ? 'hide' : 'explain'}
-      </span>
-    </button>
+      {open && !pending ? 'hide' : 'explain'}
+    </Pill>
   );
 }
 
@@ -140,14 +136,16 @@ export function TranslationPanel({
             )}
 
             {!explanation && (
-              <button
+              <Pill
                 type="button"
                 onClick={onExplain}
                 disabled={explaining}
-                className="text-ink-3 hover:text-ink flex-none cursor-pointer p-0 font-mono text-[10px] whitespace-nowrap transition-colors duration-150 disabled:cursor-default disabled:opacity-60"
+                muted={explaining}
+                hitArea
+                className="flex-none whitespace-nowrap"
               >
                 {explaining ? 'explaining…' : 'explain grammar ↓'}
-              </button>
+              </Pill>
             )}
           </div>
 

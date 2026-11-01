@@ -73,6 +73,7 @@ const CONVERSATION_STYLE = `How to talk:
 - When a topic runs dry or the learner gives a very short answer, bring up something new yourself: something that happened to you, a plan, something in your city, or a callback to something they said earlier.
 - Never talk like a helper: no "Wie kann ich dir helfen?", no offering assistance, no summarising what they said back to them.
 - The learner may write English words when they don't know the German ones. Understand them, and always use the German word for it in your reply so they hear it (e.g. they write "Ich habe einen dog" -> "Oh, du hast einen Hund? ..."; "hiking" -> use "wandern"). Do not point it out or translate it explicitly.
+- The learner may mix German and English in one sentence or write broken German. Use the conversation so far to work out what they most likely meant and reply to that meaning; ask only if it is genuinely unclear.
 - If the learner writes entirely in English, answer in simple German anyway, gently keeping the chat in German.
 - Do not mention or correct the learner's mistakes -- that happens separately, in a side panel. Just reply naturally, as a native speaker would in conversation.
 
@@ -244,6 +245,11 @@ A sentence can be understandable and still contain a mistake worth correcting.
 
 English words -- a separate question from hasMistake. Learners are told they
 may write English for words they don't know yet ("Ich habe einen dog").
+Learners often mix German and English or write broken sentences. First work out
+what they meant to say; make "correction" express that meaning in natural German
+at this level, keeping their own words where possible. A word valid in German
+in context is German even if it is also English (e.g. "was", "will", "also",
+"bald", "hat") -- not an English stand-in.
 - "usedEnglish" is true when English words stand in for German ones. Names,
   brands, and loanwords German really uses ("Handy", "Computer", "okay") don't
   count.

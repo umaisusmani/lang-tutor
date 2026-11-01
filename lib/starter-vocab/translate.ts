@@ -36,3 +36,31 @@ export async function translateStarterWord(
   await logUsage('gloss', MODEL, usage, usageContext);
   return object.translation.trim().slice(0, 80);
 }
+
+export async function translateStarterWords(
+  words: StarterWord[],
+  usageContext: UsageContext = {},
+): Promise<Record<string, string>> {
+  if (!words.length) return {};
+  const { object, usage } = await generateObject({
+    model: groq(MODEL),
+    schema: z.object({ translations: z.array(z.object({ lemma: z.string(), translation: z.string() })) }),
+    system:
+      'Translate each German dictionary word into English for a learner. Return one translation per lemma. ' +
+      'Each translation must be a short dictionary meaning of 1-3 words, with no article for nouns ' +
+      '("the bank" -> "bank") and "to ..." for verbs. Use example sentences only to choose the right sense.',
+    prompt: JSON.stringify(words.map(({ lemma, example, exampleTranslation }) => ({ lemma, example, exampleTranslation }))),
+    temperature: 0,
+    providerOptions: { groq: { reasoningEffort: 'low' } },
+  });
+
+  await logUsage('gloss', MODEL, usage, usageContext);
+  const requested = new Map(words.map((word) => [word.lemma.toLowerCase(), word.lemma]));
+  const translations: Record<string, string> = {};
+  for (const item of object.translations) {
+    const lemma = requested.get(item.lemma.trim().toLowerCase());
+    const translation = item.translation.trim().slice(0, 80);
+    if (lemma && translation) translations[lemma] = translation;
+  }
+  return translations;
+}

@@ -17,6 +17,7 @@ import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
 import { QuotaBanner } from '@/app/components/quota-banner';
 import { useQuota } from '@/app/hooks/use-quota';
+import { useStickToBottom } from '@/app/hooks/use-stick-to-bottom';
 import type { QuotaStatus } from '@/lib/quota';
 import { useTheme } from '@/app/hooks/use-theme';
 import { saveVocabAction } from '@/app/vocab/actions';
@@ -138,11 +139,7 @@ export default function Chat({
     for (const l of locallySaved) set.add(l);
     return set;
   }, [initialSavedLemmas, messages, locallySaved]);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (messages.length > 0) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, status]);
+  const { scrollerRef, contentRef, hasNewMessage, onScroll, scrollToBottom } = useStickToBottom(messages.length);
 
   const busy = status === 'submitted' || status === 'streaming';
   const capped = quota.reason !== null || remaining <= 0;
@@ -271,11 +268,11 @@ export default function Chat({
   function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed || busy || capped) return;
+    scrollToBottom();
     // `level` rides along so the reply uses the level on screen, not whatever
     // the profile holds -- see the route for the race this closes.
     sendMessage({ text: trimmed }, { body: { conversationId: conversationId.current, level } });
     setInput('');
-
   }
 
   async function promptToolsSignUp() {
@@ -329,37 +326,48 @@ export default function Chat({
             <span>Tools</span><span aria-hidden="true" className="text-base leading-none">‹</span>
           </button>
         <div className="flex min-h-0 min-w-0 max-w-[860px] flex-1 flex-col">
-          <div className="chat-scroll-area flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
-          {messages.length === 0 ? (
-            <ChatWelcome
-              level={level}
-              remaining={remaining}
-              signedIn={userEmail !== null}
-              starters={starters}
-              disabled={capped || busy}
-              persona={persona}
-              onSend={send}
-            />
-          ) : (
-            <ChatThread
-              messages={messages}
-              status={status}
-              error={error}
-              persona={persona}
-              openPanels={openPanel}
-              explanations={explanations}
-              explaining={explaining}
-              canSave={canSave}
-              isSaved={isSaved}
-              onTogglePanel={(key) =>
-                setOpenPanel((current) => ({ ...current, [key]: !current[key] }))
-              }
-              onSaveWord={saveWord}
-              onExplain={explain}
-            />
-          )}
-
-          <div ref={bottomRef} />
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <div ref={scrollerRef} onScroll={onScroll} className="chat-scroll-area flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+              <div ref={contentRef} className="flex min-h-full flex-col">
+                {messages.length === 0 ? (
+                  <ChatWelcome
+                    level={level}
+                    remaining={remaining}
+                    signedIn={userEmail !== null}
+                    starters={starters}
+                    disabled={capped || busy}
+                    persona={persona}
+                    onSend={send}
+                  />
+                ) : (
+                  <ChatThread
+                    messages={messages}
+                    status={status}
+                    error={error}
+                    persona={persona}
+                    openPanels={openPanel}
+                    explanations={explanations}
+                    explaining={explaining}
+                    canSave={canSave}
+                    isSaved={isSaved}
+                    onTogglePanel={(key) =>
+                      setOpenPanel((current) => ({ ...current, [key]: !current[key] }))
+                    }
+                    onSaveWord={saveWord}
+                    onExplain={explain}
+                  />
+                )}
+              </div>
+            </div>
+            {hasNewMessage && (
+              <button
+                type="button"
+                onClick={() => scrollToBottom('smooth')}
+                className="border-line bg-panel hover:bg-yellow hover:text-on-bright absolute bottom-3 left-1/2 -translate-x-1/2 animate-[fade-rise_160ms_ease-out] rounded-full border-2 px-3 py-1.5 font-mono text-[11px] shadow-[3px_3px_0_var(--line)]"
+              >
+                ↓ new message
+              </button>
+            )}
           </div>
 
           <ChatComposer

@@ -11,7 +11,10 @@ vi.mock('@/app/conversations/actions', () => ({ deleteConversationAction: vi.fn(
 vi.mock('@/app/components/toaster', () => ({ notifyError: vi.fn() }));
 vi.mock('@/app/components/confirm-modal', () => ({ useConfirm: () => vi.fn() }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const conversation: Conversation = {
   id: 'chat-1',
@@ -25,10 +28,12 @@ function renderHeader({
   userEmail = 'learner@example.com',
   dueCount = 0,
   onLevelChange = vi.fn(),
+  activePage = 'chat',
 }: {
   userEmail?: string | null;
   dueCount?: number;
   onLevelChange?: (next: CefrLevel) => void;
+  activePage?: 'chat' | 'vocab';
 } = {}) {
   render(
     <SiteHeader
@@ -41,76 +46,89 @@ function renderHeader({
       remaining={null}
       messageCap={0}
       dueCount={dueCount}
+      activePage={activePage}
     />,
   );
 }
 
-function openMenu() {
-  const trigger = screen.getByRole('button', { name: 'Open menu' });
-  fireEvent.click(trigger);
-  return screen.getByRole('region', { name: 'Site menu' });
+function openAccount() {
+  fireEvent.click(screen.getByRole('button', { name: 'Account options' }));
+  return screen.getByRole('region', { name: 'Account options' });
 }
 
-test('signed-in mobile menu shows navigation, proficiency, chats, and account', () => {
-  renderHeader({ dueCount: 3 });
-  const menu = openMenu();
-  expect(screen.getByRole('button', { name: 'Close menu', expanded: true })).toHaveAttribute('aria-controls', 'mobile-menu');
-  expect(within(menu).getByRole('link', { name: 'chat', current: 'page' })).toBeInTheDocument();
-  expect(within(menu).getByRole('link', { name: /vocab/ })).toBeInTheDocument();
-  expect(within(menu).getByLabelText('Proficiency')).toHaveValue('A2');
-  expect(within(menu).getByText('chats · 1')).toBeInTheDocument();
-  expect(within(menu).getByRole('link', { name: '+ new chat' })).toBeInTheDocument();
-  expect(within(menu).getByRole('link', { name: 'First conversation' })).toBeInTheDocument();
-  expect(within(menu).getByRole('button', { name: 'Delete chat: First conversation' })).toBeInTheDocument();
-  expect(within(menu).getByRole('button', { name: 'sign out' })).toBeInTheDocument();
+test('mobile row exposes proficiency and chats while account contains navigation and sign out', () => {
+  renderHeader({ dueCount: 3, activePage: 'vocab' });
+  expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Proficiency: A2' })).toBeInTheDocument();
+  const chats = screen.getByRole('button', { name: 'chats · 1' });
+  fireEvent.click(chats);
+  const conversations = screen.getByRole('region', { name: 'Conversations' });
+  expect(within(conversations).getByRole('link', { name: '+ new chat' })).toBeInTheDocument();
+  expect(within(conversations).getByRole('link', { name: 'First conversation' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Account options' }));
+  expect(screen.queryByRole('region', { name: 'Conversations' })).not.toBeInTheDocument();
+  const account = screen.getByRole('region', { name: 'Account options' });
+  expect(within(account).getByText('Learner')).toBeInTheDocument();
+  expect(within(account).getByText('learner@example.com')).toBeInTheDocument();
+  expect(within(account).getByRole('link', { name: 'chat' })).toBeInTheDocument();
+  expect(within(account).getByRole('link', { name: /vocab/, current: 'page' })).toBeInTheDocument();
+  expect(within(account).getByLabelText('3 words ready to review')).toBeInTheDocument();
+  expect(within(account).getByRole('button', { name: 'Toggle color theme' })).toBeInTheDocument();
+  expect(within(account).getByRole('button', { name: 'sign out' })).toBeInTheDocument();
 });
 
-test('Escape closes the mobile menu and returns focus to its trigger', () => {
+test('Escape closes account and chats popovers and returns focus to their triggers', () => {
   renderHeader();
-  const menu = openMenu();
-  expect(within(menu).getByRole('link', { name: 'chat' })).toHaveFocus();
+  openAccount();
   fireEvent.keyDown(window, { key: 'Escape' });
-  expect(screen.queryByRole('region', { name: 'Site menu' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Open menu' })).toHaveFocus();
+  expect(screen.queryByRole('region', { name: 'Account options' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Account options' })).toHaveFocus();
+  const chats = screen.getByRole('button', { name: 'chats · 1' });
+  fireEvent.click(chats);
+  expect(within(screen.getByRole('region', { name: 'Conversations' })).getByRole('link', { name: '+ new chat' })).toHaveFocus();
+  fireEvent.keyDown(window, { key: 'Escape' });
+  expect(chats).toHaveFocus();
 });
 
-test('clicking a mobile menu link closes the disclosure', () => {
+test('mobile account menu focuses its first navigation link when opened', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
   renderHeader();
-  const menu = openMenu();
-  fireEvent.click(within(menu).getByRole('link', { name: /vocab/ }));
-  expect(screen.queryByRole('region', { name: 'Site menu' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Open menu' })).toHaveAttribute('aria-expanded', 'false');
+  const account = openAccount();
+  expect(within(account).getByRole('link', { name: 'chat' })).toHaveFocus();
 });
 
-test('mobile proficiency selection updates the level', () => {
+test('clicking an account nav link closes the dropdown', () => {
+  renderHeader();
+  fireEvent.click(within(openAccount()).getByRole('link', { name: /vocab/ }));
+  expect(screen.queryByRole('region', { name: 'Account options' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Account options' })).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('proficiency can be changed from the header row', () => {
   const onLevelChange = vi.fn();
   renderHeader({ onLevelChange });
-  fireEvent.change(within(openMenu()).getByLabelText('Proficiency'), { target: { value: 'B1' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Proficiency: A2' }));
+  fireEvent.click(screen.getByRole('option', { name: 'B1' }));
   expect(onLevelChange).toHaveBeenCalledWith('B1');
 });
 
-test('signed-out mobile menu only shows proficiency', () => {
+test('anonymous header exposes proficiency and sign in without account or chats', () => {
   renderHeader({ userEmail: null });
+  expect(screen.getByRole('button', { name: 'Proficiency: A2' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'sign in' })).toBeInTheDocument();
-  const menu = openMenu();
-  expect(within(menu).getByLabelText('Proficiency')).toHaveValue('A2');
-  expect(within(menu).queryByRole('link')).not.toBeInTheDocument();
-  expect(within(menu).queryByRole('button', { name: 'sign out' })).not.toBeInTheDocument();
-  expect(within(menu).queryByText(/chats ·/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Account options' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /chats/ })).not.toBeInTheDocument();
 });
 
-test('closed hamburger shows the review indicator when words are due', () => {
+test('review indicator sits on the avatar trigger', () => {
   renderHeader({ dueCount: 7 });
-  const trigger = screen.getByRole('button', { name: 'Open menu' });
-  expect(within(trigger).getByText('7 words ready to review')).toBeInTheDocument();
-  openMenu();
-  expect(screen.queryByText('7 words ready to review')).not.toBeInTheDocument();
+  expect(within(screen.getByRole('button', { name: 'Account options' })).getByText('7 words ready to review')).toBeInTheDocument();
 });
 
-test('opening the mobile menu closes a desktop popover', () => {
+test('outside click closes account and returns focus to its trigger', () => {
   renderHeader();
-  fireEvent.click(screen.getByRole('button', { name: 'chats · 1' }));
-  expect(screen.getByRole('region', { name: 'Conversations' })).toBeInTheDocument();
-  openMenu();
-  expect(screen.queryByRole('region', { name: 'Conversations' })).not.toBeInTheDocument();
+  openAccount();
+  fireEvent.click(screen.getByRole('button', { name: 'Close menu' }));
+  expect(screen.queryByRole('region', { name: 'Account options' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Account options' })).toHaveFocus();
 });

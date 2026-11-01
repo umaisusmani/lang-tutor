@@ -56,23 +56,21 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}
             placeholder="German, English, or an example…" className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Show
-          <Select variant="panel" value={filter} onChange={(event) => setFilter(event.target.value)}>
-            <option value="all">All words</option><option value="due">Ready to review</option>
-            <option value="mistakes">From corrections</option><option value="missing">Missing meaning</option>
-          </Select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Sort
-          <Select variant="panel" value={sort} onChange={(event) => setSort(event.target.value)}>
-            <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="az">A–Z</option>
-          </Select>
-        </label>
+        <div className="flex flex-col gap-1 text-sm">
+          <span id="vocab-filter-label">Show</span>
+          <Select variant="panel" value={filter} onValueChange={setFilter} aria-labelledby="vocab-filter-label"
+            options={[{ value: 'all', label: 'All words' }, { value: 'due', label: 'Ready to review' }, { value: 'mistakes', label: 'From corrections' }, { value: 'missing', label: 'Missing meaning' }]} />
+        </div>
+        <div className="flex flex-col gap-1 text-sm">
+          <span id="vocab-sort-label">Sort</span>
+          <Select variant="panel" value={sort} onValueChange={setSort} aria-labelledby="vocab-sort-label"
+            options={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'az', label: 'A–Z' }]} />
+        </div>
       </div>
       <p className="text-ink-3 text-sm" role="status">{visible.length} of {entries.length} words shown</p>
       <Pill
         size="sm"
+        hitArea
         onClick={toggleAll}
         aria-pressed={revealAll}
         className="self-end"
@@ -110,7 +108,7 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
                 aria-expanded={revealed}
                 className="flex flex-1 cursor-pointer flex-col gap-1.5 px-4 pt-3.5 pb-9 text-left"
               >
-                <span className="pr-12 text-[17px] font-semibold break-words">{entry.lemma}</span>
+                <span className="pr-20 text-[17px] font-semibold break-words">{entry.lemma}</span>
                 {revealed ? (
                   <span className="flex animate-[fade-rise_160ms_ease-out] flex-col gap-1">
                     <span className="text-ink-2 text-sm">
@@ -139,7 +137,7 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
       </div>
       {visible.length === 0 && <div className="border-hair bg-panel rounded-xl border-2 p-5">
         <p>No words match these filters.</p>
-        <button onClick={() => { setQuery(''); setFilter('all'); }} className="mt-2 underline">Clear search and filters</button>
+        <Pill hitArea onClick={() => { setQuery(''); setFilter('all'); }} className="mt-2">Clear search and filters</Pill>
       </div>}
     </div>
   );

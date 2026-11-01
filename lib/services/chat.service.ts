@@ -16,7 +16,7 @@ import { recordMistake } from '@/lib/services/mistake.service';
 import { resolvePersona } from '@/lib/services/persona.service';
 import { logUsage } from '@/lib/services/usage.service';
 import { getSavedLemmas } from '@/lib/services/vocab.service';
-import { detectCorrection } from '@/lib/tutor';
+import { detectCorrection, UnusableCorrectionError } from '@/lib/tutor';
 import type { Conversation } from '@/lib/types/db';
 
 /**
@@ -207,6 +207,10 @@ export async function runChatTurn(
           if (userMessageId) await annotateMessage(userMessageId, { correction });
         })
         .catch((err) => {
+          if (err instanceof UnusableCorrectionError) {
+            console.warn('[correction] unusable verdict:', err);
+            return;
+          }
           // A failed correction check shouldn't take down the whole
           // response -- the conversation reply still matters more. But say
           // so: a missing correction card otherwise reads as "no mistake".

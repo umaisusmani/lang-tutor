@@ -14,6 +14,7 @@ export function selectReviewWords<T extends {
 
 export type ReviewSummary = {
   reviewed: number;
+  added: number;
   scheduledLater: number;
   nextReviewAt: string | null;
   complete: boolean;

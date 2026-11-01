@@ -26,14 +26,21 @@ export function hasTranslatorEnv(): boolean {
   return Boolean(process.env.AZURE_TRANSLATOR_KEY && process.env.AZURE_TRANSLATOR_REGION);
 }
 
-type AzureDictionaryResult = { translations?: Array<{ displayTarget?: string }> };
+type AzureDictionaryResult = {
+  displaySource?: string;
+  translations?: Array<{ displayTarget?: string; posTag?: string }>;
+};
 type AzureTextResult = { translations?: Array<{ text?: string }> };
+export type TranslationResult = {
+  translation: string;
+  dictionary?: { source: string; target: string; posTag: string };
+};
 
 export async function translateWithAzure(
   text: string,
   direction: TranslationDirection,
   fetcher: typeof fetch = fetch,
-): Promise<string> {
+): Promise<TranslationResult> {
   const key = process.env.AZURE_TRANSLATOR_KEY;
   const region = process.env.AZURE_TRANSLATOR_REGION;
   if (!key || !region) throw new TranslatorError('unavailable');
@@ -77,12 +84,20 @@ export async function translateWithAzure(
 
   if (isDictionaryWord(text)) {
     const result = await request('dictionary/lookup') as AzureDictionaryResult[];
-    const word = result?.[0]?.translations?.[0]?.displayTarget?.trim();
-    if (word) return word;
+    const match = result?.[0];
+    const first = match?.translations?.[0];
+    const target = first?.displayTarget?.trim();
+    if (target) {
+      const source = match?.displaySource?.trim();
+      return {
+        translation: target,
+        ...(source && first?.posTag ? { dictionary: { source, target, posTag: first.posTag } } : {}),
+      };
+    }
   }
 
   const result = await request('translate') as AzureTextResult[];
   const translation = result?.[0]?.translations?.[0]?.text?.trim();
   if (!translation) throw new TranslatorError('unavailable');
-  return translation;
+  return { translation };
 }

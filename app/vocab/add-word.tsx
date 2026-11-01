@@ -23,6 +23,7 @@ export function AddWord({ savedLemmas, onAdded }: {
   const [selected, setSelected] = useState<DiscoverCard | null>(null);
   const [meaning, setMeaning] = useState('');
   const [lookingUp, setLookingUp] = useState(false);
+  const [searchPending, setSearchPending] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   const [announcement, setAnnouncement] = useState('');
@@ -47,6 +48,7 @@ export function AddWord({ savedLemmas, onAdded }: {
       }
       if (request !== requestRef.current) return;
       setResults(words);
+      setSearchPending(false);
       setActive(-1);
       setOpen(words.length > 0 && document.activeElement === inputRef.current);
       setSearchedQuery(query);
@@ -59,6 +61,7 @@ export function AddWord({ savedLemmas, onAdded }: {
     requestRef.current += 1;
     previewRef.current += 1;
     setQuery(value);
+    setSearchPending(Boolean(value.trim()));
     setSelected(null);
     setMeaning('');
     setLookingUp(false);
@@ -76,6 +79,7 @@ export function AddWord({ savedLemmas, onAdded }: {
     requestRef.current += 1;
     const preview = ++previewRef.current;
     setSelected(word);
+    setSearchPending(false);
     setQuery(word.lemma);
     setOpen(false);
     setActive(-1);
@@ -107,6 +111,11 @@ export function AddWord({ savedLemmas, onAdded }: {
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (selected && event.key === 'Escape') {
+      event.preventDefault();
+      changeQuery('');
+      return;
+    }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       if (results.length) {
         event.preventDefault();
@@ -153,48 +162,51 @@ export function AddWord({ savedLemmas, onAdded }: {
       <div className="flex items-center justify-between gap-3">
         <label htmlFor={inputId} className="font-display text-xl">Add a word</label>
       </div>
-      <div className="relative">
-        <input ref={inputRef} id={inputId} type="text" value={query}
-          onChange={(event) => changeQuery(event.target.value)} onKeyDown={handleKeyDown}
-          onFocus={() => { if (results.length && !selected) setOpen(true); }}
-          onBlur={() => { setOpen(false); setActive(-1); }}
-          role="combobox" aria-autocomplete="list" aria-expanded={open && results.length > 0}
-          aria-controls={listboxId} aria-activedescendant={open && active >= 0 ? `${listboxId}-${active}` : undefined}
-          placeholder="Type a German word…" autoComplete="off" autoCapitalize="none" autoCorrect="off"
-          spellCheck={false} maxLength={50}
-          className="border-line bg-panel w-full rounded-xl border-2 px-3 py-2" />
-        {open && results.length > 0 && <ul role="listbox" id={listboxId}
-          className="border-line bg-panel absolute top-full z-20 mt-1 max-h-[320px] w-full overflow-y-auto rounded-xl border-2 p-1.5 shadow-[3px_3px_0_var(--line)] animate-[fade-rise_160ms_ease-out]">
-          {results.map((word, index) => {
-            const saved = isSaved(word);
-            return <li key={word.lemma} id={`${listboxId}-${index}`} role="option"
-              aria-selected={active === index} aria-disabled={saved ? 'true' : undefined}
-              onMouseDown={(event) => event.preventDefault()} onClick={() => void select(word)}
-              className={`flex min-h-11 items-center justify-between gap-2 rounded-lg px-2.5 py-2 ${saved ? 'text-ink-3' : active === index ? 'bg-yellow text-on-bright' : 'hover:bg-soft cursor-pointer'}`}>
-              <span className="min-w-0 font-semibold break-words">{word.lemma}</span>
-              {saved && <span className="shrink-0 font-mono text-[11px]">✓ saved</span>}
-            </li>;
-          })}
-        </ul>}
+      <div className="flex items-start gap-3">
+        <div className="relative min-w-0 flex-1">
+          <input ref={inputRef} id={inputId} type="text" value={query} readOnly={Boolean(selected)}
+            onChange={(event) => changeQuery(event.target.value)} onKeyDown={handleKeyDown}
+            onFocus={() => { if (results.length && !selected) setOpen(true); }}
+            onBlur={() => { setOpen(false); setActive(-1); }}
+            role="combobox" aria-autocomplete="list" aria-expanded={open && results.length > 0}
+            aria-busy={searchPending} aria-controls={listboxId}
+            aria-activedescendant={open && active >= 0 ? `${listboxId}-${active}` : undefined}
+            placeholder="Type a German word…" autoComplete="off" autoCapitalize="none" autoCorrect="off"
+            spellCheck={false} maxLength={50}
+            className="border-line bg-panel w-full rounded-xl border-2 px-3 py-2 pr-10" />
+          {searchPending && <span role="status" aria-label="Searching suggestions" className="border-ink-3 absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />}
+          {selected && <button type="button" aria-label="Clear selected word" onClick={() => { changeQuery(''); inputRef.current?.focus(); }}
+            className="text-ink-2 absolute right-2 top-1.5 flex h-8 w-8 items-center justify-center rounded-lg text-xl">×</button>}
+          {open && results.length > 0 && <ul role="listbox" id={listboxId}
+            className="border-line bg-panel absolute top-full z-20 mt-1 max-h-[320px] w-full overflow-y-auto rounded-xl border-2 p-1.5 shadow-[3px_3px_0_var(--line)] animate-[fade-rise_160ms_ease-out]">
+            {results.map((word, index) => {
+              const saved = isSaved(word);
+              return <li key={word.lemma} id={`${listboxId}-${index}`} role="option"
+                aria-selected={active === index} aria-disabled={saved ? 'true' : undefined}
+                onMouseDown={(event) => event.preventDefault()} onClick={() => void select(word)}
+                className={`flex min-h-11 items-center justify-between gap-2 rounded-lg px-2.5 py-2 ${saved ? 'text-ink-3' : active === index ? 'bg-yellow text-on-bright' : 'hover:bg-soft cursor-pointer'}`}>
+                <span className="min-w-0 font-semibold break-words">{word.lemma}</span>
+                {saved && <span className="shrink-0 font-mono text-[11px]">✓ saved</span>}
+              </li>;
+            })}
+          </ul>}
+        </div>
+        <Button variant="primary" type="button" disabled={!selected || lookingUp || adding || !meaning.trim()} onClick={() => void add()}>
+          {adding ? 'Adding…' : 'Add'}
+        </Button>
       </div>
       <span className="sr-only" role="status">{announcement}</span>
       {!selected && query.trim() && searchedQuery === query && results.length === 0 &&
         <p className="text-ink-3 text-sm">Not in the starter list. Try the Translate tab in the chat panel for other words.</p>}
-      {selected && <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <label htmlFor={meaningId} className="text-ink-3 font-mono text-[10px] uppercase tracking-[0.08em]">Meaning</label>
-            <input id={meaningId} type="text" value={meaning} onChange={(event) => setMeaning(event.target.value)}
-              disabled={lookingUp} placeholder={lookingUp ? 'Looking up the meaning…' : 'Type a meaning'}
-              className="border-line bg-panel w-full rounded-xl border-2 px-3 py-2" />
-          </div>
-          <Button variant="primary" type="button" disabled={lookingUp || adding || !meaning.trim()} onClick={() => void add()}>
-            {adding ? 'Adding…' : 'Add'}
-          </Button>
-        </div>
-        <div className="text-ink-3 text-sm">
+      {selected && <div className="bg-soft flex flex-col gap-2 rounded-xl p-3">
+        <label htmlFor={meaningId} className="text-ink-3 font-mono text-[10px] uppercase tracking-[0.08em]">Meaning</label>
+        <input id={meaningId} type="text" value={meaning} onChange={(event) => setMeaning(event.target.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void add(); } }}
+          disabled={lookingUp} placeholder={lookingUp ? 'Looking up the meaning…' : 'Type a meaning'}
+          className="border-line bg-panel w-full rounded-xl border-2 px-3 py-2 font-mono" />
+        <div className="text-ink-2 text-sm">
           <p>{selected.example}</p>
-          <p>{selected.exampleTranslation}</p>
+          <p className="font-mono text-xs">{selected.exampleTranslation}</p>
         </div>
       </div>}
       {error && <p role="alert" className="text-ink-3 text-sm">{error}</p>}

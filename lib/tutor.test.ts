@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkWithSecondLook, suppressOrthographicOnlyCorrection, type Correction } from '@/lib/tutor';
+import { checkWithSecondLook, suppressOrthographicOnlyCorrection, UnusableCorrectionError, type Correction } from '@/lib/tutor';
 
 const clean: Correction = {
   hasMistake: false,
@@ -45,18 +45,18 @@ test('two clean verdicts stay clean', async () => {
   assert.equal(result, clean);
 });
 
-test('a positive verdict without a corrected sentence is retried, then fails visibly', async () => {
+test('a positive verdict without a corrected sentence is retried, then omitted', async () => {
   const broken = { ...flagged, correction: ' ' };
   await assert.rejects(
     () => checkWithSecondLook(async () => broken),
-    /correction verdict without a corrected sentence/,
+    (error) => error instanceof UnusableCorrectionError && error.message === 'correction verdict without a corrected sentence',
   );
 });
 
 test('a corrected sentence without a positive verdict is not shown as clean', async () => {
   await assert.rejects(
     () => checkWithSecondLook(async () => ({ ...clean, correction: 'Er geht zur Arbeit.' })),
-    /corrected sentence without a correction verdict/,
+    (error) => error instanceof UnusableCorrectionError && error.message === 'corrected sentence without a correction verdict',
   );
 });
 

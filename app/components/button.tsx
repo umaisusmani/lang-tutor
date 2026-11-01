@@ -11,10 +11,10 @@ type ButtonProps = ButtonStyle & (
   | ({ href?: never } & ComponentProps<'button'>)
 );
 
-const base = 'inline-flex items-center justify-center gap-2 rounded-xl border-2 border-line min-h-11 cursor-pointer disabled:cursor-default';
+const base = 'inline-flex items-center justify-center gap-2 rounded-full border-2 border-line min-h-11 cursor-pointer disabled:cursor-default';
 const styles = {
-  primary: 'bg-yellow text-on-bright font-display tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] disabled:opacity-50',
-  secondary: 'bg-panel text-ink font-bold transition-transform hover:shadow-[3px_3px_0_var(--line)] hover:-translate-x-px hover:-translate-y-px disabled:opacity-50',
+  primary: 'bg-yellow text-on-bright font-display tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-[transform,box-shadow] duration-120 ease-out hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:opacity-50',
+  secondary: 'bg-panel text-ink font-bold transition-[transform,box-shadow] duration-120 ease-out hover:shadow-[3px_3px_0_var(--line)] hover:-translate-x-px hover:-translate-y-px active:translate-x-0 active:translate-y-0 active:shadow-none disabled:opacity-50',
   dark: 'bg-ink text-paper font-display tracking-[0.04em] transition-colors hover:bg-accent hover:text-on-accent disabled:cursor-default disabled:opacity-40',
   danger: 'bg-orange text-on-bright font-bold transition-transform hover:shadow-[3px_3px_0_var(--line)] hover:-translate-x-px hover:-translate-y-px disabled:opacity-50',
 };

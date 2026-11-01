@@ -8,19 +8,19 @@ import { saveTimezone, signOut } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
 import { useConfirm } from '@/app/components/confirm-modal';
 import { WARNING_AT, useResetLabel } from '@/app/components/quota-banner';
+import { Pill, pillClassName } from '@/app/components/pill';
 import { Select } from '@/app/components/select';
 import { notifyError } from '@/app/components/toaster';
 import { deleteConversationAction } from '@/app/conversations/actions';
 import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
 
-function ConversationList({ conversations, conversationId, deletingId, onClose, onDelete, mobile = false }: {
+function ConversationList({ conversations, conversationId, deletingId, onClose, onDelete }: {
   conversations: Conversation[];
   conversationId: string | null;
   deletingId: string | null;
   onClose: () => void;
   onDelete: (chat: Conversation) => void;
-  mobile?: boolean;
 }) {
   return (
     <>
@@ -34,7 +34,7 @@ function ConversationList({ conversations, conversationId, deletingId, onClose, 
         + new chat
       </Link>
       {conversations.length > 0 && <div className="bg-hair my-1.5 h-px" />}
-      <div className={mobile ? 'flex flex-col' : 'flex flex-col overflow-y-auto max-h-[280px]'}>
+      <div className="flex max-h-[280px] flex-col overflow-y-auto">
         {conversations.map((chat) => {
           const current = chat.id === conversationId;
           return (
@@ -71,11 +71,14 @@ function ConversationList({ conversations, conversationId, deletingId, onClose, 
   );
 }
 
-function AccountContent({ userEmail, userName, theme, onThemeToggle }: {
+function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage, dueCount, onNavigate }: {
   userEmail: string;
   userName: string | null;
   theme?: 'light' | 'dark' | null;
   onThemeToggle?: () => void;
+  activePage: 'chat' | 'vocab';
+  dueCount: number;
+  onNavigate: () => void;
 }) {
   return (
     <>
@@ -84,6 +87,33 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle }: {
         <span className="text-ink-3 truncate font-mono text-[10px]">{userEmail}</span>
       </div>
       <div className="bg-hair my-1 h-px" />
+      <div className="flex flex-col sm:hidden">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          aria-current={activePage === 'chat' ? 'page' : undefined}
+          className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'chat' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
+        >
+          chat
+        </Link>
+        <Link
+          href="/vocab"
+          onClick={onNavigate}
+          aria-current={activePage === 'vocab' ? 'page' : undefined}
+          className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'vocab' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
+        >
+          vocab
+          {dueCount > 0 && (
+            <span
+              className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
+              aria-label={`${dueCount} words ready to review`}
+            >
+              {dueCount > 99 ? '99+' : dueCount}
+            </span>
+          )}
+        </Link>
+        <div className="bg-hair my-1 h-px" />
+      </div>
       <button
         type="button"
         aria-label="Toggle color theme"
@@ -152,17 +182,14 @@ export function SiteHeader({
 }) {
   const [chatsOpen, setChatsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const confirm = useConfirm();
   const resetLabel = useResetLabel(resetsAt);
   const router = useRouter();
   const chatsTrigger = useRef<HTMLButtonElement>(null);
   const accountTrigger = useRef<HTMLButtonElement>(null);
-  const mobileTrigger = useRef<HTMLButtonElement>(null);
   const chatsPanel = useRef<HTMLDivElement>(null);
   const accountPanel = useRef<HTMLDivElement>(null);
-  const mobilePanel = useRef<HTMLDivElement>(null);
 
   // Tell the server the learner's timezone once per browser session, so the
   // flashcard day rolls over at 4am where they are, not at 4am UTC.
@@ -179,27 +206,28 @@ export function SiteHeader({
   }, [userEmail]);
 
   useEffect(() => {
-    if (!chatsOpen && !accountOpen && !mobileOpen) return;
+    if (!chatsOpen && !accountOpen) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault();
-        (mobileOpen ? mobileTrigger : chatsOpen ? chatsTrigger : accountTrigger).current?.focus();
+        (chatsOpen ? chatsTrigger : accountTrigger).current?.focus();
         setChatsOpen(false);
         setAccountOpen(false);
-        setMobileOpen(false);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [chatsOpen, accountOpen, mobileOpen]);
+  }, [chatsOpen, accountOpen]);
 
   useEffect(() => {
-    const panel = mobileOpen ? mobilePanel.current : chatsOpen ? chatsPanel.current : accountOpen ? accountPanel.current : null;
-    panel?.querySelector<HTMLElement>('a[href], button:not([disabled]), select:not([disabled])')?.focus();
-  }, [chatsOpen, accountOpen, mobileOpen]);
+    const panel = chatsOpen ? chatsPanel.current : accountOpen ? accountPanel.current : null;
+    const firstItem = accountOpen && !window.matchMedia?.('(max-width: 639px)').matches
+      ? 'button:not([disabled])'
+      : 'a[href], button:not([disabled])';
+    panel?.querySelector<HTMLElement>(firstItem)?.focus();
+  }, [chatsOpen, accountOpen]);
 
-  function handleLevelChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const next = e.target.value;
+  function handleLevelChange(next: string) {
     if (!isCefrLevel(next)) return;
     onLevelChange(next);
   }
@@ -243,8 +271,6 @@ export function SiteHeader({
 
   const progressPct =
     remaining === null ? 0 : Math.round(((messageCap - remaining) / messageCap) * 100);
-  const activeNavHighlight =
-    "relative z-0 after:absolute after:inset-x-[-2px] after:bottom-[1px] after:-z-10 after:h-[6px] after:rounded-[2px] after:bg-yellow after:content-['']";
 
   return (
     // Its own 1080px track, wider than the 860px content column below it: the
@@ -252,52 +278,41 @@ export function SiteHeader({
     // the header can spread out while reply text keeps a readable line length.
     <header className="bg-paper sticky top-0 z-5 flex w-full max-w-[1080px] flex-col gap-3 pt-5 pb-3">
       <div className="relative flex items-center gap-3 sm:flex-wrap">
-        <Brand />
+        <Brand compactOnMobile />
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3.5">
-          <div className="hidden items-center gap-3.5 sm:flex">
-            <label className="flex items-center gap-2">
-              <span className="text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase">Proficiency</span>
-              <Select variant="pill" selectClassName="w-[58px]" value={level} onChange={handleLevelChange}>
-                {CEFR_LEVELS.map((l) => (
-                  <option key={l} value={l} className="text-ink bg-panel">
-                    {l}
-                  </option>
-                ))}
-              </Select>
-            </label>
+          <div className="flex items-center gap-2 sm:gap-3.5">
+            <div className="flex items-center gap-2">
+              <span className="text-ink-3 hidden font-mono text-[10px] tracking-[0.08em] uppercase sm:inline">Proficiency</span>
+              <Select variant="pill" selectClassName="w-[58px]" value={level} onValueChange={handleLevelChange}
+                aria-label="Proficiency" options={CEFR_LEVELS.map((l) => ({ value: l, label: l }))} />
+            </div>
 
             {userEmail && (
-              <div className="flex items-center gap-1.5 sm:gap-2.5">
+              <div className="hidden items-center gap-1.5 sm:flex sm:gap-2.5">
                 <Link
                   href="/"
-                  className={`flex min-h-11 min-w-11 items-center font-mono text-xs underline underline-offset-[3px] transition-colors ${
-                    activePage === 'chat'
-                      ? 'text-ink no-underline'
-                      : 'text-ink-2 hover:text-ink'
-                  }`}
+                  className="group/pill inline-flex min-h-11 items-center"
                   aria-current={activePage === 'chat' ? 'page' : undefined}
                 >
-                  <span className={activePage === 'chat' ? activeNavHighlight : undefined}>chat</span>
+                  <span className={pillClassName({ active: activePage === 'chat' })}>chat</span>
                 </Link>
                 <Link
                   href="/vocab"
-                  className={`flex min-h-11 min-w-11 items-center font-mono text-xs underline underline-offset-[3px] transition-colors ${
-                    activePage === 'vocab'
-                      ? 'text-ink no-underline'
-                      : 'text-ink-2 hover:text-ink'
-                  }`}
+                  className="group/pill inline-flex min-h-11 items-center"
                   aria-current={activePage === 'vocab' ? 'page' : undefined}
                 >
-                  <span className={activePage === 'vocab' ? activeNavHighlight : undefined}>vocab</span>
-                  {dueCount > 0 && (
-                    <span
-                      className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
-                      aria-label={`${dueCount} words ready to review`}
-                    >
-                      {dueCount > 99 ? '99+' : dueCount}
-                    </span>
-                  )}
+                  <span className={pillClassName({ active: activePage === 'vocab' })}>
+                    vocab
+                    {dueCount > 0 && (
+                      <span
+                        className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
+                        aria-label={`${dueCount} words ready to review`}
+                      >
+                        {dueCount > 99 ? '99+' : dueCount}
+                      </span>
+                    )}
+                  </span>
                 </Link>
               </div>
             )}
@@ -306,20 +321,19 @@ export function SiteHeader({
               <div className="relative" onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setChatsOpen(false);
               }}>
-                <button
+                <Pill
                   ref={chatsTrigger}
                   type="button"
                   aria-expanded={chatsOpen}
                   aria-controls="conversation-panel"
                   onClick={() => {
                     setAccountOpen(false);
-                    setMobileOpen(false);
                     setChatsOpen((v) => !v);
                   }}
-                  className="text-ink-2 hover:text-ink min-h-11 min-w-11 cursor-pointer font-mono text-xs underline underline-offset-[3px]"
+                  hitArea
                 >
                   chats{conversations.length > 0 && ` · ${conversations.length}`}
-                </button>
+                </Pill>
 
                 {chatsOpen && (
                   <>
@@ -330,7 +344,7 @@ export function SiteHeader({
                       onClick={() => { setChatsOpen(false); chatsTrigger.current?.focus(); }}
                       className="fixed inset-0 z-10 cursor-default"
                     />
-                    <div id="conversation-panel" ref={chatsPanel} role="region" aria-label="Conversations" className="border-line bg-panel absolute right-0 z-20 mt-2 flex w-[260px] animate-[fade-rise_160ms_ease-out] flex-col rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)]">
+                    <div id="conversation-panel" ref={chatsPanel} role="region" aria-label="Conversations" className="border-line bg-panel fixed top-[68px] right-4 z-20 mt-2 flex w-[260px] max-w-[calc(100vw-2rem)] animate-[fade-rise_160ms_ease-out] flex-col rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)] sm:absolute sm:top-auto sm:right-0">
                       <ConversationList
                         conversations={conversations}
                         conversationId={conversationId}
@@ -356,10 +370,9 @@ export function SiteHeader({
                   aria-expanded={accountOpen}
                   onClick={() => {
                     setChatsOpen(false);
-                    setMobileOpen(false);
                     setAccountOpen((v) => !v);
                   }}
-                  className="border-line hover:bg-soft flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 py-[3px] pr-3 pl-[3px] transition-colors duration-150"
+                  className="border-line hover:bg-soft relative flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-full border-2 py-[3px] px-[3px] transition-colors duration-150 sm:pr-3"
                 >
                   <span
                     aria-hidden
@@ -370,9 +383,14 @@ export function SiteHeader({
                   <span className="hidden max-w-[110px] truncate text-[13px] font-bold sm:block">
                     {userName ?? userEmail}
                   </span>
-                  <span aria-hidden className="text-[9px] opacity-60">
+                  <span aria-hidden className="hidden text-[9px] opacity-60 sm:inline">
                     ▾
                   </span>
+                  {dueCount > 0 && (
+                    <span className="bg-orange border-paper absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border-2 sm:hidden">
+                      <span className="sr-only">{dueCount} words ready to review</span>
+                    </span>
+                  )}
                 </button>
 
                 {accountOpen && (
@@ -389,13 +407,16 @@ export function SiteHeader({
                       ref={accountPanel}
                       role="region"
                       aria-label="Account options"
-                      className="border-line bg-panel absolute right-0 z-20 mt-2 flex w-[220px] animate-[fade-rise_160ms_ease-out] flex-col rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)]"
+                      className="border-line bg-panel absolute right-0 z-20 mt-2 flex w-[220px] max-w-[calc(100vw-2rem)] animate-[fade-rise_160ms_ease-out] flex-col rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)]"
                     >
                       <AccountContent
                         userEmail={userEmail}
                         userName={userName}
                         theme={theme}
                         onThemeToggle={onThemeToggle}
+                        activePage={activePage}
+                        dueCount={dueCount}
+                        onNavigate={() => setAccountOpen(false)}
                       />
                     </div>
                   </>
@@ -404,113 +425,11 @@ export function SiteHeader({
             )}
           </div>
           {!userEmail && (
-            <Link
-              href="/login"
-              className="text-ink-2 hover:text-ink flex min-h-11 min-w-11 items-center font-mono text-xs underline underline-offset-[3px]"
-            >
-              sign in
+            <Link href="/login" className="group/pill inline-flex min-h-11 items-center">
+              <span className={pillClassName()}>sign in</span>
             </Link>
           )}
-          <button
-            ref={mobileTrigger}
-            type="button"
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={mobileOpen}
-            aria-controls="mobile-menu"
-            onClick={() => {
-              setChatsOpen(false);
-              setAccountOpen(false);
-              setMobileOpen((open) => !open);
-            }}
-            className="border-line bg-panel relative flex min-h-11 min-w-11 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 sm:hidden"
-          >
-            <span aria-hidden className={`bg-ink h-0.5 w-5 rounded transition-transform ${mobileOpen ? 'translate-y-1.5 rotate-45' : ''}`} />
-            <span aria-hidden className={`bg-ink h-0.5 w-5 rounded ${mobileOpen ? 'invisible' : ''}`} />
-            <span aria-hidden className={`bg-ink h-0.5 w-5 rounded transition-transform ${mobileOpen ? '-translate-y-1.5 -rotate-45' : ''}`} />
-            {dueCount > 0 && !mobileOpen && (
-              <span className="bg-orange border-paper absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border-2">
-                <span className="sr-only">{dueCount} words ready to review</span>
-              </span>
-            )}
-          </button>
         </div>
-        {mobileOpen && (
-          <>
-            <button
-              type="button"
-              aria-label="Close menu"
-              tabIndex={-1}
-              onClick={() => { setMobileOpen(false); mobileTrigger.current?.focus(); }}
-              className="fixed inset-0 z-10 cursor-default sm:hidden"
-            />
-            <div
-              id="mobile-menu"
-              ref={mobilePanel}
-              role="region"
-              aria-label="Site menu"
-              className="border-line bg-panel absolute top-full right-0 left-0 z-20 mt-2 flex max-h-[calc(100dvh-5.5rem)] animate-[fade-rise_160ms_ease-out] flex-col overflow-y-auto overscroll-contain rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)] sm:hidden"
-            >
-              {userEmail && (
-                <>
-                  <Link
-                    href="/"
-                    onClick={() => setMobileOpen(false)}
-                    aria-current={activePage === 'chat' ? 'page' : undefined}
-                    className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'chat' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
-                  >
-                    chat
-                  </Link>
-                  <Link
-                    href="/vocab"
-                    onClick={() => setMobileOpen(false)}
-                    aria-current={activePage === 'vocab' ? 'page' : undefined}
-                    className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'vocab' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
-                  >
-                    vocab
-                    {dueCount > 0 && (
-                      <span
-                        className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
-                        aria-label={`${dueCount} words ready to review`}
-                      >
-                        {dueCount > 99 ? '99+' : dueCount}
-                      </span>
-                    )}
-                  </Link>
-                  <div className="bg-hair my-1.5 h-px" />
-                </>
-              )}
-              <div className="flex flex-col gap-1 px-2.5 py-2">
-                <label htmlFor="mobile-proficiency" className="text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase">Proficiency</label>
-                <Select id="mobile-proficiency" variant="panel" selectClassName="min-h-11" value={level} onChange={handleLevelChange}>
-                  {CEFR_LEVELS.map((l) => (
-                    <option key={l} value={l} className="text-ink bg-panel">{l}</option>
-                  ))}
-                </Select>
-              </div>
-              {userEmail && (
-                <>
-                  <div className="bg-hair my-1.5 h-px" />
-                  <div className="text-ink-3 px-2.5 py-1 font-mono text-[10px]">chats · {conversations.length}</div>
-                  <ConversationList
-                    conversations={conversations}
-                    conversationId={conversationId}
-                    deletingId={deletingId}
-                    onClose={() => setMobileOpen(false)}
-                    onDelete={handleDeleteChat}
-                    mobile
-                  />
-                  <div className="bg-hair my-1.5 h-px" />
-                  <AccountContent
-                    userEmail={userEmail}
-                    userName={userName}
-                    theme={theme}
-                    onThemeToggle={onThemeToggle}
-                  />
-                </>
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       {remaining !== null && (

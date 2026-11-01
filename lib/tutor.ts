@@ -68,9 +68,16 @@ export function suppressOrthographicOnlyCorrection(
   };
 }
 
+export class UnusableCorrectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnusableCorrectionError';
+  }
+}
+
 /** A clean first verdict gets an independent second look. A positive verdict
- * without a sentence is retried too, then treated as a failed check if the
- * second pass cannot produce a usable correction. */
+ * without a sentence is retried too, then omitted if neither pass can
+ * produce a usable correction. */
 export async function checkWithSecondLook(
   check: (secondLook: boolean) => Promise<Correction>,
 ): Promise<Correction> {
@@ -81,10 +88,10 @@ export async function checkWithSecondLook(
   if (hasCorrectionCard(second)) return second;
 
   if (first.hasMistake || first.usedEnglish || second.hasMistake || second.usedEnglish) {
-    throw new Error('correction verdict without a corrected sentence');
+    throw new UnusableCorrectionError('correction verdict without a corrected sentence');
   }
   if (second.correction?.trim()) {
-    throw new Error('corrected sentence without a correction verdict');
+    throw new UnusableCorrectionError('corrected sentence without a correction verdict');
   }
   return second;
 }

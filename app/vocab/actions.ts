@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 import { getPracticeQueue, getReviewQueue, recordReview, type RecordReviewResult } from '@/lib/services/card.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
 import { deleteGrammarNote, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
-import { deleteVocabEntry, listVocab, saveVocabEntry, updateVocabNote } from '@/lib/services/vocab.service';
+import { deleteVocabEntry, listVocab, saveVocabEntry, searchVocabEntries, updateVocabNote } from '@/lib/services/vocab.service';
 import { findStarterWord, pickStarterWords, searchStarterWords } from '@/lib/starter-vocab';
 import { translateStarterWord, translateStarterWords } from '@/lib/starter-vocab/translate';
 import { consumeTranslation } from '@/lib/services/translation.service';
@@ -53,7 +53,10 @@ export async function deleteVocabAction(entryId: string): Promise<{ ok: boolean 
   if (!userId) return { ok: false };
 
   const ok = await deleteVocabEntry(userId, entryId);
-  if (ok) revalidatePath('/vocab');
+  if (ok) {
+    revalidatePath('/vocab');
+    revalidatePath('/notes');
+  }
   return { ok };
 }
 
@@ -61,7 +64,7 @@ export async function saveGrammarNoteAction(note: string, exampleSentence?: stri
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
   const ok = await saveGrammarNote(userId, { note, exampleSentence });
-  if (ok) revalidatePath('/vocab');
+  if (ok) revalidatePath('/notes');
   return { ok };
 }
 
@@ -69,7 +72,7 @@ export async function updateGrammarNoteAction(id: string, note: string): Promise
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
   const ok = await updateGrammarNote(userId, id, note);
-  if (ok) revalidatePath('/vocab');
+  if (ok) revalidatePath('/notes');
   return { ok };
 }
 
@@ -77,7 +80,7 @@ export async function deleteGrammarNoteAction(id: string): Promise<{ ok: boolean
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
   const ok = await deleteGrammarNote(userId, id);
-  if (ok) revalidatePath('/vocab');
+  if (ok) revalidatePath('/notes');
   return { ok };
 }
 
@@ -85,8 +88,15 @@ export async function updateVocabNoteAction(id: string, note: string): Promise<{
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
   const ok = await updateVocabNote(userId, id, note);
-  if (ok) revalidatePath('/vocab');
+  if (ok) revalidatePath('/notes');
   return { ok };
+}
+
+export async function searchSavedWordsAction(query: string): Promise<{ id: string; lemma: string }[]> {
+  if (typeof query !== 'string' || !query.trim() || query.trim().length > 50) return [];
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
+  return searchVocabEntries(userId, query.trim());
 }
 
 /** One flashcard as the session UI needs it: the word, what to show on the

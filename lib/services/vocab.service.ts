@@ -258,3 +258,21 @@ export async function listVocab(userId: string): Promise<VocabEntry[]> {
 
   return (data as VocabEntry[]) ?? [];
 }
+
+export async function searchVocabEntries(userId: string, query: string, limit = 8): Promise<{ id: string; lemma: string }[]> {
+  const term = query.trim();
+  if (!term) return [];
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from('vocab_entries')
+      .select('id,lemma').eq('user_id', userId).ilike('lemma', `%${term}%`).limit(limit);
+    if (error) {
+      console.error('[vocab.service] searchVocabEntries failed:', error.message);
+      return [];
+    }
+    return data ?? [];
+  } catch (err) {
+    console.error('[vocab.service] searchVocabEntries failed:', err);
+    return [];
+  }
+}

@@ -77,7 +77,7 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
   userName: string | null;
   theme?: 'light' | 'dark' | null;
   onThemeToggle?: () => void;
-  activePage: 'chat' | 'vocab';
+  activePage: 'chat' | 'vocab' | 'notes';
   dueCount: number;
   onNavigate: () => void;
 }) {
@@ -89,6 +89,14 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
       </div>
       <div className="bg-hair my-1 h-px" />
       <div className="flex flex-col sm:hidden">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          aria-current={activePage === 'chat' ? 'page' : undefined}
+          className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'chat' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
+        >
+          chat
+        </Link>
         <Link
           href="/vocab"
           onClick={onNavigate}
@@ -104,6 +112,14 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
               {dueCount > 99 ? '99+' : dueCount}
             </span>
           )}
+        </Link>
+        <Link
+          href="/notes"
+          onClick={onNavigate}
+          aria-current={activePage === 'notes' ? 'page' : undefined}
+          className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'notes' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
+        >
+          notes
         </Link>
         <div className="bg-hair my-1 h-px" />
       </div>
@@ -169,7 +185,7 @@ export function SiteHeader({
   resetsAt?: string;
   theme?: 'light' | 'dark' | null;
   onThemeToggle?: () => void;
-  activePage?: 'chat' | 'vocab';
+  activePage?: 'chat' | 'vocab' | 'notes';
   /** Cards waiting in the review queue; the badge on the vocab link. */
   dueCount?: number;
 }) {
@@ -300,6 +316,10 @@ export function SiteHeader({
                       </span>
                     )}
                   </span>
+                </Link>
+                <Link href="/notes" className="group/pill inline-flex min-h-11 items-center"
+                  aria-current={activePage === 'notes' ? 'page' : undefined}>
+                  <span className={pillClassName({ active: activePage === 'notes' })}>notes</span>
                 </Link>
               </div>
             )}

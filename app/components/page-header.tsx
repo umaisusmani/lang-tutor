@@ -8,7 +8,7 @@ import { useTheme } from '@/app/hooks/use-theme';
 import type { CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
 
-/** The header for the pages that aren't the chat (/vocab): the same
+/** The header for the pages that aren't the chat (/vocab and /notes): the same
  * SiteHeader, with the level and theme state the chat page keeps for itself. */
 export function PageHeader({
   initialLevel,
@@ -22,7 +22,7 @@ export function PageHeader({
   userEmail: string | null;
   userName: string | null;
   conversations: Conversation[];
-  activePage: 'vocab';
+  activePage: 'chat' | 'vocab' | 'notes';
   dueCount: number;
 }) {
   const [level, setLevel] = useState<CefrLevel>(initialLevel);

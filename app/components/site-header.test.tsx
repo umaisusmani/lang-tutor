@@ -33,7 +33,7 @@ function renderHeader({
   userEmail?: string | null;
   dueCount?: number;
   onLevelChange?: (next: CefrLevel) => void;
-  activePage?: 'chat' | 'vocab';
+  activePage?: 'chat' | 'vocab' | 'notes';
 } = {}) {
   render(
     <SiteHeader
@@ -61,6 +61,7 @@ test('chat trigger opens conversations and account keeps saved navigation', () =
   expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Proficiency: A2' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /saved/, current: 'page' })).toHaveAttribute('href', '/vocab');
+  expect(screen.getByRole('link', { name: 'notes' })).toHaveAttribute('href', '/notes');
   const chats = screen.getByRole('button', { name: 'chat · 1' });
   expect(screen.queryByRole('link', { name: 'chat' })).not.toBeInTheDocument();
   expect(chats).not.toHaveAttribute('aria-current');
@@ -74,12 +75,21 @@ test('chat trigger opens conversations and account keeps saved navigation', () =
   const account = screen.getByRole('region', { name: 'Account options' });
   expect(within(account).getByText('Learner')).toBeInTheDocument();
   expect(within(account).getByText('learner@example.com')).toBeInTheDocument();
-  expect(within(account).queryByRole('link', { name: 'chat' })).not.toBeInTheDocument();
+  expect(within(account).getByRole('link', { name: 'chat' })).toHaveAttribute('href', '/');
   expect(within(account).getByRole('link', { name: /saved/, current: 'page' })).toHaveAttribute('href', '/vocab');
+  expect(within(account).getByRole('link', { name: 'notes' })).toHaveAttribute('href', '/notes');
   expect(within(account).queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
   expect(within(account).getByLabelText('3 words ready to review')).toBeInTheDocument();
   expect(within(account).getByRole('button', { name: 'Toggle color theme' })).toBeInTheDocument();
   expect(within(account).getByRole('button', { name: 'sign out' })).toBeInTheDocument();
+});
+
+test('notes navigation is current in the header and account menu', () => {
+  renderHeader({ activePage: 'notes' });
+  expect(screen.getByRole('link', { name: 'notes', current: 'page' })).toHaveAttribute('href', '/notes');
+  const account = openAccount();
+  expect(within(account).getByRole('link', { name: 'chat' })).toHaveAttribute('href', '/');
+  expect(within(account).getByRole('link', { name: 'notes', current: 'page' })).toHaveAttribute('href', '/notes');
 });
 
 test('Escape closes account and chats popovers and returns focus to their triggers', () => {
@@ -95,11 +105,11 @@ test('Escape closes account and chats popovers and returns focus to their trigge
   expect(chats).toHaveFocus();
 });
 
-test('mobile account menu focuses saved when opened', () => {
+test('mobile account menu focuses chat when opened', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   renderHeader();
   const account = openAccount();
-  expect(within(account).getByRole('link', { name: 'saved' })).toHaveFocus();
+  expect(within(account).getByRole('link', { name: 'chat', current: 'page' })).toHaveFocus();
 });
 
 test('clicking an account nav link closes the dropdown', () => {

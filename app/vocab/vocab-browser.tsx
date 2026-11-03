@@ -11,7 +11,7 @@ import { DiscoverWords } from '@/app/vocab/discover-words';
 import { AddWord } from '@/app/vocab/add-word';
 import type { ReviewSummary } from '@/lib/review-session';
 import { VocabGrid } from '@/app/vocab/vocab-grid';
-import type { GrammarNote, VocabEntry } from '@/lib/types/db';
+import type { VocabEntry } from '@/lib/types/db';
 
 const SKIPPED_KEY = 'starfinch_skipped_words';
 const SKIPPED_MAX = 500;
@@ -44,13 +44,11 @@ function rememberSkipped(lemma: string) {
  */
 export function VocabBrowser({
   entries,
-  grammarNotes,
   dueCount,
   heading,
   dueWordIds,
 }: {
   entries: VocabEntry[];
-  grammarNotes: GrammarNote[];
   dueCount: number;
   dueWordIds: string[];
   /** The page title block, rendered here so it can share a row with the
@@ -178,7 +176,7 @@ export function VocabBrowser({
           </div>
         </>
       )}
-      <VocabGrid entries={entries} grammarNotes={grammarNotes} dueWordIds={dueWordIds} />
+      <VocabGrid entries={entries} dueWordIds={dueWordIds} />
     </>
   );
 }

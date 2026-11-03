@@ -171,7 +171,7 @@ export function GlossedText({
               aria-expanded={open}
               onClick={(event) => { menuAnchorRef.current = event.currentTarget; setOpenIndex(open ? null : i); }}
               className={`group cursor-pointer border-b-2 border-dashed text-left ${
-                open ? 'border-accent-ink' : 'border-transparent hover:border-accent-ink'
+                open ? 'border-accent-ink' : 'border-accent-ink/40 hover:border-accent-ink focus:border-accent-ink'
               }`}
             >
               {body}

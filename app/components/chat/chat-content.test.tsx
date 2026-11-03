@@ -45,6 +45,8 @@ test('collapses a correction to its changed-word summary and expands it again', 
 
   expect(screen.getByText('Use habe with ich.')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '+ save as note' })).not.toBeInTheDocument();
+  expect(screen.getByText('Du').closest('div.flex-col')).toHaveClass('flex-col', 'sm:flex-row');
+  expect(screen.getByText('habe').closest('div.flex-col')).toHaveClass('flex-col', 'sm:flex-row', 'pr-8');
   const hide = screen.getByRole('button', { name: 'Hide correction' });
   expect(hide).toHaveAttribute('aria-expanded', 'true');
   fireEvent.click(hide);

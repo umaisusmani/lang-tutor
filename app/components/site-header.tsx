@@ -7,12 +7,12 @@ import { useEffect, useRef, useState } from 'react';
 import { saveTimezone, signOut } from '@/app/auth/actions';
 import { Brand } from '@/app/components/brand';
 import { useConfirm } from '@/app/components/confirm-modal';
+import { InstallBanner } from '@/app/components/install-banner';
 import { WARNING_AT, useResetLabel } from '@/app/components/quota-banner';
 import { Pill, pillClassName } from '@/app/components/pill';
 import { Select } from '@/app/components/select';
 import { notifyError } from '@/app/components/toaster';
 import { deleteConversationAction } from '@/app/conversations/actions';
-import { useInstallPrompt } from '@/app/hooks/use-install-prompt';
 import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
 
@@ -72,7 +72,7 @@ function ConversationList({ conversations, conversationId, deletingId, onClose, 
   );
 }
 
-function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage, dueCount, onNavigate, installAvailable, onInstall }: {
+function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage, dueCount, onNavigate }: {
   userEmail: string;
   userName: string | null;
   theme?: 'light' | 'dark' | null;
@@ -80,8 +80,6 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
   activePage: 'chat' | 'vocab';
   dueCount: number;
   onNavigate: () => void;
-  installAvailable: boolean;
-  onInstall: () => void;
 }) {
   return (
     <>
@@ -97,7 +95,7 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
           aria-current={activePage === 'vocab' ? 'page' : undefined}
           className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'vocab' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
         >
-          vocab
+          saved
           {dueCount > 0 && (
             <span
               className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
@@ -133,15 +131,6 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
           </span>
         </span>
       </button>
-      {installAvailable && (
-        <button
-          type="button"
-          onClick={onInstall}
-          className="text-ink hover:bg-soft min-h-11 w-full cursor-pointer rounded-lg px-2.5 py-2 text-left font-mono text-[11px]"
-        >
-          Install app
-        </button>
-      )}
       <form action={signOut}>
         <button
           type="submit"
@@ -188,7 +177,6 @@ export function SiteHeader({
   const [accountOpen, setAccountOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const confirm = useConfirm();
-  const { canInstall, install } = useInstallPrompt();
   const resetLabel = useResetLabel(resetsAt);
   const router = useRouter();
   const chatsTrigger = useRef<HTMLButtonElement>(null);
@@ -243,7 +231,7 @@ export function SiteHeader({
       description: (
         <>
           &ldquo;{chat.title ?? 'Untitled'}&rdquo; and all of its messages will be permanently
-          deleted. Words you saved from it stay in your vocab list.
+          deleted. Words you saved from it stay in your saved list.
         </>
       ),
       confirmLabel: 'Delete chat',
@@ -281,6 +269,7 @@ export function SiteHeader({
     // Its own 1080px track, wider than the 860px content column below it: the
     // pages render this as a sibling of that column rather than inside it, so
     // the header can spread out while reply text keeps a readable line length.
+    <>
     <header className="bg-paper sticky top-0 z-5 flex w-full max-w-[1080px] flex-col gap-3 pt-5 pb-3">
       <div className="relative flex items-center gap-3 sm:flex-wrap">
         <Brand compactOnMobile />
@@ -301,7 +290,7 @@ export function SiteHeader({
                   aria-current={activePage === 'vocab' ? 'page' : undefined}
                 >
                   <span className={pillClassName({ active: activePage === 'vocab' })}>
-                    vocab
+                    saved
                     {dueCount > 0 && (
                       <span
                         className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
@@ -416,8 +405,6 @@ export function SiteHeader({
                         activePage={activePage}
                         dueCount={dueCount}
                         onNavigate={() => setAccountOpen(false)}
-                        installAvailable={canInstall}
-                        onInstall={() => { setAccountOpen(false); void install(); }}
                       />
                     </div>
                   </>
@@ -450,5 +437,7 @@ export function SiteHeader({
 
       <div className="bg-line h-0.5 opacity-50" />
     </header>
+    {userEmail && <InstallBanner />}
+    </>
   );
 }

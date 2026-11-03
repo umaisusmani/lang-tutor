@@ -56,10 +56,11 @@ function openAccount() {
   return screen.getByRole('region', { name: 'Account options' });
 }
 
-test('chat trigger opens conversations and account keeps vocab navigation', () => {
+test('chat trigger opens conversations and account keeps saved navigation', () => {
   renderHeader({ dueCount: 3, activePage: 'vocab' });
   expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Proficiency: A2' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /saved/, current: 'page' })).toHaveAttribute('href', '/vocab');
   const chats = screen.getByRole('button', { name: 'chat · 1' });
   expect(screen.queryByRole('link', { name: 'chat' })).not.toBeInTheDocument();
   expect(chats).not.toHaveAttribute('aria-current');
@@ -74,7 +75,8 @@ test('chat trigger opens conversations and account keeps vocab navigation', () =
   expect(within(account).getByText('Learner')).toBeInTheDocument();
   expect(within(account).getByText('learner@example.com')).toBeInTheDocument();
   expect(within(account).queryByRole('link', { name: 'chat' })).not.toBeInTheDocument();
-  expect(within(account).getByRole('link', { name: /vocab/, current: 'page' })).toBeInTheDocument();
+  expect(within(account).getByRole('link', { name: /saved/, current: 'page' })).toHaveAttribute('href', '/vocab');
+  expect(within(account).queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
   expect(within(account).getByLabelText('3 words ready to review')).toBeInTheDocument();
   expect(within(account).getByRole('button', { name: 'Toggle color theme' })).toBeInTheDocument();
   expect(within(account).getByRole('button', { name: 'sign out' })).toBeInTheDocument();
@@ -93,16 +95,16 @@ test('Escape closes account and chats popovers and returns focus to their trigge
   expect(chats).toHaveFocus();
 });
 
-test('mobile account menu focuses vocab when opened', () => {
+test('mobile account menu focuses saved when opened', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   renderHeader();
   const account = openAccount();
-  expect(within(account).getByRole('link', { name: 'vocab' })).toHaveFocus();
+  expect(within(account).getByRole('link', { name: 'saved' })).toHaveFocus();
 });
 
 test('clicking an account nav link closes the dropdown', () => {
   renderHeader();
-  fireEvent.click(within(openAccount()).getByRole('link', { name: /vocab/ }));
+  fireEvent.click(within(openAccount()).getByRole('link', { name: /saved/ }));
   expect(screen.queryByRole('region', { name: 'Account options' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Account options' })).toHaveAttribute('aria-expanded', 'false');
 });

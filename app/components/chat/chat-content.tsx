@@ -207,7 +207,7 @@ export function ChatThread({
 
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <div className="flex items-start gap-3">
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:gap-3">
                   <div className="flex-1 text-[19px] leading-[1.6]">
                     <GlossedText
                       text={text}
@@ -225,7 +225,7 @@ export function ChatThread({
                       <TranslateButton
                         open={replyOpen}
                         onToggle={() => onTogglePanel(replyKey)}
-                        className="mt-[5px]"
+                        className="sm:mt-[5px]"
                       />
                     ) : (
                       inFlight && (
@@ -233,7 +233,7 @@ export function ChatThread({
                           open={false}
                           pending
                           onToggle={() => {}}
-                          className="mt-[5px]"
+                          className="sm:mt-[5px]"
                         />
                       )
                     )}
@@ -400,7 +400,7 @@ function CorrectionCard({
       {!open && <div className="text-ink-2 flex min-h-11 animate-[fade-rise_160ms_ease-out] items-center pr-10 font-mono text-[11px]">{summary}</div>}
       <div className="gloss-panel" data-open={open} inert={!open}>
         <div className="pt-[18px] pb-3.5">
-          <div className="flex items-start gap-3 pr-8">
+          <div className="flex flex-col items-start gap-2 pr-8 sm:flex-row sm:items-start sm:gap-3">
             <GlossedText
               className="flex-1 text-[18px] leading-[1.6]"
               text={corrected}
@@ -414,7 +414,7 @@ function CorrectionCard({
               <TranslateButton
                 open={translationOpen}
                 onToggle={onToggleTranslation}
-                className="mt-[3px]"
+                className="sm:mt-[3px]"
               />
             </div>
           </div>

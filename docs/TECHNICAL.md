@@ -1,6 +1,6 @@
 # Starvogel — Technical Documentation
 
-> State of the codebase as of 2026-10-29 (`a3194e1`). This describes
+> State of the codebase as of 2026-11-03 (`35df25c`). This describes
 > what is **built**. Feature status is in [ROADMAP.md](../ROADMAP.md); design
 > notes live in local `plans/*.md` files that aren't committed. For the
 > user-facing overview, see [README.md](../README.md). Where a plan and the
@@ -9,32 +9,42 @@
 > The original UX findings and current verification gaps are recorded in [UI_AUDIT.md](UI_AUDIT.md).
 > A source-level review of every Groq-backed prompt is in [AI_PROMPT_AUDIT.md](AI_PROMPT_AUDIT.md).
 >
-> **Recent changes since the 2026-10-21 revision:** The side panel's tab set
-> dropped from Ask/Words/Translate to **Ask/Translate** — Translate now owns
-> word-saving itself: the German→English direction keeps the existing
-> `TranslationWords` breakdown-on-request, and the new English→German
-> direction uses `TranslatableResult` (`app/components/chat/translatable-result.tsx`)
-> to map the Azure translation's tokens back onto gloss units inline. The old
-> always-listed "Words" tab (`collectWords` over the thread's glosses) is gone.
-> A standalone **`AddWord`** search box (`app/vocab/add-word.tsx`) was added to
-> `/vocab` so a word can be added by typing, independent of chat or Translate,
-> via a new `POST /api/translate/words` route and `lib/word-units.ts`
-> (`groupGlossIntoUnits`). The quota banner became a full takeover card
-> (`OutOfMessagesCard`/`OutOfMessagesGuestCard`) once the learner's own daily
-> cap is hit, replacing the composer instead of sitting disabled above it; the
-> side panel still gets the older one-line `compact` banner. The reply prompt's
-> question cadence changed from "never two question-ending replies in a row"
-> to "a break only after **two** consecutive question-ending replies"
-> (`buildTurnGuidance`, §5.2), and the persona bio note about Rhine walks was
-> softened to an occasional detail, not a default topic — see
-> [AI_PROMPT_AUDIT.md](AI_PROMPT_AUDIT.md) for the review that prompted it.
-> Auth copy (login/signup/confirm screens) is now in English throughout,
-> matching the rest of the UI, with a shared `PasswordInput` component. New
-> shared UI primitives: `Button`, `Pill`, `Select` (`app/components/`).
-> Vitest + React Testing Library (`npm run test:ui`, `vitest.config.mts`) were
-> added alongside the existing `tsx --test` unit runner, with component tests
-> for the quota banner, site header, vocab browser, add-word, translation
-> words and translatable-result. See §2, §8, §9.
+> **Recent changes since the 2026-10-29 revision (`a3194e1` → `0e357bc`,
+> `35df25c`):** The chat thread now **sticks to the bottom** instead of
+> calling `scrollIntoView` on every streamed chunk (`useStickToBottom`,
+> `app/hooks/use-stick-to-bottom.ts`): it follows new content while the
+> learner is near the bottom, leaves them alone otherwise, and surfaces a
+> "↓ new message" pill when a new message arrives while they're scrolled up.
+> The correction card is **collapsible** (open by default, a ▾ arrow
+> collapses it to a one-line "N words fixed" summary) and gets a **"+ save as
+> note"** control next to its explanation (§8.2, §8.3). A design-system pass
+> made buttons pill-shaped, added a visible `Pill`/chip style for small
+> actions (replacing bare underlined text), replaced the native `<select>`
+> with a custom keyboard-accessible listbox, and portalled word tooltips
+> (`WordPopover`) so they clear their containers' `overflow` and the side
+> panel's `<dialog>` top layer. `/vocab`'s review flow collapsed **Review due
+> words** and **Extra practice** into one mode-aware **Practice** button,
+> with a due round ending in a "Keep practising" prompt and ~25% new
+> (starter-list) words mixed into extra practice; **Discover** grew from 3 to
+> 10 words per session with meanings fetched in one batched call instead of
+> one call per word. Translate skips the extra gloss call for a single
+> non-noun dictionary word (Azure's dictionary lookup already has the
+> meaning). `AddWord` (`/vocab`) gained **typo-tolerant fuzzy search** over
+> the starter list and an **AI lookup beyond it** (`lib/word-lookup.ts`,
+> same Groq model, costs one Translate-allowance unit) for German or English
+> input the starter list doesn't have. A new **grammar notes** feature
+> (`grammar_notes` table, migration `0009`) lets a learner save a
+> correction's explanation as a standalone note, edit or delete it from a
+> "My notes" filter on `/vocab`, and add a personal free-text note to any
+> saved word — deliberately simpler than the planned F4 grammar cards (no
+> FSRS, no scheduling; see §11). The site header's separate "chat" link and
+> "chats" menu merged into one "chat" trigger, the mobile hamburger is gone
+> (nav lives in the account dropdown instead), and the app is now an
+> **installable PWA** (`app/manifest.ts`, generated icons, an "Install app"
+> row in the account menu). Auth copy picked up two small fixes ("Los
+> geht's." on sign-up, a plainer OTP-entry line) and the Supabase
+> confirm-signup email template was rewritten to match current colors/fonts
+> and drop its old copy. See §2, §6, §8, §11, §12.
 
 ## Contents
 
@@ -489,7 +499,8 @@ written by hand and **must be updated whenever a migration changes a table**.
 | Table | Key columns | Written by | RLS |
 |---|---|---|---|
 | `profiles` | `user_id` PK → auth.users, `cefr_level` (CHECK A1–C1, default A2), `timezone` (0005, IANA name, default UTC) | signup trigger; `updateCefrLevel` | select/update own; no insert/delete policy |
-| `vocab_entries` | `term`, `lemma`, `translation`, `example_sentence`, `source` (`new_word`/`mistake`), **UNIQUE(user_id, lemma)** | `saveVocabEntry` (upsert, `ignoreDuplicates`) | full CRUD on own rows |
+| `vocab_entries` | `term`, `lemma`, `translation`, `example_sentence`, `source` (`new_word`/`mistake`), `note` (0009, nullable free-text personal note — separate from `translation`), **UNIQUE(user_id, lemma)** | `saveVocabEntry` (upsert, `ignoreDuplicates`); `updateVocabNote` (0009) | full CRUD on own rows |
+| `grammar_notes` (0009) | `note` (not null), `example_sentence` (nullable), `created_at`. No link to `vocab_entries`, `cards`, or `mistake_history` — a standalone saved explanation, not a scheduled card (see §11) | `saveGrammarNote`/`updateGrammarNote`/`deleteGrammarNote`/`listGrammarNotes` (`lib/services/grammar-note.service.ts`) | full CRUD on own rows |
 | `mistake_history` | `mistake_type` (CHECK), `user_input`, `correction`, `explanation`; index `(user_id, mistake_type)` | `recordMistake` | select/insert/delete own; **no update**, since history can't be edited |
 | `personas` (0004) | `slug` UNIQUE, `name`, `age`, `city`, `bio`, `avatar_url`, `is_default` (partial unique index: at most one default) | migration seed only — content, not user data | select for `anon, authenticated`; no insert/update/delete policy at all (managed only via migrations / service role) |
 | `conversations` | `title` (0003), `persona_id` (0004, FK → `personas`, **ON DELETE SET NULL**) | `createConversation` | select/insert/delete own |
@@ -677,6 +688,20 @@ sources of truth while allowing them to change independently.
   to the same client state.
 - The chat column fills the viewport and scrolls its welcome or message area
   inside it, keeping the composer visible on a phone-sized screen.
+- **Stick-to-bottom scrolling** (`useStickToBottom`,
+  `app/hooks/use-stick-to-bottom.ts`) replaced a `useEffect` that called
+  `bottomRef.current?.scrollIntoView({ behavior: 'smooth' })` on every
+  `messages`/`status` change — which scrolled every scrollable ancestor (not
+  just the chat area), restarted mid-flight on each streamed chunk, and left
+  the bottom hidden once content kept growing after the last trigger
+  (translate button, "checking your German…", the correction card). The hook
+  tracks whether the learner is within ~80px of the bottom, re-sticks on
+  content growth and on scroller resize (e.g. the mobile keyboard opening)
+  only while at the bottom, and shows a "↓ new message" pill — only for an
+  actual new `messages.length` increase while scrolled up, not for a panel
+  opening on an older message — that smooth-scrolls back down on click.
+  `.chat-scroll-area` sets `overflow-anchor: none` so the browser's own
+  scroll anchoring can't fight it.
 - `conversationId` is kept in a ref, updated from `data-conversation`, and
   sent in the `body` of each `sendMessage`, **alongside `level`** (§4.1's race
   fix). That's how a new chat's second message goes to the same conversation,
@@ -698,6 +723,22 @@ sources of truth while allowing them to change independently.
   rather than a grammar category — `hasCorrectionCard()` (`lib/correction-card.ts`)
   decides whether a `Correction` has anything to render at all, used both in
   `ChatThread` and in `chat.service.ts`'s failure check (§4.3).
+  - **Collapsible.** `CorrectionCard` (extracted from `ChatThread` in
+    `chat-content.tsx`) is open by default with a small ▾/▸ toggle; collapsed,
+    it shows one line — "N word(s) fixed" (hasMistake) or "N word(s) in
+    German" (usedEnglish only), N from the same `changedWordIndices` count —
+    using the existing `.gloss-panel` grid-collapse CSS, not unmounting.
+    State is per card and not persisted.
+  - **Save as a grammar note.** A "+ save as note" chip next to
+    `correction.explanation` (signed-in only) expands an inline, editable
+    textarea pre-filled with the explanation (and the corrected sentence as
+    its example) so the learner can shorten or rewrite it before saving via
+    `saveGrammarNoteAction` (`onSaveGrammarNote`, threaded down from
+    `app/chat.tsx` the same way `onSaveWord` is). No LLM call: it saves
+    whatever text is in the box. Once saved it shows "✓ saved as note" and
+    offers no further action — like a saved vocab word, this is a dead end
+    with **no persistence of the saved state across a reload**, so the same
+    explanation can be saved as a note twice (§12).
 - **Per-word reading is now `GlossedText`** (`app/components/glossed-text.tsx`,
   moved out of this file): hovering a word still shows a quick translation;
   clicking/tapping it pins a small menu with the dictionary form and a
@@ -731,6 +772,15 @@ sources of truth while allowing them to change independently.
   English. The route consumes separate atomic counters in `daily_usage`
   through `consume_translation` (migration `0008`): 50 per signed-in user and
   300 app-wide per UTC day. The Azure key and region remain server-only.
+  - **Single-word fast path.** When Azure's dictionary lookup succeeds and
+    the word isn't a noun (`translateWithAzure` now also returns
+    `{ source, target, posTag }`), `/api/translate` builds a ready-to-save
+    `WordGloss` entry straight from that result (prefixing "to " for a
+    verb) and returns it as `entry`, so `TranslatableResult`/
+    `TranslationWords` can show a save button immediately with no follow-up
+    `/api/translate/words` call. Nouns still take the LLM path, because
+    Azure's dictionary doesn't return der/die/das and saved nouns always
+    carry their article.
   - **Saving words from a translation result** differs by direction. German→
     English keeps `TranslationWords` (`app/components/chat/translation-words.tsx`):
     a "save words ↓" button calls the new `POST /api/translate/words`, which
@@ -743,6 +793,19 @@ sources of truth while allowing them to change independently.
     (token-matched, punctuation-stripped), so each German word/phrase in the
     translated sentence itself is tappable to save — rather than a separate list
     below it.
+  - **Word popovers are portalled.** Both the click-to-pin menu
+    (`GlossedText`) and the hover/click preview in `TranslatableResult` use a
+    shared `WordPopover` (`app/components/word-popover.tsx`), which renders
+    via `createPortal` instead of being absolutely positioned inside the
+    reply/result's own container. This fixes two things: clipping by an
+    ancestor's `overflow` (the side panel's scroll area, the chat scroller,
+    a collapsed `.gloss-panel`), and the popover being unreachable by clicks
+    while the side panel's `<dialog>` is open as a modal (`showModal()` makes
+    everything outside the dialog's own subtree inert, even a `body`-level
+    portal) — `WordPopover` detects an open ancestor `<dialog>` and portals
+    into it instead of `document.body`, promoting itself to the browser's
+    top layer with `popover = 'manual'` / `showPopover()` so it still clears
+    the dialog's own clipping and transforms.
 - **Persona avatar:** `PersonaAvatar` (`app/components/persona-avatar.tsx`)
   renders next to each of the persona's replies and on the empty-chat screen.
   It shows an image from `avatar_url` when set, or an initial badge when not
@@ -756,16 +819,33 @@ sources of truth while allowing them to change independently.
 
 ### 8.3 Other surfaces
 
-- `SiteHeader`: level select, chats menu (open, delete with confirm modal),
-  remaining-message indicator ("free trial" when signed out, "today" when
-  signed in), theme toggle, sign
-  in/out. Now rendered as a sibling of the 860px content column, in its own
-  1080px-wide wrapper (`app/chat.tsx`, `app/vocab/page.tsx`, `app/login/page.tsx`
-  each changed their top-level layout for this), rather than nested inside
-  that column — wider chrome without widening the reply text's line length.
+- `SiteHeader`: level select (now a custom `Select` listbox, not a native
+  `<select>`, so its open list can be styled — `app/components/select.tsx`),
+  a single **"chat"** trigger that opens the conversation dropdown
+  (`+ new chat` then the list; the separate "chat" nav link and "chats · N"
+  menu merged into one chip, active/yellow on `/`), remaining-message
+  indicator ("free trial" when signed out, "today" when signed in), theme
+  toggle, sign in/out. Now rendered as a sibling of the 860px content
+  column, in its own 1080px-wide wrapper (`app/chat.tsx`, `app/vocab/page.tsx`,
+  `app/login/page.tsx` each changed their top-level layout for this), rather
+  than nested inside that column — wider chrome without widening the reply
+  text's line length.
+  - **Mobile header has no hamburger.** Below `sm`, the row is logo ·
+    proficiency pill · "chat" trigger · an avatar button (initial only). The
+    avatar's dropdown holds the chat/vocab nav links (with the due badge),
+    theme toggle, and sign out — nav moved out of a separate menu into the
+    one account dropdown both breakpoints share.
+  - **"Install app"** appears in the account dropdown (desktop and mobile)
+    via `useInstallPrompt` (`app/hooks/use-install-prompt.ts`): on Chromium/
+    Android it captures `beforeinstallprompt` and calls its `prompt()`; on
+    iOS Safari (no such event) it opens the confirm modal with manual
+    "Share → Add to Home Screen" instructions; it's hidden once already
+    running in standalone mode, and hidden entirely on browsers with
+    neither signal.
 - `/vocab`: `VocabGrid` (`app/vocab/vocab-grid.tsx`) renders saved words as a
-  responsive grid of click-to-reveal cards (lemma always visible; translation
-  and example sentence hidden until tapped), with search, sort, filters,
+  responsive grid of click-to-reveal cards (lemma always visible; translation,
+  example sentence, and now an optional personal note hidden until tapped),
+  with search, sort, filters (`all`/`due`/`mistakes`/`missing`/**`notes`**),
   ready status, and a page-level "show all / hide all" toggle. A card's own
   flip state and the toggle combine with XOR,
   so toggling "show all" clears individual flips rather than fighting them.
@@ -774,11 +854,37 @@ sources of truth while allowing them to change independently.
   the earlier flat list. A revealed card is tinted with a faint wash of
   `--accent-ink` (`bg-accent-ink/[0.08]`), not `bg-soft`: `--soft` is too
   close to `--panel` in both themes for the two states to read as different.
+  Card grid minimum width is 260px (was 200px), to fit the added note field.
+  - **Personal word notes.** A revealed card shows its `vocab_entries.note`
+    (0009) if set, or an "add a note…" affordance if not; both open the same
+    inline textarea + Save/Cancel pattern, saved via `updateVocabNoteAction`.
+    Free text the learner writes themselves — no model call.
+  - **"My notes" filter.** Selecting `notes` swaps the grid to
+    `grammar_notes` rows (`grammar-note-card.tsx`), rendered as cards with
+    edit (same inline textarea) and delete (`remove-grammar-note-button.tsx`,
+    confirm-before-delete like `remove-word-button.tsx`) controls; the word
+    search/other filters are inert while it's selected.
 - **Flashcard session** (`app/vocab/vocab-browser.tsx`, `flashcard-session.tsx`):
-  `/vocab` shows **Review due words** and **Extra practice** separately.
-  `startSessionAction()` loads the chosen queue on click and returns plain
-  card data. The session replaces the grid, then automatically returns to it
-  with a completion summary when its available cards are done.
+  one mode-aware **Practice** button replaced the separate **Review due
+  words** / **Extra practice** buttons the 2026-10-21 UI audit flagged (a
+  single button silently falling back to extra practice looked broken).
+  It reads "Review N due words" when `dueCount > 0`, else "Practice"; a due
+  round that finishes shows an in-session "All due words done." panel with
+  **Keep practising** (starts a practice-ahead round in place, labelled
+  "Practising ahead: nothing here is due yet.") or **Back to my words**.
+  `startSessionAction()` loads the chosen queue on click (now also taking the
+  skipped-words list, since practice rounds mix in new words — below) and
+  returns plain card data; the session replaces the grid, then automatically
+  returns to it with a completion summary when its available cards are done.
+  - **New words mixed into practice (~25%).** `startSessionAction` also
+    returns up to 10 unseen starter words
+    (`Math.min(10, Math.round(reviewCount / 3))`, same selection as
+    Discover), interleaved one per three review cards
+    (`interleave()` in `flashcard-session.tsx`). Each appears as an
+    introduction card — meaning and example shown immediately, **Add to my
+    words** / **Skip**, no grading — sharing `DiscoverCard`/
+    `useDiscoverMeanings` (`app/vocab/discover-card.tsx`) with the standalone
+    Discover flow below. `ReviewSummary.added` counts how many were added.
   - Anki-style flip card: the German lemma shows, **Show answer** (Space /
     Enter) reveals the meaning and the saved example sentence, then four
     buttons (Again / Hard / Good / Easy, keys 1-4), each labelled with when
@@ -791,10 +897,11 @@ sources of truth while allowing them to change independently.
     value besides `panel`, kept as is) and the time taken. `answer_given` is
     null, since nothing is typed.
   - Words missing a meaning are marked on the grid and excluded from review.
-- **Extra practice** (`getPracticeQueue()`): an explicit on-demand round of
-  review cards due tomorrow or later, followed by new cards past today's
-  allowance. Waiting cards and words already reviewed today are excluded.
-  These are graded with the same FSRS scheduler.
+- **Extra practice** (`getPracticeQueue()`, reached via **Practice**/**Keep
+  practising**): an on-demand round of review cards due tomorrow or later,
+  followed by new cards past today's allowance. Waiting cards and words
+  already reviewed today are excluded. These are graded with the same FSRS
+  scheduler.
 - **Two directions per word (migration 0006):** `cards.direction` is
   `forward` (German → meaning) or `reverse` (meaning → German, production).
   The trigger creates both when a word is saved, and 0006 backfills reverse
@@ -811,21 +918,40 @@ sources of truth while allowing them to change independently.
   writing the browser's IANA zone to `profiles.timezone`, so the 4am day start
   is the learner's, not UTC's.
 - **New-word discovery (starter vocab):** `discoverWordsAction` separately
-  offers up to 3 words from `lib/starter-vocab/{a1,a2,b1}.json` the learner
-  hasn't saved. The meaning is generated and shown before the learner can
-  choose **Add to my vocabulary**; the add action saves a normal `new_word`
-  entry and the trigger makes its cards. Skips are kept in browser
-  `localStorage`. The source-list licence remains unresolved (§12), so this
-  entry point must not be published until permission or replacement is secured.
-- **`AddWord`** (`app/vocab/add-word.tsx`): a standalone combobox on `/vocab`
-  for adding a word by typing, independent of chat or the Translate tab. It
-  searches the starter word lists (`searchStarterWordsAction`) as the learner
-  types, previews a generated meaning on selection (`previewStarterWordAction`,
-  editable before saving), and saves through `addStarterWordAction`. Full
-  keyboard support (arrow keys, Enter, Escape) and an `aria-live` results count.
-  Limited to the starter-list vocabulary (§12's licence caveat applies here
-  too); a word outside that list has to go through the chat panel's Translate
-  tab instead.
+  offers up to **10** (was 3) words from `lib/starter-vocab/{a1,a2,b1}.json`
+  the learner hasn't saved, each shown with its meaning and example
+  **immediately** (was: hidden behind a "show meaning" tap) — meanings for
+  the whole batch come from **one** `translateStarterWords` call
+  (`lib/starter-vocab/translate.ts`) fired when the session opens, not one
+  call per word. **Add to my vocabulary** saves a normal `new_word` entry
+  and the trigger makes its cards. Skips are kept in browser `localStorage`.
+  The source-list licence remains unresolved (§12), so this entry point must
+  not be published until permission or replacement is secured.
+- **`AddWord`** (`app/vocab/add-word.tsx`): a combobox on `/vocab` for adding
+  a word by typing, independent of chat or the Translate tab. Typing debounces
+  into `searchStarterWordsAction` (`lib/starter-vocab/index.ts`), which now
+  ranks exact/prefix/token-prefix/contains matches as before, then falls back
+  to a **typo-tolerant tier** (bounded Damerau-Levenshtein distance — 0 for
+  queries ≤3 chars, 1 for 4–6, 2 for 7+ — against both the full key and a
+  length-matched prefix) so a misspelling still surfaces the word, capped at
+  5 results. A "See more results" row (or, with zero starter matches and 3+
+  typed characters, automatically after 700ms idle) runs `lookupWordsAction`
+  → `lookupWords` (`lib/word-lookup.ts`): a `generateObject` call (same model/
+  prompt pattern as `glossText`, reusing `LEMMA_RULES`) that accepts German
+  *or* English input and returns up to 5 dictionary entries with their
+  meanings already attached, so picking one needs no further call. This
+  lookup spends one unit of the shared Translate daily allowance
+  (`consumeTranslation`) — it is **not** a separate budget (§12). Results are
+  cached per normalized query for the session. Picking a starter word still
+  previews its meaning via `previewStarterWordAction` (editable before
+  saving, through `addStarterWordAction`); picking an AI result saves its
+  already-known meaning through `addLookedUpWordAction`. The selected state
+  is one row (word + inline-editable meaning) with a small floating ✓/✕
+  icon group — ✓ only appears once a meaning is loaded — replacing the
+  earlier separate "Meaning" field and permanent Add button. Full keyboard
+  support (arrow keys, Enter, Escape) and an `aria-live` results count/loader.
+  No longer limited to the starter list (§12's licence caveat still applies
+  to Discover above, not to this lookup path).
 - **Quota takeover card:** once the learner's own daily cap is hit (not the
   global cap or a counter outage), `QuotaBanner` renders a full card
   (`OutOfMessagesCard` signed in, `OutOfMessagesGuestCard` anonymous) that
@@ -848,6 +974,17 @@ sources of truth while allowing them to change independently.
   queue on the `vocab` link. `app/page.tsx` and `/vocab` compute it with
   `getDueCount()` on each load; `gradeCardAction` revalidates the layout.
 - `ConfirmProvider` / `useConfirm()`: a confirm dialog returned as a promise.
+- **PWA.** `app/manifest.ts` (name, icons, `display: 'standalone'`,
+  `theme_color`/`background_color` matching `--paper`) plus icons generated
+  at build/request time with `next/og`'s `ImageResponse` (`app/icon.tsx`
+  192px, `app/icon1.tsx` 512px + maskable, `app/apple-icon.tsx` 180px —
+  `pwa-icon.tsx` draws the brand tile: yellow fill, ink outline, a
+  stroke-weighted "S" since no bold font is bundled for `ImageResponse`), and
+  `appleWebApp` metadata in `app/layout.tsx`. **No service worker**: the
+  Next.js PWA guide for this version says a manifest over HTTPS is enough
+  for installability, and this app's auth/per-user pages make caching HTML
+  or API responses actively unsafe, so one was deliberately not added.
+  Installability on a real device hasn't been verified yet (§12).
 
 ## 9. Evals
 
@@ -941,7 +1078,8 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
 | A single generic conversation partner | **A named persona** (`personas` table, §6), currently one row ("Ramanath"), designed to extend to several later. `conversations.persona_id` pins each chat to the persona it started with |
 | Gloss = word-by-word only | **Gloss = whole-sentence translation + word-by-word**, surfaced as a translation panel with per-word hover/tap menus, not an always-visible word list |
 | Corrections only flag mistakes | **Corrections also surface English-stand-in sentences** (`usedEnglish`) under an "in German" label, distinct from a mistake card, reflecting that the UI now explicitly invites English for unknown words |
-| — | Not in the original design at all: the persona system, on-demand saved grammar explanations (`/api/explain`), the level/profile race fix (§4.1), the correction-without-a-sentence failure fix (§4.3), the wider header layout, the vocab flip-card grid, the reply-level eval suite, conversation history with reopen/delete, persisted annotations (0003), error toasts, confirm modal, theme toggle, conversation starters |
+| Flashcards F4: grammar cards generated from repeated mistakes, scheduled with the same FSRS engine as vocab (`cards.kind = 'grammar_cloze'`, `lib/cloze.ts`) | **Not built yet** (F4 is still ⬜ in ROADMAP). What shipped instead is a smaller, separate feature — **grammar notes** (`grammar_notes` table, 0009): the learner manually saves/edits/deletes a correction's explanation as plain text, no FSRS, no scheduling, no automatic selection by the model. It deliberately does not touch `cards` or its `mistake_id`/`grammar_cloze` columns, which stay reserved for F4 if it's built later |
+| — | Not in the original design at all: the persona system, on-demand saved grammar explanations (`/api/explain`), the level/profile race fix (§4.1), the correction-without-a-sentence failure fix (§4.3), the wider header layout, the vocab flip-card grid, the reply-level eval suite, conversation history with reopen/delete, persisted annotations (0003), error toasts, confirm modal, theme toggle, conversation starters, grammar notes, PWA installability |
 
 ## 12. Known limitations and tradeoffs
 
@@ -993,13 +1131,31 @@ done is in [ROADMAP.md](../ROADMAP.md), not here.
   use it. It has tests and is the intended basis for grammar cards (F4); delete
   it if F4 goes another way.
 - **Starter words have no per-word translation in the source,** only a
-  sentence and its translation; the word's meaning is generated when the
-  learner reveals it in discovery. The source lists are Goethe-Institut material,
+  sentence and its translation; the word's meaning is generated (now batched
+  per session, one call for up to 10 words) when the learner meets it in
+  discovery or extra practice. The source lists are Goethe-Institut material,
   reached through a third-party GitHub repo
   (`ilkermeliksitki/goethe-institute-wordlist`) that declares no licence. The
   Goethe PDFs assert copyright, so the right to ship these ~2,900 words and
   example sentences hasn't been established. The parser also leaves some noise
-  (a few conjugated headwords such as "packt ein").
+  (a few conjugated headwords such as "packt ein"). The new AI word lookup in
+  `AddWord` (§8.3) gives a licence-clean path for words typed directly, but
+  **Discover and the new-word mixing inside practice still draw only from this
+  list**, so the blocker still applies to those entry points.
+- **A saved grammar note's "✓ saved" state is client-only.** `CorrectionCard`
+  tracks it in component state, not from any server read, so a page reload
+  (or a different tab) loses it and the same explanation can be saved as a
+  note more than once. No dedup on the `grammar_notes` table either.
+- **The AI word lookup in `AddWord` spends from the Translate daily
+  allowance** (`consumeTranslation`), not a separate budget — a learner who
+  types several misses before finding a word, or an active discover session,
+  can use up translations they'd otherwise have for the Translate tab.
+- **PWA installability is unverified on a real device.** The manifest and
+  icons are confirmed to serve correctly (`/manifest.webmanifest`, `/icon`,
+  `/icon1`, `/apple-icon` all return the right content-type and size), and
+  `use-install-prompt.ts` is unit-tested, but whether Chrome on an actual
+  Android phone actually offers `beforeinstallprompt` over the deployed HTTPS
+  origin hasn't been checked.
 - **Skipped starter words are remembered per browser only**, so another
   device can offer them again.
 - **No suspend / undo / leech handling yet** (F5). Suspending needs a way to
@@ -1064,6 +1220,10 @@ this is the index.
 - **`signUp` for an existing address succeeds silently** with no session and no
   new email, by design (no account enumeration). A user who "never got the
   code" may simply already have an account. §7.2.
+- **`grammar_notes` (0009) is deliberately unrelated to `cards`.** It's a
+  flat save/list/edit/delete table, not a scheduled card — don't wire it
+  into `lib/srs.ts` or the `cards.kind = 'grammar_cloze'` columns reserved
+  for F4 without first deciding F4 supersedes it. §6, §11.
 - **`consume_message` is security definer with its execute grant revoked.**
   The default `PUBLIC` grant would otherwise let any browser call it through
   the REST API and burn another caller's allowance. §7.4.

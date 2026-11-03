@@ -11,7 +11,7 @@ type PillProps = ComponentProps<'button'> & PillOptions & { hitArea?: boolean };
 
 export function pillClassName({ size = 'sm', muted = false, active = false, className }: PillOptions = {}) {
   return [
-    'inline-flex items-center justify-center rounded-full border-2 font-mono leading-none transition-[background-color,color,transform,box-shadow] duration-120 ease-out',
+    'inline-flex items-center justify-center whitespace-nowrap rounded-full border-2 font-mono leading-none transition-[background-color,color,transform,box-shadow] duration-120 ease-out',
     size === 'sm' ? 'px-3 py-1 text-[11px]' : 'px-[13px] py-[5px] text-[13.5px] font-semibold',
     muted
       ? 'border-hair bg-panel text-ink-3 cursor-default'

@@ -6,7 +6,9 @@ import { useState } from 'react';
 
 import { Button } from '@/app/components/button';
 import { GlossedText } from '@/app/components/glossed-text';
+import { Pill } from '@/app/components/pill';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
+import { notifyError } from '@/app/components/toaster';
 import { TranslateButton, TranslationPanel } from '@/app/components/translation-panel';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
@@ -123,6 +125,7 @@ type ChatThreadProps = {
   isSaved: (lemma: string) => boolean;
   onTogglePanel: (key: string) => void;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
+  onSaveGrammarNote: (note: string, exampleSentence: string) => Promise<{ ok: boolean }>;
   onExplain: (key: string, request: ExplanationRequest) => void;
 };
 
@@ -138,6 +141,7 @@ export function ChatThread({
   isSaved,
   onTogglePanel,
   onSaveWord,
+  onSaveGrammarNote,
   onExplain,
 }: ChatThreadProps) {
   const busy = status === 'submitted' || status === 'streaming';
@@ -282,6 +286,7 @@ export function ChatThread({
                   isSaved={isSaved}
                   onToggleTranslation={() => onTogglePanel(correctionKey)}
                   onSaveWord={onSaveWord}
+                  onSaveGrammarNote={onSaveGrammarNote}
                   onExplain={() => onExplain(correctionKey, {
                     kind: 'correction',
                     messageId: dbIds?.user ?? null,
@@ -323,6 +328,7 @@ function CorrectionCard({
   isSaved,
   onToggleTranslation,
   onSaveWord,
+  onSaveGrammarNote,
   onExplain,
 }: {
   correction: Correction;
@@ -334,9 +340,34 @@ function CorrectionCard({
   isSaved: (lemma: string) => boolean;
   onToggleTranslation: () => void;
   onSaveWord: ChatThreadProps['onSaveWord'];
+  onSaveGrammarNote: ChatThreadProps['onSaveGrammarNote'];
   onExplain: () => void;
 }) {
   const [open, setOpen] = useState(true);
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(correction.explanation ?? '');
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+  const [noteError, setNoteError] = useState(false);
+  async function saveNote() {
+    if (savingNote || !noteDraft.trim()) return;
+    setSavingNote(true);
+    let ok = false;
+    try {
+      ({ ok } = await onSaveGrammarNote(noteDraft, correction.correction ?? ''));
+    } catch {
+      // A rejected action is handled like an unsuccessful save.
+    }
+    setSavingNote(false);
+    if (ok) {
+      setNoteSaved(true);
+      setEditingNote(false);
+      setNoteError(false);
+    } else {
+      setNoteError(true);
+      notifyError("Couldn't save this note. Please try again.", 'save-grammar-note');
+    }
+  }
   const corrected = correction.correction ?? '';
   const changed = changedWordIndices(priorUserText, corrected);
   const count = changed.size;
@@ -398,9 +429,27 @@ function CorrectionCard({
             />
           </div>
 
-          <p className="text-explain-ink mt-3 font-mono text-[12.5px] leading-[1.6]">
-            {correction.explanation}
-          </p>
+          <div className="mt-3 flex flex-wrap items-start gap-2">
+            <p className="text-explain-ink min-w-[180px] flex-1 font-mono text-[12.5px] leading-[1.6]">
+              {correction.explanation}
+            </p>
+            {canSave && correction.explanation && !editingNote && (
+              noteSaved ? <span className="text-ink-3 font-mono text-[11px]">✓ saved as note</span>
+                : <Pill hitArea onClick={() => setEditingNote(true)}>+ save as note</Pill>
+            )}
+          </div>
+          {canSave && correction.explanation && editingNote && !noteSaved && (
+            <div className="mt-2 flex flex-col gap-2">
+              <textarea aria-label="Grammar note" value={noteDraft} maxLength={500} rows={3}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                className="border-hair bg-panel text-ink focus:border-line w-full resize-y rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
+              {noteError && <span role="alert" className="text-ink-2 text-sm">Couldn&apos;t save this note. Please try again.</span>}
+              <div className="flex gap-2">
+                <Pill hitArea disabled={savingNote || !noteDraft.trim()} onClick={() => void saveNote()}>{savingNote ? 'saving…' : 'Save'}</Pill>
+                <Pill hitArea disabled={savingNote} onClick={() => { setEditingNote(false); setNoteError(false); }}>Cancel</Pill>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

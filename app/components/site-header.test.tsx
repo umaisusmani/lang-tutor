@@ -56,21 +56,24 @@ function openAccount() {
   return screen.getByRole('region', { name: 'Account options' });
 }
 
-test('mobile row exposes proficiency and chats while account contains navigation and sign out', () => {
+test('chat trigger opens conversations and account keeps vocab navigation', () => {
   renderHeader({ dueCount: 3, activePage: 'vocab' });
   expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Proficiency: A2' })).toBeInTheDocument();
-  const chats = screen.getByRole('button', { name: 'chats · 1' });
+  const chats = screen.getByRole('button', { name: 'chat · 1' });
+  expect(screen.queryByRole('link', { name: 'chat' })).not.toBeInTheDocument();
+  expect(chats).not.toHaveAttribute('aria-current');
   fireEvent.click(chats);
   const conversations = screen.getByRole('region', { name: 'Conversations' });
   expect(within(conversations).getByRole('link', { name: '+ new chat' })).toBeInTheDocument();
   expect(within(conversations).getByRole('link', { name: 'First conversation' })).toBeInTheDocument();
+  expect(within(conversations).getByRole('link', { name: 'First conversation' })).toHaveAttribute('aria-current', 'page');
   fireEvent.click(screen.getByRole('button', { name: 'Account options' }));
   expect(screen.queryByRole('region', { name: 'Conversations' })).not.toBeInTheDocument();
   const account = screen.getByRole('region', { name: 'Account options' });
   expect(within(account).getByText('Learner')).toBeInTheDocument();
   expect(within(account).getByText('learner@example.com')).toBeInTheDocument();
-  expect(within(account).getByRole('link', { name: 'chat' })).toBeInTheDocument();
+  expect(within(account).queryByRole('link', { name: 'chat' })).not.toBeInTheDocument();
   expect(within(account).getByRole('link', { name: /vocab/, current: 'page' })).toBeInTheDocument();
   expect(within(account).getByLabelText('3 words ready to review')).toBeInTheDocument();
   expect(within(account).getByRole('button', { name: 'Toggle color theme' })).toBeInTheDocument();
@@ -83,18 +86,18 @@ test('Escape closes account and chats popovers and returns focus to their trigge
   fireEvent.keyDown(window, { key: 'Escape' });
   expect(screen.queryByRole('region', { name: 'Account options' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Account options' })).toHaveFocus();
-  const chats = screen.getByRole('button', { name: 'chats · 1' });
+  const chats = screen.getByRole('button', { name: 'chat · 1' });
   fireEvent.click(chats);
   expect(within(screen.getByRole('region', { name: 'Conversations' })).getByRole('link', { name: '+ new chat' })).toHaveFocus();
   fireEvent.keyDown(window, { key: 'Escape' });
   expect(chats).toHaveFocus();
 });
 
-test('mobile account menu focuses its first navigation link when opened', () => {
+test('mobile account menu focuses vocab when opened', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   renderHeader();
   const account = openAccount();
-  expect(within(account).getByRole('link', { name: 'chat' })).toHaveFocus();
+  expect(within(account).getByRole('link', { name: 'vocab' })).toHaveFocus();
 });
 
 test('clicking an account nav link closes the dropdown', () => {
@@ -112,12 +115,12 @@ test('proficiency can be changed from the header row', () => {
   expect(onLevelChange).toHaveBeenCalledWith('B1');
 });
 
-test('anonymous header exposes proficiency and sign in without account or chats', () => {
+test('anonymous header exposes proficiency and sign in without account or chat', () => {
   renderHeader({ userEmail: null });
   expect(screen.getByRole('button', { name: 'Proficiency: A2' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'sign in' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Account options' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /chats/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /chat/ })).not.toBeInTheDocument();
 });
 
 test('review indicator sits on the avatar trigger', () => {

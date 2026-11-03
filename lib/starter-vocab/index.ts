@@ -38,19 +38,64 @@ const SEARCH_INDEX = [...BY_LEMMA.values()].map((word) => {
   return { word, key, tokens: key.split(' ') };
 });
 
+function distanceWithin(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let previousPrevious: number[] = [];
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let rowMin = row[0];
+    for (let j = 1; j <= b.length; j++) {
+      const value = Math.min(
+        previous[j] + 1,
+        row[j - 1] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+        i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]
+          ? previousPrevious[j - 2] + 1 : Infinity,
+      );
+      row.push(value);
+      rowMin = Math.min(rowMin, value);
+    }
+    if (rowMin > max) return max + 1;
+    previousPrevious = previous;
+    previous = row;
+  }
+  return previous[b.length];
+}
+
+function fuzzyDistance(key: string, candidates: string[], max: number): number {
+  let best = max + 1;
+  for (const candidate of candidates) {
+    if (Math.abs(candidate.length - key.length) <= max) {
+      best = Math.min(best, distanceWithin(key, candidate, max));
+    }
+    if (candidate.length > key.length) {
+      best = Math.min(best, distanceWithin(key, candidate.slice(0, key.length), max));
+    }
+    if (best === 1) break;
+  }
+  return best;
+}
+
 /** Finds starter words by their German lemma, regardless of article or diacritics. */
 export function searchStarterWords(query: string, limit = 8): StarterWord[] {
   const key = searchKey(query);
   if (!key || key.length > 50 || !Number.isFinite(limit) || limit <= 0) return [];
 
+  const maxDistance = key.length <= 3 ? 0 : key.length <= 6 ? 1 : 2;
+
   const ranked = SEARCH_INDEX.flatMap((entry) => {
     const rank = entry.key === key ? 0
       : entry.key.startsWith(key) ? 1
         : entry.tokens.some((token) => token.startsWith(key)) ? 2
-          : entry.key.includes(key) ? 3 : -1;
-    return rank < 0 ? [] : [{ ...entry, rank }];
+          : entry.key.includes(key) ? 3 : 4;
+    const distance = rank === 4 && maxDistance
+      ? fuzzyDistance(key, [entry.key, ...entry.tokens], maxDistance) : 0;
+    return rank === 4 && (!maxDistance || distance > maxDistance)
+      ? [] : [{ ...entry, rank, distance }];
   });
   ranked.sort((a, b) => a.rank - b.rank
+    || a.distance - b.distance
     || a.word.lemma.length - b.word.lemma.length
     || a.word.lemma.localeCompare(b.word.lemma, 'de'));
   return ranked.slice(0, limit).map(({ word }) => word);

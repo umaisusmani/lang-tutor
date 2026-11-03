@@ -26,6 +26,31 @@ describe('searchStarterWords', () => {
     assert.equal(searchStarterWords('ab')[0].lemma, 'ab');
   });
 
+  it('finds adjacent transpositions, missing letters, and extra letters', () => {
+    for (const query of ['Bahnhfo', 'bahnof', 'bahnhofx']) {
+      assert.ok(searchStarterWords(query).includes(findStarterWord('der Bahnhof')!), query);
+    }
+  });
+
+  it('finds an umlaut typed with an extra e', () => {
+    assert.ok(searchStarterWords('ueber').some((word) => word.lemma.startsWith('über')));
+  });
+
+  it('keeps exact and prefix results above fuzzy results', () => {
+    const words = searchStarterWords('haus', 100);
+    assert.equal(words[0].lemma, 'das Haus');
+    assert.ok(words.findIndex((word) => word.lemma === 'das Haustier')
+      < words.findIndex((word) => word.lemma === 'aus'));
+  });
+
+  it('finds a misspelled prefix while the learner is still typing', () => {
+    assert.ok(searchStarterWords('farh').some((word) => word.lemma === 'fahren'));
+  });
+
+  it('does not fuzzy-match a three-letter typo', () => {
+    assert.ok(!searchStarterWords('Hnu', 100).includes(findStarterWord('der Hund')!));
+  });
+
   it('keeps article and reflexive-pronoun queries searchable', () => {
     assert.ok(searchStarterWords('die').length > 0);
     assert.ok(searchStarterWords('die').some((word) => word.lemma === 'dienen'));

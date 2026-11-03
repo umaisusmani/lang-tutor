@@ -5,11 +5,16 @@ import { cookies } from 'next/headers';
 
 import { getPracticeQueue, getReviewQueue, recordReview, type RecordReviewResult } from '@/lib/services/card.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
-import { deleteVocabEntry, listVocab, saveVocabEntry } from '@/lib/services/vocab.service';
+import { deleteGrammarNote, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
+import { deleteVocabEntry, listVocab, saveVocabEntry, updateVocabNote } from '@/lib/services/vocab.service';
 import { findStarterWord, pickStarterWords, searchStarterWords } from '@/lib/starter-vocab';
 import { translateStarterWord, translateStarterWords } from '@/lib/starter-vocab/translate';
+import { consumeTranslation } from '@/lib/services/translation.service';
+import { lookupWords, type LookedUpWord } from '@/lib/word-lookup';
 import type { Grade } from '@/lib/srs';
 import type { CardDirection, CardSchedule, ReviewSurface, VocabSource } from '@/lib/types/db';
+
+export type { LookedUpWord } from '@/lib/word-lookup';
 
 /**
  * `source` records where the learner met the word, which is the whole
@@ -52,6 +57,38 @@ export async function deleteVocabAction(entryId: string): Promise<{ ok: boolean 
   return { ok };
 }
 
+export async function saveGrammarNoteAction(note: string, exampleSentence?: string): Promise<{ ok: boolean }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { ok: false };
+  const ok = await saveGrammarNote(userId, { note, exampleSentence });
+  if (ok) revalidatePath('/vocab');
+  return { ok };
+}
+
+export async function updateGrammarNoteAction(id: string, note: string): Promise<{ ok: boolean }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { ok: false };
+  const ok = await updateGrammarNote(userId, id, note);
+  if (ok) revalidatePath('/vocab');
+  return { ok };
+}
+
+export async function deleteGrammarNoteAction(id: string): Promise<{ ok: boolean }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { ok: false };
+  const ok = await deleteGrammarNote(userId, id);
+  if (ok) revalidatePath('/vocab');
+  return { ok };
+}
+
+export async function updateVocabNoteAction(id: string, note: string): Promise<{ ok: boolean }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { ok: false };
+  const ok = await updateVocabNote(userId, id, note);
+  if (ok) revalidatePath('/vocab');
+  return { ok };
+}
+
 /** One flashcard as the session UI needs it: the word, what to show on the
  * back, and the schedule the grade buttons preview their intervals from. */
 export type SessionCard = {
@@ -71,7 +108,59 @@ export async function searchStarterWordsAction(query: string): Promise<DiscoverC
   if (typeof query !== 'string') return [];
   const userId = await getCurrentUserId();
   if (!userId) return [];
-  return searchStarterWords(query, 8);
+  return searchStarterWords(query, 5);
+}
+
+export async function lookupWordsAction(query: string): Promise<{
+  words: LookedUpWord[]; remaining?: number; error?: string;
+}> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { words: [], error: 'Sign in to look up words.' };
+  if (typeof query !== 'string' || !query.trim() || query.trim().length > 50) {
+    return { words: [], error: 'Enter a word of up to 50 characters.' };
+  }
+
+  const usage = await consumeTranslation(userId);
+  if (!usage.allowed) {
+    const error = usage.reason === 'user'
+      ? 'You have used your 50 translations for today. Try again tomorrow.'
+      : usage.reason === 'global'
+        ? 'Translations are full for today. Try again tomorrow.'
+        : 'Could not check the translation allowance. Please try again.';
+    return { words: [], error, remaining: usage.reason === 'user' ? 0 : undefined };
+  }
+
+  try {
+    return { words: await lookupWords(query.trim(), { userId }), remaining: usage.remaining };
+  } catch (err) {
+    console.error('[vocab] lookupWordsAction failed:', err);
+    return { words: [], remaining: usage.remaining, error: 'Could not look up words. Please try again.' };
+  }
+}
+
+export async function addLookedUpWordAction(word: {
+  lemma: string; meaning: string; example?: string; exampleTranslation?: string;
+}): Promise<{ ok: boolean }> {
+  const userId = await getCurrentUserId();
+  if (!userId || !word || typeof word !== 'object') return { ok: false };
+  const { lemma, meaning, example, exampleTranslation } = word;
+  if (typeof lemma !== 'string' || !lemma.trim() || lemma.length > 60
+    || typeof meaning !== 'string' || !meaning.trim() || meaning.length > 500
+    || (example !== undefined && (typeof example !== 'string' || example.length > 200))
+    || (exampleTranslation !== undefined && (typeof exampleTranslation !== 'string' || exampleTranslation.length > 200))) {
+    return { ok: false };
+  }
+  try {
+    const ok = await saveVocabEntry(userId, {
+      term: lemma.trim(), lemma: lemma.trim(), translation: meaning.trim(),
+      exampleSentence: example?.trim(), source: 'new_word',
+    });
+    if (ok) revalidatePath('/', 'layout');
+    return { ok };
+  } catch (err) {
+    console.error('[vocab] addLookedUpWordAction failed:', err);
+    return { ok: false };
+  }
 }
 
 export type SessionPayload = {

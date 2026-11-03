@@ -12,6 +12,7 @@ import { Pill, pillClassName } from '@/app/components/pill';
 import { Select } from '@/app/components/select';
 import { notifyError } from '@/app/components/toaster';
 import { deleteConversationAction } from '@/app/conversations/actions';
+import { useInstallPrompt } from '@/app/hooks/use-install-prompt';
 import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
 
@@ -71,7 +72,7 @@ function ConversationList({ conversations, conversationId, deletingId, onClose, 
   );
 }
 
-function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage, dueCount, onNavigate }: {
+function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage, dueCount, onNavigate, installAvailable, onInstall }: {
   userEmail: string;
   userName: string | null;
   theme?: 'light' | 'dark' | null;
@@ -79,6 +80,8 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
   activePage: 'chat' | 'vocab';
   dueCount: number;
   onNavigate: () => void;
+  installAvailable: boolean;
+  onInstall: () => void;
 }) {
   return (
     <>
@@ -88,14 +91,6 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
       </div>
       <div className="bg-hair my-1 h-px" />
       <div className="flex flex-col sm:hidden">
-        <Link
-          href="/"
-          onClick={onNavigate}
-          aria-current={activePage === 'chat' ? 'page' : undefined}
-          className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'chat' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
-        >
-          chat
-        </Link>
         <Link
           href="/vocab"
           onClick={onNavigate}
@@ -138,6 +133,15 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
           </span>
         </span>
       </button>
+      {installAvailable && (
+        <button
+          type="button"
+          onClick={onInstall}
+          className="text-ink hover:bg-soft min-h-11 w-full cursor-pointer rounded-lg px-2.5 py-2 text-left font-mono text-[11px]"
+        >
+          Install app
+        </button>
+      )}
       <form action={signOut}>
         <button
           type="submit"
@@ -184,6 +188,7 @@ export function SiteHeader({
   const [accountOpen, setAccountOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const confirm = useConfirm();
+  const { canInstall, install } = useInstallPrompt();
   const resetLabel = useResetLabel(resetsAt);
   const router = useRouter();
   const chatsTrigger = useRef<HTMLButtonElement>(null);
@@ -291,13 +296,6 @@ export function SiteHeader({
             {userEmail && (
               <div className="hidden items-center gap-1.5 sm:flex sm:gap-2.5">
                 <Link
-                  href="/"
-                  className="group/pill inline-flex min-h-11 items-center"
-                  aria-current={activePage === 'chat' ? 'page' : undefined}
-                >
-                  <span className={pillClassName({ active: activePage === 'chat' })}>chat</span>
-                </Link>
-                <Link
                   href="/vocab"
                   className="group/pill inline-flex min-h-11 items-center"
                   aria-current={activePage === 'vocab' ? 'page' : undefined}
@@ -331,8 +329,9 @@ export function SiteHeader({
                     setChatsOpen((v) => !v);
                   }}
                   hitArea
+                  active={activePage === 'chat'}
                 >
-                  chats{conversations.length > 0 && ` · ${conversations.length}`}
+                  chat{conversations.length > 0 && ` · ${conversations.length}`}
                 </Pill>
 
                 {chatsOpen && (
@@ -417,6 +416,8 @@ export function SiteHeader({
                         activePage={activePage}
                         dueCount={dueCount}
                         onNavigate={() => setAccountOpen(false)}
+                        installAvailable={canInstall}
+                        onInstall={() => { setAccountOpen(false); void install(); }}
                       />
                     </div>
                   </>

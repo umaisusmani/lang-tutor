@@ -20,7 +20,7 @@ import { useQuota } from '@/app/hooks/use-quota';
 import { useStickToBottom } from '@/app/hooks/use-stick-to-bottom';
 import type { QuotaStatus } from '@/lib/quota';
 import { useTheme } from '@/app/hooks/use-theme';
-import { saveVocabAction } from '@/app/vocab/actions';
+import { saveGrammarNoteAction, saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
 import type { WordGloss } from '@/lib/gloss';
@@ -354,6 +354,7 @@ export default function Chat({
                       setOpenPanel((current) => ({ ...current, [key]: !current[key] }))
                     }
                     onSaveWord={saveWord}
+                    onSaveGrammarNote={saveGrammarNoteAction}
                     onExplain={explain}
                   />
                 )}

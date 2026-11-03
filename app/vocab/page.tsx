@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { PageHeader } from '@/app/components/page-header';
 import { VocabBrowser } from '@/app/vocab/vocab-browser';
 import { getReviewQueue } from '@/lib/services/card.service';
+import { listGrammarNotes } from '@/lib/services/grammar-note.service';
 import { listConversations } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
 import { listVocab } from '@/lib/services/vocab.service';
@@ -13,6 +14,7 @@ export default async function VocabPage() {
   if (!user) redirect('/login');
 
   const entries = await listVocab(user.id);
+  const grammarNotes = await listGrammarNotes(user.id);
   const conversations = await listConversations(user.id);
   const dueCards = await getReviewQueue(user.id);
   const dueCount = dueCards.length;
@@ -43,7 +45,7 @@ export default async function VocabPage() {
       />
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
         <main className="flex flex-1 flex-col gap-[22px] pt-6 pb-7">
-          <VocabBrowser entries={entries} dueCount={dueCount} dueWordIds={dueWordIds} heading={heading} />
+          <VocabBrowser entries={entries} grammarNotes={grammarNotes} dueCount={dueCount} dueWordIds={dueWordIds} heading={heading} />
         </main>
       </div>
     </div>

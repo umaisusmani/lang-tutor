@@ -34,7 +34,16 @@ export interface VocabEntry {
   lemma: string;
   translation: string | null;
   example_sentence: string | null;
+  note: string | null;
   source: VocabSource;
+  created_at: string;
+}
+
+export interface GrammarNote {
+  id: string;
+  user_id: string;
+  note: string;
+  example_sentence: string | null;
   created_at: string;
 }
 

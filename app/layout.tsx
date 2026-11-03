@@ -33,6 +33,7 @@ const londrina = Londrina_Solid({
 export const metadata: Metadata = {
   title: "Starvogel",
   description: "Practice German conversation with an AI tutor that explains your mistakes.",
+  appleWebApp: { capable: true, title: "Starvogel", statusBarStyle: "default" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

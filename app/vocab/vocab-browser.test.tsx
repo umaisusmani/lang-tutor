@@ -22,7 +22,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 const entry: VocabEntry = {
   id: 'word-1', user_id: 'user-1', term: 'Haus', lemma: 'Haus', translation: 'house',
-  example_sentence: null, source: 'new_word', created_at: '2026-01-01T00:00:00.000Z',
+  example_sentence: null, note: null, source: 'new_word', created_at: '2026-01-01T00:00:00.000Z',
 };
 const card: SessionCard = {
   id: 'card-1', direction: 'forward', lemma: 'Haus', translation: 'house', exampleSentence: null,
@@ -31,7 +31,7 @@ const card: SessionCard = {
 };
 
 test('discovering words only changes the Discover words loading label', () => {
-  render(<VocabBrowser entries={[entry]} dueCount={1} dueWordIds={[entry.id]} heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser grammarNotes={[]} entries={[entry]} dueCount={1} dueWordIds={[entry.id]} heading={<h1>Vocabulary</h1>} />);
 
   const reviewButton = screen.getByRole('button', { name: 'Review 1 due word' });
   const discoverButton = screen.getByRole('button', { name: 'Discover words' });
@@ -42,17 +42,17 @@ test('discovering words only changes the Discover words loading label', () => {
 });
 
 test('the add-word field is visible with saved entries', () => {
-  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser grammarNotes={[]} entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
   expect(screen.getByRole('combobox', { name: 'Add a word' })).toBeInTheDocument();
 });
 
 test('the add-word field is visible with an empty vocabulary', () => {
-  render(<VocabBrowser entries={[]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser grammarNotes={[]} entries={[]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
   expect(screen.getByRole('combobox', { name: 'Add a word' })).toBeInTheDocument();
 });
 
 test('the single primary button says Practice when nothing is due', () => {
-  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser grammarNotes={[]} entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
   expect(screen.getByRole('button', { name: 'Practice' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Extra practice|Review due words/ })).not.toBeInTheDocument();
 });
@@ -62,7 +62,7 @@ test('finishing due words offers practice ahead in place', async () => {
     .mockResolvedValueOnce({ cards: [card], discover: [], extra: false })
     .mockResolvedValueOnce({ cards: [card], discover: [], extra: true });
   vi.mocked(gradeCardAction).mockResolvedValue({ status: 'ok', next: { state: 1, due: '2026-11-01T00:00:00.000Z' } } as Awaited<ReturnType<typeof gradeCardAction>>);
-  render(<VocabBrowser entries={[entry]} dueCount={1} dueWordIds={[entry.id]} heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser grammarNotes={[]} entries={[entry]} dueCount={1} dueWordIds={[entry.id]} heading={<h1>Vocabulary</h1>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Review 1 due word' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Show answer' }));
   fireEvent.click(screen.getByRole('button', { name: /GoodI knew it/ }));
@@ -75,7 +75,7 @@ test('finishing due words offers practice ahead in place', async () => {
 test('a practice round returns to the list with a Practice summary', async () => {
   vi.mocked(startSessionAction).mockResolvedValue({ cards: [card], discover: [], extra: true });
   vi.mocked(gradeCardAction).mockResolvedValue({ status: 'ok', next: { state: 1, due: '2026-11-01T00:00:00.000Z' } } as Awaited<ReturnType<typeof gradeCardAction>>);
-  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser grammarNotes={[]} entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Practice' }));
   expect(await screen.findByText('Practising ahead: nothing here is due yet.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Show answer' }));

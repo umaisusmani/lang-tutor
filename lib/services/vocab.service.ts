@@ -27,7 +27,7 @@ export type VocabCandidate = {
 const LEMMA_BATCH_SIZE = 100;
 
 /** Longest example sentence stored with a saved word -- see saveVocabEntry(). */
-const EXAMPLE_SENTENCE_MAX = 500;
+export const EXAMPLE_SENTENCE_MAX = 500;
 
 /**
  * Which of these lemmas the user has already saved, lowercased.
@@ -225,6 +225,25 @@ export async function deleteVocabEntry(userId: string, entryId: string): Promise
     return true;
   } catch (err) {
     console.error('[vocab.service] deleteVocabEntry failed:', err);
+    return false;
+  }
+}
+
+export async function updateVocabNote(userId: string, entryId: string, note: string | null): Promise<boolean> {
+  if (note !== null && typeof note !== 'string') return false;
+  const trimmed = note?.trim() || null;
+  if (trimmed && trimmed.length > EXAMPLE_SENTENCE_MAX) return false;
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from('vocab_entries').update({ note: trimmed })
+      .eq('id', entryId).eq('user_id', userId);
+    if (error) {
+      console.error('[vocab.service] updateVocabNote failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[vocab.service] updateVocabNote failed:', err);
     return false;
   }
 }

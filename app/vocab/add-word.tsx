@@ -1,26 +1,35 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
-import { Button } from '@/app/components/button';
-import { addStarterWordAction, previewStarterWordAction, searchStarterWordsAction, type DiscoverCard } from '@/app/vocab/actions';
+import { addLookedUpWordAction, addStarterWordAction, lookupWordsAction,
+  previewStarterWordAction, searchStarterWordsAction, type DiscoverCard, type LookedUpWord } from '@/app/vocab/actions';
 
-export function AddWord({ savedLemmas, onAdded }: {
-  savedLemmas: ReadonlySet<string>;
-  onAdded: () => void;
-}) {
+type Option = { kind: 'starter'; word: DiscoverCard } | { kind: 'lookup'; word: LookedUpWord } | { kind: 'more' };
+type Selected = Extract<Option, { kind: 'starter' | 'lookup' }>;
+const lookupKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+
+export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<string>; onAdded: () => void }) {
   const inputId = useId();
   const listboxId = useId();
-  const meaningId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectedRef = useRef<HTMLDivElement>(null);
+  const focusSearchRef = useRef(false);
   const requestRef = useRef(0);
   const previewRef = useRef(0);
+  const lookupRef = useRef(0);
   const pendingRef = useRef(false);
+  const typedAtRef = useRef(0);
+  const cacheRef = useRef(new Map<string, LookedUpWord[]>());
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DiscoverCard[]>([]);
+  const [lookupResults, setLookupResults] = useState<LookedUpWord[]>([]);
+  const [lookupPending, setLookupPending] = useState(false);
+  const [lookupDone, setLookupDone] = useState(false);
+  const [lookupError, setLookupError] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const [selected, setSelected] = useState<DiscoverCard | null>(null);
+  const [selected, setSelected] = useState<Selected | null>(null);
   const [meaning, setMeaning] = useState('');
   const [lookingUp, setLookingUp] = useState(false);
   const [searchPending, setSearchPending] = useState(false);
@@ -31,40 +40,89 @@ export function AddWord({ savedLemmas, onAdded }: {
   const [searchedQuery, setSearchedQuery] = useState('');
   const [addedLemmas, setAddedLemmas] = useState<ReadonlySet<string>>(() => new Set());
 
-  function isSaved(word: DiscoverCard) {
-    const lemma = word.lemma.toLowerCase();
-    return savedLemmas.has(lemma) || addedLemmas.has(lemma);
-  }
+  const isSaved = (lemma: string) => savedLemmas.has(lemma.toLowerCase()) || addedLemmas.has(lemma.toLowerCase());
+  const options: Option[] = [
+    ...results.map((word): Option => ({ kind: 'starter', word })),
+    ...(results.length ? [{ kind: 'more' } as Option] : []),
+    ...lookupResults.map((word): Option => ({ kind: 'lookup', word })),
+  ];
+  const showMenu = open && !selected && Boolean(query.trim()) && !searchPending;
+
+  const runLookup = useCallback(async (value: string) => {
+    const key = lookupKey(value);
+    if (cacheRef.current.has(key)) {
+      setLookupResults(cacheRef.current.get(key)!);
+      setLookupDone(true);
+      setLookupError('');
+      setOpen(true);
+      return;
+    }
+    const request = ++lookupRef.current;
+    setLookupPending(true);
+    setLookupError('');
+    setOpen(true);
+    try {
+      const response = await lookupWordsAction(value.trim());
+      if (request !== lookupRef.current) return;
+      if (response.error) setLookupError(response.error);
+      else {
+        cacheRef.current.set(key, response.words);
+        setLookupResults(response.words);
+        setLookupDone(true);
+      }
+    } catch {
+      if (request === lookupRef.current) setLookupError('Could not look up words. Please try again.');
+    } finally {
+      if (request === lookupRef.current) setLookupPending(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!query.trim() || selected) return;
     const request = requestRef.current;
     const timer = window.setTimeout(async () => {
       let words: DiscoverCard[];
-      try {
-        words = await searchStarterWordsAction(query);
-      } catch {
-        words = [];
-      }
+      try { words = await searchStarterWordsAction(query); }
+      catch { words = []; }
       if (request !== requestRef.current) return;
-      setResults(words);
+      setResults(words.slice(0, 5));
       setSearchPending(false);
       setActive(-1);
-      setOpen(words.length > 0 && document.activeElement === inputRef.current);
+      setOpen(document.activeElement === inputRef.current);
       setSearchedQuery(query);
       setAnnouncement(words.length ? `${words.length} suggestions` : 'No matches');
     }, 150);
     return () => window.clearTimeout(timer);
   }, [query, selected]);
 
+  useEffect(() => {
+    if (selected || query.trim().length < 3 || searchedQuery !== query || results.length || lookupDone || lookupPending || lookupError) return;
+    const timer = window.setTimeout(() => void runLookup(query), Math.max(0, 700 - (Date.now() - typedAtRef.current)));
+    return () => window.clearTimeout(timer);
+  }, [query, searchedQuery, results, selected, lookupDone, lookupPending, lookupError, runLookup]);
+
+  useEffect(() => {
+    if (selected) selectedRef.current?.focus();
+    else if (focusSearchRef.current) {
+      inputRef.current?.focus();
+      focusSearchRef.current = false;
+    }
+  }, [selected]);
+
   function changeQuery(value: string) {
-    requestRef.current += 1;
-    previewRef.current += 1;
+    requestRef.current++;
+    previewRef.current++;
+    lookupRef.current++;
+    typedAtRef.current = Date.now();
     setQuery(value);
     setSearchPending(Boolean(value.trim()));
     setSelected(null);
     setMeaning('');
     setLookingUp(false);
+    setLookupResults(cacheRef.current.get(lookupKey(value)) ?? []);
+    setLookupDone(cacheRef.current.has(lookupKey(value)));
+    setLookupPending(false);
+    setLookupError('');
     setError('');
     setAddedMessage('');
     setResults([]);
@@ -74,24 +132,34 @@ export function AddWord({ savedLemmas, onAdded }: {
     setAnnouncement('');
   }
 
-  async function select(word: DiscoverCard) {
-    if (isSaved(word)) return;
-    requestRef.current += 1;
+  function cancel() {
+    focusSearchRef.current = true;
+    changeQuery('');
+  }
+
+  async function select(option: Option) {
+    if (option.kind === 'more') {
+      if (!lookupPending && !lookupDone) void runLookup(query);
+      return;
+    }
+    if (isSaved(option.word.lemma)) return;
+    requestRef.current++;
+    lookupRef.current++;
     const preview = ++previewRef.current;
-    setSelected(word);
+    setSelected(option);
     setSearchPending(false);
-    setQuery(word.lemma);
+    setLookupPending(false);
     setOpen(false);
     setActive(-1);
-    setMeaning('');
+    setMeaning(option.kind === 'lookup' ? option.word.meaning : '');
     setError('');
     setAddedMessage('');
-    setLookingUp(true);
-    inputRef.current?.focus();
+    setLookingUp(option.kind === 'starter');
+    if (option.kind === 'lookup') return;
     try {
-      const result = await previewStarterWordAction(word.lemma);
+      const response = await previewStarterWordAction(option.word.lemma);
       if (preview !== previewRef.current) return;
-      if (result?.translation) setMeaning(result.translation);
+      if (response?.translation) setMeaning(response.translation);
       else setError("Couldn't load a meaning. Type your own, or pick another word.");
     } catch {
       if (preview === previewRef.current) setError("Couldn't load a meaning. Type your own, or pick another word.");
@@ -101,37 +169,28 @@ export function AddWord({ savedLemmas, onAdded }: {
   }
 
   function moveActive(direction: 1 | -1) {
-    setOpen(true);
-    const enabled = results.map((word, index) => isSaved(word) ? -1 : index).filter((index) => index >= 0);
+    const enabled = options.map((option, index) => option.kind !== 'more' && isSaved(option.word.lemma) ? -1 : index)
+      .filter((index) => index >= 0);
     if (!enabled.length) return;
     const position = enabled.indexOf(active);
-    const next = position < 0 ? (direction === 1 ? 0 : enabled.length - 1)
-      : (position + direction + enabled.length) % enabled.length;
-    setActive(enabled[next]);
+    setActive(position < 0 ? (direction === 1 ? enabled[0] : enabled[enabled.length - 1])
+      : enabled[(position + direction + enabled.length) % enabled.length]);
+    setOpen(true);
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (selected && event.key === 'Escape') {
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && options.length) {
       event.preventDefault();
-      changeQuery('');
-      return;
-    }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (results.length) {
-        event.preventDefault();
-        moveActive(event.key === 'ArrowDown' ? 1 : -1);
-      }
-    } else if (event.key === 'Enter' && open && active >= 0) {
+      moveActive(event.key === 'ArrowDown' ? 1 : -1);
+    } else if (event.key === 'Enter' && showMenu && active >= 0) {
       event.preventDefault();
-      void select(results[active]);
+      void select(options[active]);
     } else if (event.key === 'Escape') {
       if (open) {
         event.preventDefault();
         setOpen(false);
         setActive(-1);
-      } else {
-        changeQuery('');
-      }
+      } else changeQuery('');
     }
   }
 
@@ -140,15 +199,17 @@ export function AddWord({ savedLemmas, onAdded }: {
     pendingRef.current = true;
     setAdding(true);
     setError('');
-    const word = selected;
+    const current = selected;
     try {
-      const result = await addStarterWordAction(word.lemma, meaning.trim());
+      const result = current.kind === 'starter'
+        ? await addStarterWordAction(current.word.lemma, meaning.trim())
+        : await addLookedUpWordAction({ ...current.word, meaning: meaning.trim() });
       if (!result.ok) throw new Error('Save failed');
-      setAddedLemmas((previous) => new Set([...previous, word.lemma.toLowerCase()]));
+      setAddedLemmas((previous) => new Set([...previous, current.word.lemma.toLowerCase()]));
+      focusSearchRef.current = true;
       changeQuery('');
-      setAddedMessage(`✓ ${word.lemma} added`);
+      setAddedMessage(`✓ ${current.word.lemma} added`);
       onAdded();
-      inputRef.current?.focus();
     } catch {
       setError("Couldn't add that word. Please try again.");
     } finally {
@@ -157,58 +218,90 @@ export function AddWord({ savedLemmas, onAdded }: {
     }
   }
 
+  function handleSelectedKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancel();
+    } else if (event.key === 'Enter' && (event.target === event.currentTarget || event.target instanceof HTMLInputElement)
+      && meaning.trim() && !lookingUp) {
+      event.preventDefault();
+      void add();
+    }
+  }
+
   return (
     <section className="border-line bg-panel flex flex-col gap-3 rounded-2xl border-2 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <label htmlFor={inputId} className="font-display text-xl">Add a word</label>
-      </div>
-      <div className="flex items-start gap-3">
-        <div className="relative min-w-0 flex-1">
-          <input ref={inputRef} id={inputId} type="text" value={query} readOnly={Boolean(selected)}
-            onChange={(event) => changeQuery(event.target.value)} onKeyDown={handleKeyDown}
-            onFocus={() => { if (results.length && !selected) setOpen(true); }}
+      <label htmlFor={inputId} className="font-display text-xl">Add a word</label>
+      <div className="relative min-w-0">
+        {selected ? <div ref={selectedRef} tabIndex={0} onKeyDown={handleSelectedKeyDown}
+          className="border-line bg-panel flex flex-wrap items-start gap-3 rounded-xl border-2 p-3 outline-offset-2">
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-2xl leading-tight">{selected.word.lemma}</div>
+            {lookingUp ? <span className="text-ink-2 inline-flex items-center gap-2 font-mono text-xs">
+              <span aria-hidden="true" className="border-ink-3 h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
+              looking up the meaning…
+            </span> : <input aria-label="Meaning" value={meaning} onChange={(event) => setMeaning(event.target.value)}
+              placeholder="Type a meaning" maxLength={500}
+              className="text-ink-2 w-full border-0 border-b border-transparent bg-transparent p-0 font-mono outline-none focus:border-ink-2" />}
+            {(selected.word.example || selected.word.exampleTranslation) && <div className="text-ink-2 mt-2 text-sm">
+              <p>{selected.word.example}</p>
+              <p className="font-mono text-xs">{selected.word.exampleTranslation}</p>
+            </div>}
+          </div>
+          <div className="border-line bg-panel ml-auto flex shrink-0 overflow-hidden rounded-full border-2 shadow-[2px_2px_0_var(--line)]">
+            {!lookingUp && meaning.trim() && <button type="button" aria-label={`Add ${selected.word.lemma}`} title={`Add ${selected.word.lemma}`}
+              disabled={adding} onClick={() => void add()}
+              className="bg-yellow text-on-bright flex h-11 w-11 items-center justify-center text-xl disabled:opacity-50">✓</button>}
+            <button type="button" aria-label="Cancel" title="Cancel" onClick={cancel}
+              className="text-ink flex h-11 w-11 items-center justify-center text-xl">✕</button>
+          </div>
+        </div> : <>
+          <input ref={inputRef} id={inputId} type="text" value={query}
+            onChange={(event) => changeQuery(event.target.value)} onKeyDown={handleSearchKeyDown}
+            onFocus={() => { if (searchedQuery === query && query.trim()) setOpen(true); }}
             onBlur={() => { setOpen(false); setActive(-1); }}
-            role="combobox" aria-autocomplete="list" aria-expanded={open && results.length > 0}
+            role="combobox" aria-autocomplete="list" aria-expanded={showMenu}
             aria-busy={searchPending} aria-controls={listboxId}
-            aria-activedescendant={open && active >= 0 ? `${listboxId}-${active}` : undefined}
-            placeholder="Type a German word…" autoComplete="off" autoCapitalize="none" autoCorrect="off"
+            aria-activedescendant={showMenu && active >= 0 ? `${listboxId}-${active}` : undefined}
+            placeholder="Type a word in German or English…" autoComplete="off" autoCapitalize="none" autoCorrect="off"
             spellCheck={false} maxLength={50}
             className="border-line bg-panel w-full rounded-xl border-2 px-3 py-2 pr-10" />
           {searchPending && <span role="status" aria-label="Searching suggestions" className="border-ink-3 absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />}
-          {selected && <button type="button" aria-label="Clear selected word" onClick={() => { changeQuery(''); inputRef.current?.focus(); }}
-            className="text-ink-2 absolute right-2 top-1.5 flex h-8 w-8 items-center justify-center rounded-lg text-xl">×</button>}
-          {open && results.length > 0 && <ul role="listbox" id={listboxId}
+          {showMenu && <ul role="listbox" id={listboxId}
             className="border-line bg-panel absolute top-full z-20 mt-1 max-h-[320px] w-full overflow-y-auto rounded-xl border-2 p-1.5 shadow-[3px_3px_0_var(--line)] animate-[fade-rise_160ms_ease-out]">
-            {results.map((word, index) => {
-              const saved = isSaved(word);
-              return <li key={word.lemma} id={`${listboxId}-${index}`} role="option"
-                aria-selected={active === index} aria-disabled={saved ? 'true' : undefined}
-                onMouseDown={(event) => event.preventDefault()} onClick={() => void select(word)}
-                className={`flex min-h-11 items-center justify-between gap-2 rounded-lg px-2.5 py-2 ${saved ? 'text-ink-3' : active === index ? 'bg-yellow text-on-bright' : 'hover:bg-soft cursor-pointer'}`}>
-                <span className="min-w-0 font-semibold break-words">{word.lemma}</span>
-                {saved && <span className="shrink-0 font-mono text-[11px]">✓ saved</span>}
+            {results.map((word, index) => <li key={`starter-${word.lemma}`} id={`${listboxId}-${index}`} role="option"
+              aria-selected={active === index} aria-disabled={isSaved(word.lemma) ? 'true' : undefined}
+              onMouseDown={(event) => event.preventDefault()} onClick={() => void select({ kind: 'starter', word })}
+              className={`flex min-h-11 items-center justify-between gap-2 rounded-lg px-2.5 py-2 ${isSaved(word.lemma) ? 'text-ink-3' : active === index ? 'bg-yellow text-on-bright' : 'hover:bg-soft cursor-pointer'}`}>
+              <span className="min-w-0 font-semibold break-words">{word.lemma}</span>
+              {isSaved(word.lemma) && <span className="shrink-0 font-mono text-[11px]">✓ saved</span>}
+            </li>)}
+            {results.length > 0 && <li id={`${listboxId}-${results.length}`} role="option" aria-selected={active === results.length}
+              onMouseDown={(event) => event.preventDefault()} onClick={() => void select({ kind: 'more' })}
+              className={`flex min-h-11 items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-xs cursor-pointer ${active === results.length ? 'bg-yellow text-on-bright' : 'hover:bg-soft'}`}>
+              {lookupPending && <span aria-hidden="true" className="border-ink-3 h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />}
+              {lookupPending ? 'Looking up…' : 'See more results'}
+            </li>}
+            {lookupResults.length > 0 && <li aria-hidden="true" className="text-ink-3 px-2.5 pt-2 font-mono text-[10px] uppercase">More words</li>}
+            {lookupResults.map((word, offset) => {
+              const index = results.length + (results.length ? 1 : 0) + offset;
+              return <li key={`lookup-${word.lemma}`} id={`${listboxId}-${index}`} role="option"
+                aria-selected={active === index} aria-disabled={isSaved(word.lemma) ? 'true' : undefined}
+                onMouseDown={(event) => event.preventDefault()} onClick={() => void select({ kind: 'lookup', word })}
+                className={`flex min-h-11 items-center justify-between gap-2 rounded-lg px-2.5 py-2 ${isSaved(word.lemma) ? 'text-ink-3' : active === index ? 'bg-yellow text-on-bright' : 'hover:bg-soft cursor-pointer'}`}>
+                <span className="min-w-0"><span className="font-semibold break-words">{word.lemma}</span>
+                  <span className="text-ink-2 ml-2 font-mono text-xs">{word.meaning}</span></span>
+                {isSaved(word.lemma) && <span className="shrink-0 font-mono text-[11px]">✓ saved</span>}
               </li>;
             })}
+            {lookupError && <li role="alert" className="text-ink-2 px-2.5 py-2 text-sm">{lookupError}</li>}
+            {!options.length && !lookupError && <li className="text-ink-3 px-2.5 py-2 text-sm">
+              {lookupPending || (query.trim().length >= 3 && !lookupDone) ? 'Looking up…' : 'No matches'}
+            </li>}
           </ul>}
-        </div>
-        <Button variant="primary" type="button" disabled={!selected || lookingUp || adding || !meaning.trim()} onClick={() => void add()}>
-          {adding ? 'Adding…' : 'Add'}
-        </Button>
+        </>}
       </div>
       <span className="sr-only" role="status">{announcement}</span>
-      {!selected && query.trim() && searchedQuery === query && results.length === 0 &&
-        <p className="text-ink-3 text-sm">Not in the starter list. Try the Translate tab in the chat panel for other words.</p>}
-      {selected && <div className="bg-soft flex flex-col gap-2 rounded-xl p-3">
-        <label htmlFor={meaningId} className="text-ink-3 font-mono text-[10px] uppercase tracking-[0.08em]">Meaning</label>
-        <input id={meaningId} type="text" value={meaning} onChange={(event) => setMeaning(event.target.value)}
-          onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void add(); } }}
-          disabled={lookingUp} placeholder={lookingUp ? 'Looking up the meaning…' : 'Type a meaning'}
-          className="border-line bg-panel w-full rounded-xl border-2 px-3 py-2 font-mono" />
-        <div className="text-ink-2 text-sm">
-          <p>{selected.example}</p>
-          <p className="font-mono text-xs">{selected.exampleTranslation}</p>
-        </div>
-      </div>}
       {error && <p role="alert" className="text-ink-3 text-sm">{error}</p>}
       {addedMessage && <p role="status" className="text-ink-2 text-sm">{addedMessage}</p>}
     </section>

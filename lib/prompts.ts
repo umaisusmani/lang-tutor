@@ -177,6 +177,15 @@ For a unit it's the unit's meaning ("anrufen" -> "to call (on the phone)",
 "es gibt" -> "there is / there are", "ein bisschen" -> "a little"). Words
 that share a lemma share its lemmaTranslation.`;
 
+export function buildWordLookupSystemPrompt(): string {
+  return `A learner typed a word they want to add to their German vocabulary. The input may be German, possibly misspelled, or English. Return up to five German dictionary entries, with the most likely intended entry first. If the input is nonsense, return an empty words list.
+
+For each entry return "lemma", "meaning", "example", and "exampleTranslation". The meaning is a short English dictionary meaning of 1-4 words, with "to ..." for verbs and no article for nouns. The example is one short, natural German sentence at A2-B1 level using the lemma, and exampleTranslation is its English translation.
+
+Apply these lemma rules to each entry. Where the rules mention "lemmaTranslation", use that guidance for "meaning":
+${LEMMA_RULES}`;
+}
+
 /** System prompt for the structured correction-detection pass (step 2).
  * Analyzes a single learner message in isolation — it does not see the
  * tutor's reply, since it runs concurrently with it, not after it. */

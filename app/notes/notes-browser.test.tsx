@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { NotesBrowser } from '@/app/notes/notes-browser';
 import {
@@ -18,7 +18,25 @@ vi.mock('@/app/vocab/actions', () => ({
   saveGrammarNoteAction: vi.fn(), searchSavedWordsAction: vi.fn(),
   updateGrammarNoteAction: vi.fn(), updateVocabNoteAction: vi.fn(),
 }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.mocked(listNoteCategoriesAction).mockResolvedValue([]); });
+const showModalDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
+const closeDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true, value(this: HTMLDialogElement) { this.setAttribute('open', ''); },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true, value(this: HTMLDialogElement) { this.removeAttribute('open'); },
+  });
+});
+afterEach(() => {
+  cleanup();
+  if (showModalDescriptor) Object.defineProperty(HTMLDialogElement.prototype, 'showModal', showModalDescriptor);
+  else Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
+  if (closeDescriptor) Object.defineProperty(HTMLDialogElement.prototype, 'close', closeDescriptor);
+  else Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+  vi.clearAllMocks();
+  vi.mocked(listNoteCategoriesAction).mockResolvedValue([]);
+});
 
 const verbs: NoteCategory = { id: 'verbs', user_id: 'user-1', name: 'Verbs', created_at: '2026-01-01' };
 const ideas: NoteCategory = { id: 'ideas', user_id: 'user-1', name: 'Ideas', created_at: '2026-01-01' };
@@ -32,7 +50,19 @@ const wordNote: VocabEntry = {
 };
 
 function browser(grammarNotes: GrammarNote[] = [], wordNotes: VocabEntry[] = []) {
-  return <NotesBrowser grammarNotes={grammarNotes} wordNotes={wordNotes} heading={<h1>Your notes.</h1>} />;
+  return <NotesBrowser grammarNotes={grammarNotes} wordNotes={wordNotes} count={grammarNotes.length + wordNotes.length} />;
+}
+
+function openAddNote() {
+  fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
+  return screen.getByRole('dialog', { name: 'Add a note' });
+}
+
+function openAddCategory() {
+  fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add category' }));
+  return screen.getByRole('dialog', { name: 'Add a category' });
 }
 
 function enterHtml(label: string, html: string) {
@@ -41,17 +71,63 @@ function enterHtml(label: string, html: string) {
   fireEvent.input(editor);
 }
 
+test('the title menu opens, then closes on Escape or outside click', () => {
+  render(browser());
+  expect(screen.getByRole('heading', { name: 'Your notes.' })).toBeInTheDocument();
+  expect(screen.getByText('0 notes saved')).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'Add a note' })).not.toBeInTheDocument();
+  const trigger = screen.getByRole('button', { name: 'Add' });
+  fireEvent.click(trigger);
+  expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('button', { name: 'Add note' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Add category' })).toBeInTheDocument();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(trigger);
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole('button', { name: 'Add category' })).not.toBeInTheDocument();
+});
+
+test('each title menu option opens its modal and closes the menu', () => {
+  render(browser());
+  const noteDialog = openAddNote();
+  expect(screen.getByRole('button', { name: 'Add' })).toHaveAttribute('aria-expanded', 'false');
+  expect(within(noteDialog).getByRole('textbox', { name: 'Add a note' })).toBeInTheDocument();
+  fireEvent(noteDialog, new Event('cancel', { cancelable: true }));
+  expect(screen.queryByRole('dialog', { name: 'Add a note' })).not.toBeInTheDocument();
+  const categoryDialog = openAddCategory();
+  expect(within(categoryDialog).getByRole('textbox', { name: 'Category name' })).toBeInTheDocument();
+  fireEvent.click(within(categoryDialog).getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('dialog', { name: 'Add a category' })).not.toBeInTheDocument();
+});
+
+test('closing either modal keeps its unfinished draft for reopening', () => {
+  render(browser());
+  const noteDialog = openAddNote();
+  enterHtml('Add a note', '<strong>Draft</strong>');
+  fireEvent.click(noteDialog);
+  expect(screen.queryByRole('dialog', { name: 'Add a note' })).not.toBeInTheDocument();
+  expect(within(openAddNote()).getByRole('textbox', { name: 'Add a note' }).innerHTML).toBe('<strong>Draft</strong>');
+  fireEvent.click(screen.getByRole('dialog', { name: 'Add a note' }));
+
+  const categoryDialog = openAddCategory();
+  fireEvent.change(within(categoryDialog).getByRole('textbox', { name: 'Category name' }), { target: { value: 'Draft category' } });
+  fireEvent.click(within(categoryDialog).getByRole('button', { name: 'Cancel' }));
+  expect(within(openAddCategory()).getByRole('textbox', { name: 'Category name' })).toHaveValue('Draft category');
+});
+
 test('adds sanitized rich text with a selected managed category', async () => {
   vi.mocked(listNoteCategoriesAction).mockResolvedValue([verbs]);
   vi.mocked(saveGrammarNoteAction).mockResolvedValue({ ok: true });
   const view = render(browser());
-  const addBox = screen.getByRole('heading', { name: 'Add a note' }).closest('section')!;
+  const addBox = openAddNote();
   expect(screen.getByRole('button', { name: 'Add note' })).toBeDisabled();
   enterHtml('Add a note', '<strong>Use</strong> habe with ich.');
   fireEvent.click(within(addBox).getByRole('button', { name: 'Add or choose a category' }));
   fireEvent.click(await within(addBox).findByRole('button', { name: 'Verbs' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
   await waitFor(() => expect(saveGrammarNoteAction).toHaveBeenCalledWith('<strong>Use</strong> habe with ich.', undefined, 'verbs'));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add a note' })).not.toBeInTheDocument());
   expect(refresh).toHaveBeenCalled();
   view.rerender(browser([{ ...grammarNote, note: '<strong>Use</strong> habe with ich.', category_id: 'verbs' }]));
   expect(within(screen.getByRole('article')).getByText('Verbs')).toBeInTheDocument();
@@ -61,6 +137,7 @@ test('attaches a plain note to a searched saved word', async () => {
   vi.mocked(searchSavedWordsAction).mockResolvedValue([{ id: 'word-1', lemma: 'Hund' }]);
   vi.mocked(updateVocabNoteAction).mockResolvedValue({ ok: true });
   render(browser());
+  openAddNote();
   fireEvent.click(screen.getByRole('button', { name: 'attach to a saved word (optional)' }));
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search saved words' }), { target: { value: 'Hun' } });
   fireEvent.click(await screen.findByRole('button', { name: 'Hund' }));
@@ -68,7 +145,34 @@ test('attaches a plain note to a searched saved word', async () => {
   fireEvent.change(screen.getByRole('textbox', { name: 'Add a note' }), { target: { value: 'Remember the article.' } });
   fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
   await waitFor(() => expect(updateVocabNoteAction).toHaveBeenCalledWith('word-1', 'Remember the article.'));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add a note' })).not.toBeInTheDocument());
   expect(saveGrammarNoteAction).not.toHaveBeenCalled();
+});
+
+test('the category modal creates an unassigned category and updates the shared list', async () => {
+  vi.mocked(createNoteCategoryAction).mockResolvedValue({ ok: true, category: ideas });
+  render(browser());
+  const dialog = openAddCategory();
+  const submit = within(dialog).getByRole('button', { name: 'Add' });
+  expect(submit).toBeDisabled();
+  fireEvent.change(within(dialog).getByRole('textbox', { name: 'Category name' }), { target: { value: 'Ideas' } });
+  fireEvent.click(submit);
+  await waitFor(() => expect(createNoteCategoryAction).toHaveBeenCalledWith('Ideas'));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add a category' })).not.toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Ideas' })).toBeInTheDocument();
+  const noteDialog = openAddNote();
+  fireEvent.click(within(noteDialog).getByRole('button', { name: 'Add or choose a category' }));
+  expect(within(noteDialog).getByRole('button', { name: 'Ideas' })).toBeInTheDocument();
+});
+
+test('the category modal reports creation errors inline', async () => {
+  vi.mocked(createNoteCategoryAction).mockResolvedValue({ ok: false });
+  render(browser());
+  const dialog = openAddCategory();
+  fireEvent.change(within(dialog).getByRole('textbox', { name: 'Category name' }), { target: { value: 'Ideas' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent("Couldn't add this category. Please try again.");
+  expect(screen.getByRole('dialog', { name: 'Add a category' })).toBeInTheDocument();
 });
 
 test('filter chips show matching grammar notes and hide word notes', async () => {
@@ -89,7 +193,7 @@ test('filter chips show matching grammar notes and hide word notes', async () =>
   expect(listNoteCategoriesAction).toHaveBeenCalledTimes(1);
 });
 
-test('a category created while editing is immediately available in the add box', async () => {
+test('a category created while editing is immediately available in the add note modal', async () => {
   vi.mocked(createNoteCategoryAction).mockResolvedValue({ ok: true, category: ideas });
   render(browser([grammarNote]));
   const row = screen.getByRole('article');
@@ -98,7 +202,7 @@ test('a category created while editing is immediately available in the add box',
   fireEvent.change(within(row).getByRole('textbox', { name: 'New category name' }), { target: { value: 'Ideas' } });
   fireEvent.click(within(row).getByRole('button', { name: 'Add' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Ideas' })).toBeInTheDocument());
-  const addBox = screen.getByRole('heading', { name: 'Add a note' }).closest('section')!;
+  const addBox = openAddNote();
   fireEvent.click(within(addBox).getByRole('button', { name: 'Add or choose a category' }));
   expect(within(addBox).getByRole('button', { name: 'Ideas' })).toBeInTheDocument();
 });

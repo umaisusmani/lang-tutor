@@ -25,17 +25,6 @@ export default async function NotesPage() {
   const quota = await getQuotaStatus(user.id);
   const count = grammarNotes.length + wordNotes.length;
 
-  const heading = (
-    <div className="flex flex-col gap-1">
-      <h1 className="font-display text-[40px] leading-none font-black tracking-[0.04em]">
-        Your <span className="text-accent">notes</span>.
-      </h1>
-      <span className="text-ink-3 font-mono text-[11px]">
-        {count} {count === 1 ? 'note' : 'notes'} saved
-      </span>
-    </div>
-  );
-
   return (
     <div className="bg-paper bg-dotted text-ink flex min-h-dvh flex-col items-center px-[18px] pb-6">
       <PageHeader
@@ -50,7 +39,7 @@ export default async function NotesPage() {
       />
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
         <main className="flex flex-1 flex-col gap-[22px] pt-6 pb-7">
-          <NotesBrowser grammarNotes={grammarNotes} wordNotes={wordNotes} heading={heading} />
+          <NotesBrowser grammarNotes={grammarNotes} wordNotes={wordNotes} count={count} />
         </main>
       </div>
     </div>

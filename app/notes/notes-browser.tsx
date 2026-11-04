@@ -1,25 +1,32 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/app/components/button';
+import { Modal } from '@/app/components/modal';
 import { Pill, pillClassName } from '@/app/components/pill';
 import { CategoryAssigner } from '@/app/notes/category-assigner';
 import { NoteRow, type NoteItem } from '@/app/notes/note-row';
 import { RichEditor } from '@/app/notes/rich-editor';
-import { listNoteCategoriesAction, saveGrammarNoteAction, searchSavedWordsAction, updateVocabNoteAction } from '@/app/vocab/actions';
+import { createNoteCategoryAction, listNoteCategoriesAction, saveGrammarNoteAction, searchSavedWordsAction, updateVocabNoteAction } from '@/app/vocab/actions';
 import { noteHtmlToPlainText, noteTextToHtml } from '@/lib/sanitize-note-html';
 import type { GrammarNote, NoteCategory, VocabEntry } from '@/lib/types/db';
 
 type SavedWord = { id: string; lemma: string };
 
-export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
+export function NotesBrowser({ grammarNotes, wordNotes, count }: {
   grammarNotes: GrammarNote[];
   wordNotes: VocabEntry[];
-  heading: ReactNode;
+  count: number;
 }) {
   const router = useRouter();
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [addNoteModalOpen, setAddNoteModalOpen] = useState(false);
+  const [addCategoryModalOpen, setAddCategoryModalOpen] = useState(false);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryError, setCategoryError] = useState('');
+  const [categoryPending, setCategoryPending] = useState(false);
   const [text, setText] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categories, setCategories] = useState<NoteCategory[]>([]);
@@ -33,6 +40,23 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
   const [error, setError] = useState('');
   const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
   const searchRef = useRef(0);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!addMenuRef.current?.contains(event.target as Node)) setAddMenuOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setAddMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [addMenuOpen]);
 
   useEffect(() => {
     let active = true;
@@ -48,6 +72,25 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
   function includeCategory(category: NoteCategory) {
     setCategories((current) => [...current.filter((item) => item.id !== category.id), category]
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
+  }
+
+  async function addCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = categoryName.trim();
+    if (!name || categoryPending) return;
+    setCategoryPending(true);
+    setCategoryError('');
+    try {
+      const result = await createNoteCategoryAction(name);
+      if (!result.ok || !result.category) throw new Error('Create failed');
+      includeCategory(result.category);
+      setCategoryName('');
+      setAddCategoryModalOpen(false);
+    } catch {
+      setCategoryError("Couldn't add this category. Please try again.");
+    } finally {
+      setCategoryPending(false);
+    }
   }
 
   useEffect(() => {
@@ -81,6 +124,16 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
     setSearching(false);
   }
 
+  function closeNoteModal() {
+    setAddNoteModalOpen(false);
+    setError('');
+  }
+
+  function closeCategoryModal() {
+    setAddCategoryModalOpen(false);
+    setCategoryError('');
+  }
+
   async function add() {
     if (!noteHtmlToPlainText(text).trim() || saving) return;
     setSaving(true);
@@ -99,6 +152,7 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
       setCategoryId(null);
       resetAttachment();
       setAttachOpen(false);
+      closeNoteModal();
       router.refresh();
     } catch {
       setError("Couldn't add this note. Please try again.");
@@ -108,56 +162,92 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
   }
 
   return <>
-    {heading}
-    <section className="border-line bg-panel flex flex-col gap-3 rounded-2xl border-2 p-4">
-      <h2 className="font-display text-xl">Add a note</h2>
-      {selectedWord ? <textarea aria-label="Add a note" value={text} maxLength={500} rows={4}
-        onChange={(event) => setText(event.target.value)}
-        placeholder="A grammar rule, a reminder, anything you want to keep…"
-        className="border-line bg-panel text-ink w-full resize-y rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
-        : <RichEditor label="Add a note" value={text} onChange={setText}
-          placeholder="A grammar rule, a reminder, anything you want to keep…" />}
-      {selectedWord ? <div className="flex items-center gap-2">
-        <span className="text-ink-3 font-mono text-xs">attached to:</span>
-        <Pill onClick={() => { setText(noteTextToHtml(text)); resetAttachment(); }} aria-label={`Remove attachment: ${selectedWord.lemma}`}>
-          {selectedWord.lemma} ×
-        </Pill>
-      </div> : <>
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill onClick={() => {
-            if (attachOpen) resetAttachment();
-            setAttachOpen(!attachOpen);
-          }} aria-expanded={attachOpen}>attach to a saved word (optional)</Pill>
-          <CategoryAssigner categories={categories} selectedId={categoryId} onSelect={setCategoryId} onCreated={includeCategory} />
-        </div>
-        {attachOpen && <div className="flex flex-col gap-2">
-          <label htmlFor="saved-word-search" className="text-ink-2 text-sm">Search saved words</label>
-          <input id="saved-word-search" type="search" value={query} maxLength={50}
-            onChange={(event) => {
-              searchRef.current++;
-              setQuery(event.target.value);
-              setMatches([]);
-              setSearching(Boolean(event.target.value.trim()));
-            }}
-            placeholder="Type a German word…"
-            className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
-          {searching && <span className="text-ink-3 font-mono text-xs" role="status">Searching…</span>}
-          {matches.length > 0 && <div className="flex flex-wrap gap-2" aria-label="Saved word matches">
-            {matches.map((word) => <Pill key={word.id} onClick={() => {
-              searchRef.current++;
-              const plain = new DOMParser().parseFromString(text, 'text/html').body.textContent ?? '';
-              setText(plain);
-              setSelectedWord(word);
-              setMatches([]);
-              setSearching(false);
-            }}>{word.lemma}</Pill>)}
-          </div>}
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <h1 className="font-display text-[40px] leading-none font-black tracking-[0.04em]">
+          Your <span className="text-accent">notes</span>.
+        </h1>
+        <span className="text-ink-3 font-mono text-[11px]">
+          {count} {count === 1 ? 'note' : 'notes'} saved
+        </span>
+      </div>
+      <div ref={addMenuRef} className="relative">
+        <button type="button" aria-label="Add" aria-expanded={addMenuOpen}
+          onClick={() => setAddMenuOpen((current) => !current)}
+          className="text-ink-2 hover:bg-soft hover:text-ink rounded-md p-1.5">
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 3v14M3 10h14" /></svg>
+        </button>
+        {addMenuOpen && <div className="border-line bg-panel absolute top-full right-0 z-30 mt-1 min-w-40 rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)] animate-[fade-rise_160ms_ease-out]">
+          <button type="button" className="hover:bg-soft min-h-11 w-full rounded-lg px-2.5 text-left"
+            onClick={() => { setAddMenuOpen(false); setAddNoteModalOpen(true); }}>Add note</button>
+          <button type="button" className="hover:bg-soft min-h-11 w-full rounded-lg px-2.5 text-left"
+            onClick={() => { setAddMenuOpen(false); setAddCategoryModalOpen(true); }}>Add category</button>
         </div>}
+      </div>
+    </div>
+    <Modal open={addNoteModalOpen} onClose={closeNoteModal} title="Add a note">
+      {addNoteModalOpen && <>
+        {selectedWord ? <textarea aria-label="Add a note" value={text} maxLength={500} rows={4}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="A grammar rule, a reminder, anything you want to keep…"
+          className="border-line bg-panel text-ink w-full resize-y rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
+          : <RichEditor label="Add a note" value={text} onChange={setText}
+            placeholder="A grammar rule, a reminder, anything you want to keep…" />}
+        {selectedWord ? <div className="flex items-center gap-2">
+          <span className="text-ink-3 font-mono text-xs">attached to:</span>
+          <Pill onClick={() => { setText(noteTextToHtml(text)); resetAttachment(); }} aria-label={`Remove attachment: ${selectedWord.lemma}`}>
+            {selectedWord.lemma} ×
+          </Pill>
+        </div> : <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill onClick={() => {
+              if (attachOpen) resetAttachment();
+              setAttachOpen(!attachOpen);
+            }} aria-expanded={attachOpen}>attach to a saved word (optional)</Pill>
+            <CategoryAssigner categories={categories} selectedId={categoryId} onSelect={setCategoryId} onCreated={includeCategory} />
+          </div>
+          {attachOpen && <div className="flex flex-col gap-2">
+            <label htmlFor="saved-word-search" className="text-ink-2 text-sm">Search saved words</label>
+            <input id="saved-word-search" type="search" value={query} maxLength={50}
+              onChange={(event) => {
+                searchRef.current++;
+                setQuery(event.target.value);
+                setMatches([]);
+                setSearching(Boolean(event.target.value.trim()));
+              }}
+              placeholder="Type a German word…"
+              className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
+            {searching && <span className="text-ink-3 font-mono text-xs" role="status">Searching…</span>}
+            {matches.length > 0 && <div className="flex flex-wrap gap-2" aria-label="Saved word matches">
+              {matches.map((word) => <Pill key={word.id} onClick={() => {
+                searchRef.current++;
+                const plain = new DOMParser().parseFromString(text, 'text/html').body.textContent ?? '';
+                setText(plain);
+                setSelectedWord(word);
+                setMatches([]);
+                setSearching(false);
+              }}>{word.lemma}</Pill>)}
+            </div>}
+          </div>}
+        </>}
+        {error && <p role="alert" className="text-ink-2 text-sm">{error}</p>}
+        <Button variant="primary" type="button" disabled={saving || !noteHtmlToPlainText(text).trim()} onClick={() => void add()}
+          className="self-start">{saving ? 'Adding…' : 'Add note'}</Button>
       </>}
-      {error && <p role="alert" className="text-ink-2 text-sm">{error}</p>}
-      <Button variant="primary" type="button" disabled={saving || !noteHtmlToPlainText(text).trim()} onClick={() => void add()}
-        className="self-start">{saving ? 'Adding…' : 'Add note'}</Button>
-    </section>
+    </Modal>
+    <Modal open={addCategoryModalOpen} onClose={closeCategoryModal} title="Add a category">
+      {addCategoryModalOpen && <form onSubmit={(event) => void addCategory(event)} className="flex flex-col gap-3">
+        <label htmlFor="category-name" className="text-ink-2 text-sm">Category name</label>
+        <input id="category-name" value={categoryName} maxLength={40} placeholder="Category name"
+          onChange={(event) => setCategoryName(event.target.value)}
+          className="border-line bg-panel text-ink w-full rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
+        {categoryError && <p role="alert" className="text-ink-2 text-sm">{categoryError}</p>}
+        <div className="mt-2 flex justify-end gap-2.5">
+          <Button variant="secondary" type="button" onClick={closeCategoryModal}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={categoryPending || !categoryName.trim()}>{categoryPending ? 'Adding…' : 'Add'}</Button>
+        </div>
+      </form>}
+    </Modal>
     <div className="flex flex-col gap-3">
       <div role="group" className="flex flex-wrap items-center gap-2" aria-label="Filter notes by category">
         <button type="button" className={pillClassName({ active: categoryFilter === null })} aria-pressed={categoryFilter === null}
@@ -178,7 +268,7 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
           setRemoved((previous) => new Set(previous).add(`${item.kind}-${item.note.id}`));
           router.refresh();
         }} />)}
-      {items.length === 0 && <p className="text-ink-3 text-sm">No notes saved yet. Save one from a chat correction, or add one above.</p>}
+      {items.length === 0 && <p className="text-ink-3 text-sm">No notes saved yet. Save one from a chat correction, or use the + button above.</p>}
     </div>
   </>;
 }

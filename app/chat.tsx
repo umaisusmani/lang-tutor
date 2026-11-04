@@ -20,14 +20,14 @@ import { useQuota } from '@/app/hooks/use-quota';
 import { useStickToBottom } from '@/app/hooks/use-stick-to-bottom';
 import type { QuotaStatus } from '@/lib/quota';
 import { useTheme } from '@/app/hooks/use-theme';
-import { saveGrammarNoteAction, saveVocabAction } from '@/app/vocab/actions';
+import { createNoteCategoryAction, listNoteCategoriesAction, saveGrammarNoteAction, saveVocabAction } from '@/app/vocab/actions';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
 import type { WordGloss } from '@/lib/gloss';
 import type { PersonaProfile } from '@/lib/personas';
 import type { CefrLevel } from '@/lib/prompts';
 import { sentenceContaining } from '@/lib/text';
-import type { Conversation, VocabSource } from '@/lib/types/db';
+import type { Conversation, NoteCategory, VocabSource } from '@/lib/types/db';
 
 const LEVEL_COOKIE = 'cefr_level';
 
@@ -80,6 +80,7 @@ export default function Chat({
   // Words the learner ticked during this session -- the only part of "is this
   // saved" that's genuinely local state. Everything else is derived below.
   const [locallySaved, setLocallySaved] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const [noteCategories, setNoteCategories] = useState<NoteCategory[]>([]);
   const conversationId = useRef(initialConversationId);
   const { messages, sendMessage, status, error } = useChat<LangTutorUIMessage>({
     messages: initialMessages,
@@ -100,6 +101,14 @@ export default function Chat({
       if (part.type === 'data-notice') notifyError(part.data.message, part.data.source);
     },
   });
+
+  useEffect(() => {
+    let active = true;
+    void listNoteCategoriesAction().then((categories) => {
+      if (active) setNoteCategories(categories);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const id = messages
@@ -338,7 +347,19 @@ export default function Chat({
                       setOpenPanel((current) => ({ ...current, [key]: !current[key] }))
                     }
                     onSaveWord={saveWord}
-                    onSaveGrammarNote={(note, exampleSentence, category) => saveGrammarNoteAction(note, exampleSentence, category)}
+                    noteCategories={noteCategories}
+                    onSaveGrammarNote={async (note, exampleSentence, categoryName) => {
+                      let categoryId: string | null = null;
+                      if (categoryName) {
+                        const created = await createNoteCategoryAction(categoryName);
+                        if (!created.ok || !created.category) return { ok: false };
+                        const category = created.category;
+                        categoryId = category.id;
+                        setNoteCategories((current) => current.some((item) => item.id === category.id)
+                          ? current : [...current, category].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
+                      }
+                      return saveGrammarNoteAction(note, exampleSentence, categoryId);
+                    }}
                     onExplain={explain}
                   />
                 )}

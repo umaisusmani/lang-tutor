@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { Button } from '@/app/components/button';
 import { GlossedText } from '@/app/components/glossed-text';
+import { RichEditor } from '@/app/notes/rich-editor';
 import { Pill } from '@/app/components/pill';
 import { PersonaAvatar } from '@/app/components/persona-avatar';
 import { notifyError } from '@/app/components/toaster';
@@ -13,6 +14,8 @@ import { TranslateButton, TranslationPanel } from '@/app/components/translation-
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
 import { hasCorrectionCard } from '@/lib/correction-card';
+import { noteHtmlToPlainText, noteTextToHtml } from '@/lib/sanitize-note-html';
+import type { NoteCategory } from '@/lib/types/db';
 import type { ExplainKind } from '@/lib/explain';
 import type { WordGloss } from '@/lib/gloss';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
@@ -126,6 +129,7 @@ type ChatThreadProps = {
   onTogglePanel: (key: string) => void;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
   onSaveGrammarNote: (note: string, exampleSentence: string, category: string) => Promise<{ ok: boolean }>;
+  noteCategories?: NoteCategory[];
   onExplain: (key: string, request: ExplanationRequest) => void;
 };
 
@@ -142,6 +146,7 @@ export function ChatThread({
   onTogglePanel,
   onSaveWord,
   onSaveGrammarNote,
+  noteCategories = [],
   onExplain,
 }: ChatThreadProps) {
   const busy = status === 'submitted' || status === 'streaming';
@@ -287,6 +292,7 @@ export function ChatThread({
                   onToggleTranslation={() => onTogglePanel(correctionKey)}
                   onSaveWord={onSaveWord}
                   onSaveGrammarNote={onSaveGrammarNote}
+                  noteCategories={noteCategories}
                   onExplain={() => onExplain(correctionKey, {
                     kind: 'correction',
                     messageId: dbIds?.user ?? null,
@@ -329,6 +335,7 @@ function CorrectionCard({
   onToggleTranslation,
   onSaveWord,
   onSaveGrammarNote,
+  noteCategories,
   onExplain,
 }: {
   correction: Correction;
@@ -341,17 +348,18 @@ function CorrectionCard({
   onToggleTranslation: () => void;
   onSaveWord: ChatThreadProps['onSaveWord'];
   onSaveGrammarNote: ChatThreadProps['onSaveGrammarNote'];
+  noteCategories: NoteCategory[];
   onExplain: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const [editingNote, setEditingNote] = useState(false);
-  const [noteDraft, setNoteDraft] = useState(correction.explanation ?? '');
+  const [noteDraft, setNoteDraft] = useState(noteTextToHtml(correction.explanation ?? ''));
   const [categoryDraft, setCategoryDraft] = useState(correction.mistakeType ? MISTAKE_TYPE_LABELS[correction.mistakeType] : '');
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
   const [noteError, setNoteError] = useState(false);
   async function saveNote() {
-    if (savingNote || !noteDraft.trim()) return;
+    if (savingNote || !noteHtmlToPlainText(noteDraft).trim()) return;
     setSavingNote(true);
     let ok = false;
     try {
@@ -441,15 +449,19 @@ function CorrectionCard({
           </div>
           {canSave && correction.explanation && editingNote && !noteSaved && (
             <div className="mt-2 flex flex-col gap-2">
-              <textarea aria-label="Grammar note" value={noteDraft} maxLength={500} rows={3}
-                onChange={(event) => setNoteDraft(event.target.value)}
-                className="border-hair bg-panel text-ink focus:border-line w-full resize-y rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
-              <input aria-label="Category (optional)" value={categoryDraft} maxLength={40}
-                onChange={(event) => setCategoryDraft(event.target.value)} placeholder="category (optional)"
-                className="border-hair bg-panel text-ink focus:border-line w-full rounded-xl border-2 px-3 py-2 text-sm outline-none" />
+              <RichEditor label="Grammar note" value={noteDraft} onChange={setNoteDraft} />
+              <select aria-label="Category (optional)" value={noteCategories.find((category) =>
+                category.name.toLowerCase() === categoryDraft.toLowerCase())?.name ?? categoryDraft}
+                onChange={(event) => setCategoryDraft(event.target.value)}
+                className="border-hair bg-panel text-ink focus:border-line w-full rounded-xl border-2 px-3 py-2 text-sm outline-none">
+                <option value="">No category</option>
+                {categoryDraft && !noteCategories.some((category) => category.name.toLowerCase() === categoryDraft.toLowerCase()) &&
+                  <option value={categoryDraft}>{categoryDraft}</option>}
+                {noteCategories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
+              </select>
               {noteError && <span role="alert" className="text-ink-2 text-sm">Couldn&apos;t save this note. Please try again.</span>}
               <div className="flex gap-2">
-                <Pill hitArea disabled={savingNote || !noteDraft.trim()} onClick={() => void saveNote()}>{savingNote ? 'saving…' : 'Save'}</Pill>
+                <Pill hitArea disabled={savingNote || !noteHtmlToPlainText(noteDraft).trim()} onClick={() => void saveNote()}>{savingNote ? 'saving…' : 'Save'}</Pill>
                 <Pill hitArea disabled={savingNote} onClick={() => { setEditingNote(false); setNoteError(false); }}>Cancel</Pill>
               </div>
             </div>

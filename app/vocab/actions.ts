@@ -5,14 +5,15 @@ import { cookies } from 'next/headers';
 
 import { getPracticeQueue, getReviewQueue, recordReview, type RecordReviewResult } from '@/lib/services/card.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
-import { deleteGrammarNote, listNoteCategories, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
+import { deleteGrammarNote, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
+import { createNoteCategory, listNoteCategories } from '@/lib/services/note-category.service';
 import { deleteVocabEntry, listVocab, saveVocabEntry, searchVocabEntries, updateVocabNote } from '@/lib/services/vocab.service';
 import { findStarterWord, pickStarterWords, searchStarterWords } from '@/lib/starter-vocab';
 import { translateStarterWord, translateStarterWords } from '@/lib/starter-vocab/translate';
 import { consumeTranslation } from '@/lib/services/translation.service';
 import { lookupWords, type LookedUpWord } from '@/lib/word-lookup';
 import type { Grade } from '@/lib/srs';
-import type { CardDirection, CardSchedule, ReviewSurface, VocabSource } from '@/lib/types/db';
+import type { CardDirection, CardSchedule, NoteCategory, ReviewSurface, VocabSource } from '@/lib/types/db';
 
 export type { LookedUpWord } from '@/lib/word-lookup';
 
@@ -60,25 +61,33 @@ export async function deleteVocabAction(entryId: string): Promise<{ ok: boolean 
   return { ok };
 }
 
-export async function saveGrammarNoteAction(note: string, exampleSentence?: string, category?: string): Promise<{ ok: boolean }> {
+export async function saveGrammarNoteAction(note: string, exampleSentence?: string, categoryId?: string | null): Promise<{ ok: boolean }> {
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
-  const ok = await saveGrammarNote(userId, { note, exampleSentence, category });
+  const ok = await saveGrammarNote(userId, { note, exampleSentence, categoryId });
   if (ok) revalidatePath('/notes');
   return { ok };
 }
 
-export async function updateGrammarNoteAction(id: string, note: string, category?: string): Promise<{ ok: boolean }> {
+export async function updateGrammarNoteAction(id: string, note: string, categoryId?: string | null): Promise<{ ok: boolean }> {
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
-  const ok = await updateGrammarNote(userId, id, { note, category });
+  const ok = await updateGrammarNote(userId, id, { note, categoryId });
   if (ok) revalidatePath('/notes');
   return { ok };
 }
 
-export async function listNoteCategoriesAction(): Promise<string[]> {
+export async function listNoteCategoriesAction(): Promise<NoteCategory[]> {
   const userId = await getCurrentUserId();
   return userId ? listNoteCategories(userId) : [];
+}
+
+export async function createNoteCategoryAction(name: string): Promise<{ ok: boolean; category?: NoteCategory }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { ok: false };
+  const category = await createNoteCategory(userId, name);
+  if (category) revalidatePath('/notes');
+  return category ? { ok: true, category } : { ok: false };
 }
 
 export async function deleteGrammarNoteAction(id: string): Promise<{ ok: boolean }> {

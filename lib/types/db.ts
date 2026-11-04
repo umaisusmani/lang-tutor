@@ -43,8 +43,15 @@ export interface GrammarNote {
   id: string;
   user_id: string;
   note: string;
-  category: string | null;
+  category_id: string | null;
   example_sentence: string | null;
+  created_at: string;
+}
+
+export interface NoteCategory {
+  id: string;
+  user_id: string;
+  name: string;
   created_at: string;
 }
 

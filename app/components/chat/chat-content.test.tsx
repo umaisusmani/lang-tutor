@@ -74,16 +74,19 @@ test('edits a correction explanation before saving it as a note', async () => {
   ];
   render(<ChatThread messages={messages} status="ready" error={undefined} persona={FALLBACK_PERSONA}
     openPanels={{}} explanations={{}} explaining={{}} canSave isSaved={() => false}
+    noteCategories={[{ id: 'my-verbs', user_id: 'user', name: 'My verbs', created_at: '2026-01-01' }]}
     onTogglePanel={vi.fn()} onSaveWord={vi.fn()} onSaveGrammarNote={save} onExplain={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: '+ save as note' }));
-  const textarea = screen.getByRole('textbox', { name: 'Grammar note' });
-  expect(textarea).toHaveValue('Use habe with ich.');
-  const category = screen.getByRole('textbox', { name: 'Category (optional)' });
+  const editor = screen.getByRole('textbox', { name: 'Grammar note' });
+  expect(editor).toHaveTextContent('Use habe with ich.');
+  expect(screen.getByRole('button', { name: 'Underline' })).toBeInTheDocument();
+  const category = screen.getByRole('combobox', { name: 'Category (optional)' });
   expect(category).toHaveValue('verb conjugation');
-  fireEvent.change(textarea, { target: { value: 'Use habe for ich.' } });
+  editor.innerHTML = 'Use <strong>habe</strong> for ich.';
+  fireEvent.input(editor);
   fireEvent.change(category, { target: { value: 'My verbs' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  await waitFor(() => expect(save).toHaveBeenCalledWith('Use habe for ich.', 'Ich habe Hund.', 'My verbs'));
+  await waitFor(() => expect(save).toHaveBeenCalledWith('Use <strong>habe</strong> for ich.', 'Ich habe Hund.', 'My verbs'));
   expect(screen.getByText('✓ saved as note')).toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: 'Grammar note' })).not.toBeInTheDocument();
 });
@@ -104,5 +107,5 @@ test('English stand-in corrections start with an empty category', () => {
     openPanels={{}} explanations={{}} explaining={{}} canSave isSaved={() => false}
     onTogglePanel={vi.fn()} onSaveWord={vi.fn()} onSaveGrammarNote={vi.fn()} onExplain={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: '+ save as note' }));
-  expect(screen.getByRole('textbox', { name: 'Category (optional)' })).toHaveValue('');
+  expect(screen.getByRole('combobox', { name: 'Category (optional)' })).toHaveValue('');
 });

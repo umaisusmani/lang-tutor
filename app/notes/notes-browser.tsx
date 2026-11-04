@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation';
 
 import { Button } from '@/app/components/button';
 import { Pill } from '@/app/components/pill';
+import { Select } from '@/app/components/select';
+import { CategoryPicker } from '@/app/notes/category-picker';
+import { FormatToolbar } from '@/app/notes/format-toolbar';
 import { NoteRow, type NoteItem } from '@/app/notes/note-row';
-import { saveGrammarNoteAction, searchSavedWordsAction, updateVocabNoteAction } from '@/app/vocab/actions';
+import { listNoteCategoriesAction, saveGrammarNoteAction, searchSavedWordsAction, updateVocabNoteAction } from '@/app/vocab/actions';
 import type { GrammarNote, VocabEntry } from '@/lib/types/db';
 
 type SavedWord = { id: string; lemma: string };
@@ -18,6 +21,11 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
 }) {
   const router = useRouter();
   const [text, setText] = useState('');
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const [category, setCategory] = useState('');
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [attachOpen, setAttachOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<SavedWord[]>([]);
@@ -27,6 +35,20 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
   const [error, setError] = useState('');
   const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
   const searchRef = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    void listNoteCategoriesAction().then((values) => {
+      if (active) setCategories(values);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  function includeCategory(value: string) {
+    const clean = value.trim().slice(0, 40);
+    if (clean) setCategories((current) => [...new Set([...current, clean])]
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })));
+  }
 
   useEffect(() => {
     if (!attachOpen || selectedWord || !query.trim()) return;
@@ -47,7 +69,8 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
   const items: NoteItem[] = [
     ...grammarNotes.map((note): NoteItem => ({ kind: 'grammar', note })),
     ...wordNotes.filter((note) => note.note?.trim()).map((note): NoteItem => ({ kind: 'word', note })),
-  ].filter((item) => !removed.has(`${item.kind}-${item.note.id}`))
+  ].filter((item) => !removed.has(`${item.kind}-${item.note.id}`)
+    && (!categoryFilter || (item.kind === 'grammar' && item.note.category === categoryFilter)))
     .sort((a, b) => b.note.created_at.localeCompare(a.note.created_at));
 
   function resetAttachment() {
@@ -58,6 +81,10 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
     setSearching(false);
   }
 
+  function resetCategory() {
+    setCategory('');
+  }
+
   async function add() {
     if (!text.trim() || saving) return;
     setSaving(true);
@@ -65,14 +92,17 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
     try {
       const result = selectedWord
         ? await updateVocabNoteAction(selectedWord.id, text.trim())
-        : await saveGrammarNoteAction(text.trim());
+        : await saveGrammarNoteAction(text.trim(), undefined, category);
       if (!result.ok) throw new Error('Save failed');
       if (selectedWord) setRemoved((previous) => {
         const next = new Set(previous);
         next.delete(`word-${selectedWord.id}`);
         return next;
       });
+      else includeCategory(category);
       setText('');
+      resetCategory();
+      setCategoryOpen(false);
       resetAttachment();
       setAttachOpen(false);
       router.refresh();
@@ -87,7 +117,8 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
     {heading}
     <section className="border-line bg-panel flex flex-col gap-3 rounded-2xl border-2 p-4">
       <label htmlFor="new-note" className="font-display text-xl">Add a note</label>
-      <textarea id="new-note" value={text} maxLength={500} rows={4}
+      {!selectedWord && <FormatToolbar textareaRef={textRef} value={text} onChange={setText} />}
+      <textarea ref={textRef} id="new-note" value={text} maxLength={500} rows={4}
         onChange={(event) => setText(event.target.value)}
         placeholder="A grammar rule, a reminder, anything you want to keep…"
         className="border-line bg-panel text-ink w-full resize-y rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
@@ -97,10 +128,16 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
           {selectedWord.lemma} ×
         </Pill>
       </div> : <>
-        <Pill className="self-start" onClick={() => {
-          if (attachOpen) resetAttachment();
-          setAttachOpen(!attachOpen);
-        }} aria-expanded={attachOpen}>attach to a saved word (optional)</Pill>
+        <div className="flex flex-wrap gap-2">
+          <Pill onClick={() => {
+            if (attachOpen) resetAttachment();
+            setAttachOpen(!attachOpen);
+          }} aria-expanded={attachOpen}>attach to a saved word (optional)</Pill>
+          <Pill onClick={() => {
+            if (categoryOpen) resetCategory();
+            setCategoryOpen(!categoryOpen);
+          }} aria-expanded={categoryOpen}>+ category</Pill>
+        </div>
         {attachOpen && <div className="flex flex-col gap-2">
           <label htmlFor="saved-word-search" className="text-ink-2 text-sm">Search saved words</label>
           <input id="saved-word-search" type="search" value={query} maxLength={50}
@@ -122,14 +159,27 @@ export function NotesBrowser({ grammarNotes, wordNotes, heading }: {
             }}>{word.lemma}</Pill>)}
           </div>}
         </div>}
+        {categoryOpen && <CategoryPicker id="new-note-category" value={category} onChange={setCategory} categories={categories} />}
       </>}
       {error && <p role="alert" className="text-ink-2 text-sm">{error}</p>}
       <Button variant="primary" type="button" disabled={saving || !text.trim()} onClick={() => void add()}
         className="self-start">{saving ? 'Adding…' : 'Add note'}</Button>
     </section>
     <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span id="notes-category-filter-label" className="text-ink-2 text-sm">Category</span>
+        <Select variant="panel" value={categoryFilter} onValueChange={setCategoryFilter}
+          aria-labelledby="notes-category-filter-label"
+          options={[{ value: '', label: 'All categories' }, ...categories.map((value) => ({ value, label: value }))]}
+          className="max-w-64" />
+      </div>
+      <p className="text-ink-3 font-mono text-xs" role="status">
+        {categoryFilter ? `${items.length} ${items.length === 1 ? 'note' : 'notes'} in ${categoryFilter}`
+          : `${items.length} ${items.length === 1 ? 'note' : 'notes'}`}
+      </p>
       {items.map((item) => <NoteRow key={`${item.kind}-${item.note.id}-${item.note.note}`} item={item}
-        onChanged={() => router.refresh()}
+        categories={categories}
+        onChanged={(newCategory) => { if (newCategory) includeCategory(newCategory); router.refresh(); }}
         onRemoved={() => {
           setRemoved((previous) => new Set(previous).add(`${item.kind}-${item.note.id}`));
           router.refresh();

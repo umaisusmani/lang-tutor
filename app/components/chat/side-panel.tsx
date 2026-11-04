@@ -30,7 +30,7 @@ function messageText(message: LangTutorUIMessage): string {
 export function ChatSidePanel({
   open,
   openOnView,
-  messages,
+  messages = [],
   level,
   remaining,
   canSave,
@@ -46,7 +46,7 @@ export function ChatSidePanel({
   /** Which tab to land on the moment the panel opens; left alone (the panel
    * keeps whatever tab was last active) when omitted. */
   openOnView?: ToolView;
-  messages: LangTutorUIMessage[];
+  messages?: LangTutorUIMessage[];
   level: CefrLevel;
   remaining: number | null;
   canSave: boolean;

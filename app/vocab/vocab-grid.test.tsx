@@ -30,3 +30,18 @@ test('revealed cards show meanings without personal notes', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Show All words' }));
   expect(screen.queryByRole('option', { name: 'My notes' })).not.toBeInTheDocument();
 });
+
+test('mobile Filters toggle controls the search panel and marks active criteria', () => {
+  render(<VocabGrid entries={[entry]} dueWordIds={[]} />);
+  const toggle = screen.getByRole('button', { name: 'Filters' });
+  const controls = document.getElementById('vocab-filter-controls');
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(controls).toHaveClass('hidden', 'sm:grid');
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(controls).toHaveClass('grid');
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search your words' }), { target: { value: 'missing' } });
+  fireEvent.click(toggle);
+  expect(screen.getByRole('button', { name: 'Filters (1)' })).toHaveAttribute('aria-expanded', 'false');
+  expect(controls).toHaveClass('hidden');
+});

@@ -78,9 +78,31 @@ test('edits a correction explanation before saving it as a note', async () => {
   fireEvent.click(screen.getByRole('button', { name: '+ save as note' }));
   const textarea = screen.getByRole('textbox', { name: 'Grammar note' });
   expect(textarea).toHaveValue('Use habe with ich.');
+  const category = screen.getByRole('textbox', { name: 'Category (optional)' });
+  expect(category).toHaveValue('verb conjugation');
   fireEvent.change(textarea, { target: { value: 'Use habe for ich.' } });
+  fireEvent.change(category, { target: { value: 'My verbs' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  await waitFor(() => expect(save).toHaveBeenCalledWith('Use habe for ich.', 'Ich habe Hund.'));
+  await waitFor(() => expect(save).toHaveBeenCalledWith('Use habe for ich.', 'Ich habe Hund.', 'My verbs'));
   expect(screen.getByText('✓ saved as note')).toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: 'Grammar note' })).not.toBeInTheDocument();
+});
+
+test('English stand-in corrections start with an empty category', () => {
+  const messages: LangTutorUIMessage[] = [
+    { id: 'user', role: 'user', parts: [{ type: 'text', text: 'Ich have Zeit.' }] },
+    { id: 'reply', role: 'assistant', parts: [
+      { type: 'text', text: 'Du hast Zeit!' },
+      { type: 'data-correction', data: {
+        hasMistake: false, usedEnglish: true, mistakeType: null, correction: 'Ich habe Zeit.',
+        correctionTranslation: null, correctionGloss: null,
+        explanation: 'Use habe in German.',
+      } },
+    ] },
+  ];
+  render(<ChatThread messages={messages} status="ready" error={undefined} persona={FALLBACK_PERSONA}
+    openPanels={{}} explanations={{}} explaining={{}} canSave isSaved={() => false}
+    onTogglePanel={vi.fn()} onSaveWord={vi.fn()} onSaveGrammarNote={vi.fn()} onExplain={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: '+ save as note' }));
+  expect(screen.getByRole('textbox', { name: 'Category (optional)' })).toHaveValue('');
 });

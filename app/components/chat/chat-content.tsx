@@ -125,7 +125,7 @@ type ChatThreadProps = {
   isSaved: (lemma: string) => boolean;
   onTogglePanel: (key: string) => void;
   onSaveWord: (entry: WordGloss[number], source: VocabSource, sourceText: string) => void;
-  onSaveGrammarNote: (note: string, exampleSentence: string) => Promise<{ ok: boolean }>;
+  onSaveGrammarNote: (note: string, exampleSentence: string, category: string) => Promise<{ ok: boolean }>;
   onExplain: (key: string, request: ExplanationRequest) => void;
 };
 
@@ -346,6 +346,7 @@ function CorrectionCard({
   const [open, setOpen] = useState(true);
   const [editingNote, setEditingNote] = useState(false);
   const [noteDraft, setNoteDraft] = useState(correction.explanation ?? '');
+  const [categoryDraft, setCategoryDraft] = useState(correction.mistakeType ? MISTAKE_TYPE_LABELS[correction.mistakeType] : '');
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
   const [noteError, setNoteError] = useState(false);
@@ -354,7 +355,7 @@ function CorrectionCard({
     setSavingNote(true);
     let ok = false;
     try {
-      ({ ok } = await onSaveGrammarNote(noteDraft, correction.correction ?? ''));
+      ({ ok } = await onSaveGrammarNote(noteDraft, correction.correction ?? '', categoryDraft));
     } catch {
       // A rejected action is handled like an unsuccessful save.
     }
@@ -443,6 +444,9 @@ function CorrectionCard({
               <textarea aria-label="Grammar note" value={noteDraft} maxLength={500} rows={3}
                 onChange={(event) => setNoteDraft(event.target.value)}
                 className="border-hair bg-panel text-ink focus:border-line w-full resize-y rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
+              <input aria-label="Category (optional)" value={categoryDraft} maxLength={40}
+                onChange={(event) => setCategoryDraft(event.target.value)} placeholder="category (optional)"
+                className="border-hair bg-panel text-ink focus:border-line w-full rounded-xl border-2 px-3 py-2 text-sm outline-none" />
               {noteError && <span role="alert" className="text-ink-2 text-sm">Couldn&apos;t save this note. Please try again.</span>}
               <div className="flex gap-2">
                 <Pill hitArea disabled={savingNote || !noteDraft.trim()} onClick={() => void saveNote()}>{savingNote ? 'saving…' : 'Save'}</Pill>

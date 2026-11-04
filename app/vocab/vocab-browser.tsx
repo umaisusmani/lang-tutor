@@ -64,6 +64,7 @@ export function VocabBrowser({
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
   const [summaryMode, setSummaryMode] = useState<'due' | 'practice'>('due');
   const [notice, setNotice] = useState('');
+  const [addWordOpen, setAddWordOpen] = useState(false);
   const savedLemmas = useMemo(() => new Set(entries.map((entry) => entry.lemma.toLowerCase())), [entries]);
   const noticeRef = useRef<HTMLDivElement>(null);
   const startingRef = useRef(false);
@@ -137,7 +138,12 @@ export function VocabBrowser({
   return (
     <>
       {heading}
-      <AddWord savedLemmas={savedLemmas} onAdded={() => router.refresh()} />
+      <Button variant="secondary" type="button" aria-expanded={addWordOpen}
+        aria-controls="add-word-panel" onClick={() => setAddWordOpen((open) => !open)}
+        className="self-start sm:hidden">Add a word</Button>
+      <div id="add-word-panel" className={addWordOpen ? '' : 'hidden sm:block'}>
+        <AddWord savedLemmas={savedLemmas} onAdded={() => { setAddWordOpen(false); router.refresh(); }} />
+      </div>
       {(summary || notice) && (
         <div ref={noticeRef} tabIndex={-1} role="status"
           className={`border-line rounded-2xl border-2 p-5 outline-none ${summary ? 'bg-panel text-ink' : 'bg-yellow text-on-bright'}`}>

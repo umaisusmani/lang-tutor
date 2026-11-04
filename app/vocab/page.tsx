@@ -6,6 +6,7 @@ import { VocabBrowser } from '@/app/vocab/vocab-browser';
 import { getReviewQueue } from '@/lib/services/card.service';
 import { listConversations } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
+import { getQuotaStatus } from '@/lib/services/session.service';
 import { listVocab } from '@/lib/services/vocab.service';
 
 export default async function VocabPage() {
@@ -19,6 +20,7 @@ export default async function VocabPage() {
   const dueWordIds = dueCards.flatMap((card) => card.vocab_entry_id ? [card.vocab_entry_id] : []);
   const levelCookie = (await cookies()).get('cefr_level')?.value;
   const level = await resolveCefrLevel(user.id, levelCookie);
+  const quota = await getQuotaStatus(user.id);
 
   const heading = (
     <div className="flex flex-col gap-1">
@@ -40,6 +42,8 @@ export default async function VocabPage() {
         conversations={conversations}
         activePage="vocab"
         dueCount={dueCount}
+        initialQuota={quota}
+        initialSavedLemmas={entries.map((entry) => entry.lemma)}
       />
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
         <main className="flex flex-1 flex-col gap-[22px] pt-6 pb-7">

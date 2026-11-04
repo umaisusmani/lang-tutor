@@ -72,14 +72,11 @@ function ConversationList({ conversations, conversationId, deletingId, onClose, 
   );
 }
 
-function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage, dueCount, onNavigate }: {
+function AccountContent({ userEmail, userName, theme, onThemeToggle }: {
   userEmail: string;
   userName: string | null;
   theme?: 'light' | 'dark' | null;
   onThemeToggle?: () => void;
-  activePage: 'chat' | 'vocab' | 'notes';
-  dueCount: number;
-  onNavigate: () => void;
 }) {
   return (
     <>
@@ -88,41 +85,6 @@ function AccountContent({ userEmail, userName, theme, onThemeToggle, activePage,
         <span className="text-ink-3 truncate font-mono text-[10px]">{userEmail}</span>
       </div>
       <div className="bg-hair my-1 h-px" />
-      <div className="flex flex-col sm:hidden">
-        <Link
-          href="/"
-          onClick={onNavigate}
-          aria-current={activePage === 'chat' ? 'page' : undefined}
-          className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'chat' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
-        >
-          chat
-        </Link>
-        <Link
-          href="/vocab"
-          onClick={onNavigate}
-          aria-current={activePage === 'vocab' ? 'page' : undefined}
-          className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'vocab' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
-        >
-          saved
-          {dueCount > 0 && (
-            <span
-              className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
-              aria-label={`${dueCount} words ready to review`}
-            >
-              {dueCount > 99 ? '99+' : dueCount}
-            </span>
-          )}
-        </Link>
-        <Link
-          href="/notes"
-          onClick={onNavigate}
-          aria-current={activePage === 'notes' ? 'page' : undefined}
-          className={`flex min-h-11 items-center rounded-lg px-2.5 py-2 font-mono text-xs no-underline ${activePage === 'notes' ? 'bg-yellow text-on-bright' : 'text-ink hover:bg-soft'}`}
-        >
-          notes
-        </Link>
-        <div className="bg-hair my-1 h-px" />
-      </div>
       <button
         type="button"
         aria-label="Toggle color theme"
@@ -247,7 +209,7 @@ export function SiteHeader({
       description: (
         <>
           &ldquo;{chat.title ?? 'Untitled'}&rdquo; and all of its messages will be permanently
-          deleted. Words you saved from it stay in your saved list.
+          deleted. Words you saved from it stay in your vocab list.
         </>
       ),
       confirmLabel: 'Delete chat',
@@ -306,7 +268,7 @@ export function SiteHeader({
                   aria-current={activePage === 'vocab' ? 'page' : undefined}
                 >
                   <span className={pillClassName({ active: activePage === 'vocab' })}>
-                    saved
+                    vocab
                     {dueCount > 0 && (
                       <span
                         className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
@@ -394,11 +356,6 @@ export function SiteHeader({
                   <span aria-hidden className="hidden text-[9px] opacity-60 sm:inline">
                     ▾
                   </span>
-                  {dueCount > 0 && (
-                    <span className="bg-orange border-paper absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border-2 sm:hidden">
-                      <span className="sr-only">{dueCount} words ready to review</span>
-                    </span>
-                  )}
                 </button>
 
                 {accountOpen && (
@@ -422,9 +379,6 @@ export function SiteHeader({
                         userName={userName}
                         theme={theme}
                         onThemeToggle={onThemeToggle}
-                        activePage={activePage}
-                        dueCount={dueCount}
-                        onNavigate={() => setAccountOpen(false)}
                       />
                     </div>
                   </>
@@ -439,6 +393,24 @@ export function SiteHeader({
           )}
         </div>
       </div>
+
+      {userEmail && (
+        <nav aria-label="Mobile navigation" className="flex items-center gap-6 sm:hidden">
+          {(['chat', 'vocab', 'notes'] as const).map((page) => (
+            <Link key={page} href={page === 'chat' ? '/' : `/${page}`}
+              aria-current={activePage === page ? 'page' : undefined}
+              className="text-ink-2 relative flex min-h-11 items-center font-mono text-xs font-semibold no-underline"
+            >
+              <span className={activePage === page ? 'text-ink' : ''}>{page.charAt(0).toUpperCase() + page.slice(1)}</span>
+              {page === 'vocab' && dueCount > 0 && (
+                <span className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold"
+                  aria-label={`${dueCount} words ready to review`}>{dueCount > 99 ? '99+' : dueCount}</span>
+              )}
+              {activePage === page && <span aria-hidden="true" className="bg-yellow absolute right-0 bottom-0 left-0 h-1 rounded-full" />}
+            </Link>
+          ))}
+        </nav>
+      )}
 
       {remaining !== null && (
         <div className="text-ink-3 flex items-center gap-2.5 font-mono text-[10px]">

@@ -11,7 +11,7 @@ import {
   ChatWelcome,
   type ExplanationRequest,
 } from '@/app/components/chat/chat-content';
-import { ChatSidePanel } from '@/app/components/chat/side-panel';
+import { ToolsLauncher, type ToolsLauncherHandle } from '@/app/components/tools-launcher';
 import { useConfirm } from '@/app/components/confirm-modal';
 import { SiteHeader } from '@/app/components/site-header';
 import { notifyError } from '@/app/components/toaster';
@@ -69,12 +69,7 @@ export default function Chat({
   const { theme, toggleTheme } = useTheme();
   const { quota, accept: acceptQuota, refresh: refreshQuota } = useQuota(initialQuota);
   const remaining = quota.remaining;
-  const [sidePanelOpen, setSidePanelOpen] = useState(false);
-  // Set right before opening the panel, so a specific entry point (the "out
-  // of messages" card's Translate button) can land on that tab instead of
-  // the default "ask" view. Left alone otherwise, so the panel keeps
-  // whichever tab the learner was already on.
-  const [toolsView, setToolsView] = useState<'ask' | 'translate' | undefined>();
+  const toolsLauncherRef = useRef<ToolsLauncherHandle>(null);
   // Which translation panels are open, keyed `${message.id}-reply` / `-corr`.
   const [openPanel, setOpenPanel] = useState<Record<string, boolean>>({});
   // Grammar explanations fetched this session (same keys), and which are
@@ -290,8 +285,7 @@ export default function Chat({
       void promptToolsSignUp();
       return;
     }
-    setToolsView(view);
-    setSidePanelOpen(true);
+    toolsLauncherRef.current?.open(view);
   }
 
   return (
@@ -315,16 +309,6 @@ export default function Chat({
       />
 
       <div className="relative flex min-h-0 w-full max-w-[1240px] flex-1 justify-center">
-          <button
-            type="button"
-            aria-label="Open learning tools"
-            aria-controls="chat-side-panel"
-            aria-expanded={sidePanelOpen}
-            onClick={() => openLearningPanel()}
-            className={`${sidePanelOpen ? 'invisible' : ''} border-line bg-paper text-ink fixed top-1/2 right-0 z-20 flex h-12 -translate-y-1/2 items-center gap-1.5 rounded-l-xl border-2 border-r-0 py-2 pr-1 pl-2 font-mono text-[11px] shadow-[-2px_2px_0_var(--line)] transition-colors hover:bg-yellow hover:text-on-bright`}
-          >
-            <span>Tools</span><span aria-hidden="true" className="text-base leading-none">‹</span>
-          </button>
         <div className="flex min-h-0 min-w-0 max-w-[860px] flex-1 flex-col">
           <div className="relative flex min-h-0 flex-1 flex-col">
             <div ref={scrollerRef} onScroll={onScroll} className="chat-scroll-area flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
@@ -354,7 +338,7 @@ export default function Chat({
                       setOpenPanel((current) => ({ ...current, [key]: !current[key] }))
                     }
                     onSaveWord={saveWord}
-                    onSaveGrammarNote={saveGrammarNoteAction}
+                    onSaveGrammarNote={(note, exampleSentence, category) => saveGrammarNoteAction(note, exampleSentence, category)}
                     onExplain={explain}
                   />
                 )}
@@ -391,9 +375,8 @@ export default function Chat({
           />
         </div>
 
-        <ChatSidePanel
-          open={sidePanelOpen}
-          openOnView={toolsView}
+        <ToolsLauncher
+          ref={toolsLauncherRef}
           messages={messages}
           level={level}
           remaining={remaining}
@@ -403,11 +386,10 @@ export default function Chat({
           quota={quota}
           onQuotaChange={acceptQuota}
           onQuotaRefresh={refreshQuota}
+          onOpenRequest={() => openLearningPanel()}
           onAuthRequired={() => {
-            setSidePanelOpen(false);
             void promptToolsSignUp();
           }}
-          onClose={() => setSidePanelOpen(false)}
         />
       </div>
     </div>

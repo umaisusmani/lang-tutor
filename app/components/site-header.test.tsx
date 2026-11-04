@@ -56,14 +56,14 @@ function openAccount() {
   return screen.getByRole('region', { name: 'Account options' });
 }
 
-test('chat trigger opens conversations and account keeps saved navigation', () => {
+test('chat trigger opens conversations and account contains account controls only', () => {
   renderHeader({ dueCount: 3, activePage: 'vocab' });
   expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Proficiency: A2' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /saved/, current: 'page' })).toHaveAttribute('href', '/vocab');
+  expect(screen.getByRole('link', { name: /vocab/, current: 'page' })).toHaveAttribute('href', '/vocab');
   expect(screen.getByRole('link', { name: 'notes' })).toHaveAttribute('href', '/notes');
   const chats = screen.getByRole('button', { name: 'chat · 1' });
-  expect(screen.queryByRole('link', { name: 'chat' })).not.toBeInTheDocument();
+  expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('link', { name: 'Chat' })).toHaveAttribute('href', '/');
   expect(chats).not.toHaveAttribute('aria-current');
   fireEvent.click(chats);
   const conversations = screen.getByRole('region', { name: 'Conversations' });
@@ -75,21 +75,28 @@ test('chat trigger opens conversations and account keeps saved navigation', () =
   const account = screen.getByRole('region', { name: 'Account options' });
   expect(within(account).getByText('Learner')).toBeInTheDocument();
   expect(within(account).getByText('learner@example.com')).toBeInTheDocument();
-  expect(within(account).getByRole('link', { name: 'chat' })).toHaveAttribute('href', '/');
-  expect(within(account).getByRole('link', { name: /saved/, current: 'page' })).toHaveAttribute('href', '/vocab');
-  expect(within(account).getByRole('link', { name: 'notes' })).toHaveAttribute('href', '/notes');
+  expect(within(account).queryByRole('link')).not.toBeInTheDocument();
   expect(within(account).queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
-  expect(within(account).getByLabelText('3 words ready to review')).toBeInTheDocument();
   expect(within(account).getByRole('button', { name: 'Toggle color theme' })).toBeInTheDocument();
   expect(within(account).getByRole('button', { name: 'sign out' })).toBeInTheDocument();
 });
 
-test('notes navigation is current in the header and account menu', () => {
+test('mobile navigation shows three tabs, an active underline and the vocab due badge', () => {
+  renderHeader({ activePage: 'vocab', dueCount: 3 });
+  const nav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+  expect(nav).toHaveClass('sm:hidden');
+  expect(within(nav).getByRole('link', { name: 'Chat' })).not.toHaveAttribute('aria-current');
+  const vocab = within(nav).getByRole('link', { name: /Vocab/ });
+  expect(vocab).toHaveAttribute('aria-current', 'page');
+  expect(vocab.querySelector('.bg-yellow')).toBeInTheDocument();
+  expect(within(vocab).getByLabelText('3 words ready to review')).toHaveTextContent('3');
+  expect(within(nav).getByRole('link', { name: 'Notes' })).not.toHaveAttribute('aria-current');
+});
+
+test('notes navigation is current in the header and mobile row', () => {
   renderHeader({ activePage: 'notes' });
   expect(screen.getByRole('link', { name: 'notes', current: 'page' })).toHaveAttribute('href', '/notes');
-  const account = openAccount();
-  expect(within(account).getByRole('link', { name: 'chat' })).toHaveAttribute('href', '/');
-  expect(within(account).getByRole('link', { name: 'notes', current: 'page' })).toHaveAttribute('href', '/notes');
+  expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('link', { name: 'Notes', current: 'page' })).toHaveAttribute('href', '/notes');
 });
 
 test('Escape closes account and chats popovers and returns focus to their triggers', () => {
@@ -105,18 +112,16 @@ test('Escape closes account and chats popovers and returns focus to their trigge
   expect(chats).toHaveFocus();
 });
 
-test('mobile account menu focuses chat when opened', () => {
+test('mobile account menu focuses theme when opened', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   renderHeader();
   const account = openAccount();
-  expect(within(account).getByRole('link', { name: 'chat', current: 'page' })).toHaveFocus();
+  expect(within(account).getByRole('button', { name: 'Toggle color theme' })).toHaveFocus();
 });
 
-test('clicking an account nav link closes the dropdown', () => {
+test('account menu has no duplicate mobile navigation', () => {
   renderHeader();
-  fireEvent.click(within(openAccount()).getByRole('link', { name: /saved/ }));
-  expect(screen.queryByRole('region', { name: 'Account options' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Account options' })).toHaveAttribute('aria-expanded', 'false');
+  expect(within(openAccount()).queryByRole('link')).not.toBeInTheDocument();
 });
 
 test('proficiency can be changed from the header row', () => {
@@ -135,9 +140,9 @@ test('anonymous header exposes proficiency and sign in without account or chat',
   expect(screen.queryByRole('button', { name: /chat/ })).not.toBeInTheDocument();
 });
 
-test('review indicator sits on the avatar trigger', () => {
+test('review indicator sits on the vocab tab', () => {
   renderHeader({ dueCount: 7 });
-  expect(within(screen.getByRole('button', { name: 'Account options' })).getByText('7 words ready to review')).toBeInTheDocument();
+  expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByLabelText('7 words ready to review')).toBeInTheDocument();
 });
 
 test('outside click closes account and returns focus to its trigger', () => {

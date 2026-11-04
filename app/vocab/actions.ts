@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 
 import { getPracticeQueue, getReviewQueue, recordReview, type RecordReviewResult } from '@/lib/services/card.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
-import { deleteGrammarNote, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
+import { deleteGrammarNote, listNoteCategories, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
 import { deleteVocabEntry, listVocab, saveVocabEntry, searchVocabEntries, updateVocabNote } from '@/lib/services/vocab.service';
 import { findStarterWord, pickStarterWords, searchStarterWords } from '@/lib/starter-vocab';
 import { translateStarterWord, translateStarterWords } from '@/lib/starter-vocab/translate';
@@ -60,20 +60,25 @@ export async function deleteVocabAction(entryId: string): Promise<{ ok: boolean 
   return { ok };
 }
 
-export async function saveGrammarNoteAction(note: string, exampleSentence?: string): Promise<{ ok: boolean }> {
+export async function saveGrammarNoteAction(note: string, exampleSentence?: string, category?: string): Promise<{ ok: boolean }> {
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
-  const ok = await saveGrammarNote(userId, { note, exampleSentence });
+  const ok = await saveGrammarNote(userId, { note, exampleSentence, category });
   if (ok) revalidatePath('/notes');
   return { ok };
 }
 
-export async function updateGrammarNoteAction(id: string, note: string): Promise<{ ok: boolean }> {
+export async function updateGrammarNoteAction(id: string, note: string, category?: string): Promise<{ ok: boolean }> {
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
-  const ok = await updateGrammarNote(userId, id, note);
+  const ok = await updateGrammarNote(userId, id, { note, category });
   if (ok) revalidatePath('/notes');
   return { ok };
+}
+
+export async function listNoteCategoriesAction(): Promise<string[]> {
+  const userId = await getCurrentUserId();
+  return userId ? listNoteCategories(userId) : [];
 }
 
 export async function deleteGrammarNoteAction(id: string): Promise<{ ok: boolean }> {

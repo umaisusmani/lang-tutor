@@ -43,6 +43,7 @@ export interface GrammarNote {
   id: string;
   user_id: string;
   note: string;
+  category: string | null;
   example_sentence: string | null;
   created_at: string;
 }

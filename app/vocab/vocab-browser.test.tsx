@@ -51,6 +51,20 @@ test('the add-word field is visible with an empty vocabulary', () => {
   expect(screen.getByRole('combobox', { name: 'Add a word' })).toBeInTheDocument();
 });
 
+test('mobile Add a word toggle controls the panel', () => {
+  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
+  const toggle = screen.getByRole('button', { name: 'Add a word' });
+  const panel = document.getElementById('add-word-panel');
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(panel).toHaveClass('hidden', 'sm:block');
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(panel).not.toHaveClass('hidden');
+  expect(screen.getByRole('combobox', { name: 'Add a word' })).toBeInTheDocument();
+  fireEvent.click(toggle);
+  expect(panel).toHaveClass('hidden');
+});
+
 test('the single primary button says Practice when nothing is due', () => {
   render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} heading={<h1>Vocabulary</h1>} />);
   expect(screen.getByRole('button', { name: 'Practice' })).toBeInTheDocument();

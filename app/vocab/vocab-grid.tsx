@@ -23,6 +23,8 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('newest');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = Number(Boolean(query.trim())) + Number(filter !== 'all') + Number(sort !== 'newest');
   const due = new Set(dueWordIds);
   const search = query.trim().toLocaleLowerCase();
   const visible = entries.filter((entry) => (
@@ -50,7 +52,11 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+      <Pill hitArea className="self-start sm:hidden" aria-expanded={filtersOpen}
+        aria-controls="vocab-filter-controls" onClick={() => setFiltersOpen((open) => !open)}>
+        Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+      </Pill>
+      <div id="vocab-filter-controls" className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid sm:grid-cols-[1fr_auto_auto]`}>
         <label className="flex flex-col gap-1 text-sm">
           Search your words
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}

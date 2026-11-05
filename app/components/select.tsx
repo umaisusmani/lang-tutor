@@ -17,7 +17,7 @@ type SelectProps = {
 const styles = {
   pill: {
     wrapper: 'relative inline-flex',
-    trigger: 'border-line bg-yellow text-on-bright hover:brightness-105 flex min-h-11 sm:min-h-9 items-center justify-between gap-2 rounded-full border-2 px-3 py-1 font-display text-[13px] font-bold tracking-[0.04em] cursor-pointer',
+    trigger: 'border-line bg-yellow text-on-bright hover:brightness-105 flex min-h-9 items-center justify-between gap-2 rounded-full border-2 px-3 py-1 font-display text-[13px] font-bold tracking-[0.04em] cursor-pointer',
     list: 'right-0 min-w-max',
   },
   panel: {

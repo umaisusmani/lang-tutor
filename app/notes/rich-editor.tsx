@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { sanitizeNoteHtml } from '@/lib/sanitize-note-html';
 
 type Format = 'bold' | 'italic' | 'underline';
 
-export function RichEditor({ value, onChange, label, placeholder }: {
+export function RichEditor({ value, onChange, label, placeholder, minHeight = 'md' }: {
   value: string;
   onChange: (html: string) => void;
   label: string;
   placeholder?: string;
+  minHeight?: 'md' | 'lg';
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastAccepted = useRef('');
@@ -24,14 +25,22 @@ export function RichEditor({ value, onChange, label, placeholder }: {
     lastAccepted.current = clean;
   }, [value]);
 
-  function updateMarks() {
+  const updateMarks = useCallback(() => {
     if (!document.queryCommandState) return;
     setActive({
       bold: document.queryCommandState('bold'),
       italic: document.queryCommandState('italic'),
       underline: document.queryCommandState('underline'),
     });
-  }
+  }, []);
+
+  useEffect(() => {
+    function onSelectionChange() {
+      if (editorRef.current?.contains(document.getSelection()?.anchorNode ?? null)) updateMarks();
+    }
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
+  }, [updateMarks]);
 
   function sync() {
     const element = editorRef.current;
@@ -60,7 +69,7 @@ export function RichEditor({ value, onChange, label, placeholder }: {
         <button key={command} type="button" aria-label={command[0].toUpperCase() + command.slice(1)}
           aria-pressed={active[command]} onMouseDown={(event) => event.preventDefault()}
           onClick={() => format(command)}
-          className="text-ink-2 hover:bg-soft hover:text-ink rounded-md p-1.5">
+          className="text-ink-2 hover:bg-soft hover:text-ink aria-pressed:bg-yellow aria-pressed:text-on-bright rounded-md p-1.5">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {command === 'bold' && <path d="M6 4h5a3.5 3.5 0 0 1 0 7H6zM6 11h6a3.5 3.5 0 0 1 0 7H6z" fill="currentColor" stroke="none" />}
             {command === 'italic' && <><path d="M11 4h8M5 20h8M15 4 9 20" /></>}
@@ -74,6 +83,6 @@ export function RichEditor({ value, onChange, label, placeholder }: {
         sync();
         if (editorRef.current) editorRef.current.innerHTML = lastAccepted.current;
       }} onKeyUp={updateMarks} onMouseUp={updateMarks}
-      className="text-ink min-h-28 w-full px-3 py-2.5 text-sm whitespace-pre-wrap break-words outline-none empty:before:text-ink-3 empty:before:content-[attr(data-placeholder)]" />
+      className={`text-ink w-full px-3 py-2.5 text-sm whitespace-pre-wrap break-words outline-none empty:before:text-ink-3 empty:before:content-[attr(data-placeholder)] ${minHeight === 'lg' ? 'min-h-56 sm:min-h-72' : 'min-h-28'}`} />
   </div>;
 }

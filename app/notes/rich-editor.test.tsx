@@ -3,7 +3,17 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { RichEditor } from '@/app/notes/rich-editor';
 
-afterEach(cleanup);
+const queryCommandStateDescriptor = Object.getOwnPropertyDescriptor(document, 'queryCommandState');
+const execCommandDescriptor = Object.getOwnPropertyDescriptor(document, 'execCommand');
+
+afterEach(() => {
+  cleanup();
+  if (queryCommandStateDescriptor) Object.defineProperty(document, 'queryCommandState', queryCommandStateDescriptor);
+  else Reflect.deleteProperty(document, 'queryCommandState');
+  if (execCommandDescriptor) Object.defineProperty(document, 'execCommand', execCommandDescriptor);
+  else Reflect.deleteProperty(document, 'execCommand');
+  document.getSelection()?.removeAllRanges();
+});
 
 test('initial HTML and edits are parsed through the sanitizer', () => {
   const onChange = vi.fn();
@@ -33,4 +43,25 @@ test('toolbar buttons call the browser formatting command', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Italic' }));
   fireEvent.click(screen.getByRole('button', { name: 'Underline' }));
   expect(command.mock.calls.map(([name]) => name)).toEqual(['bold', 'italic', 'underline']);
+});
+
+test('formatting buttons show the current mark after a selection change inside the editor', () => {
+  Object.defineProperty(document, 'queryCommandState', {
+    configurable: true, value: (command: string) => command === 'bold',
+  });
+  render(<RichEditor label="Test note" value="text" onChange={vi.fn()} minHeight="lg" />);
+  const editor = screen.getByRole('textbox', { name: 'Test note' });
+  expect(editor.className).toContain('min-h-56 sm:min-h-72');
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(true);
+  const selection = document.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  fireEvent(document, new Event('selectionchange'));
+  const bold = screen.getByRole('button', { name: 'Bold' });
+  expect(bold).toHaveAttribute('aria-pressed', 'true');
+  expect(bold.className).toContain('aria-pressed:bg-yellow');
+  expect(screen.getByRole('button', { name: 'Italic' })).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.getByRole('button', { name: 'Underline' })).toHaveAttribute('aria-pressed', 'false');
 });

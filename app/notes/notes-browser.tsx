@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { Button } from '@/app/components/button';
+import { Button, buttonClassName } from '@/app/components/button';
 import { Modal } from '@/app/components/modal';
 import { Pill, pillClassName } from '@/app/components/pill';
 import { Select } from '@/app/components/select';
@@ -172,10 +172,11 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
         </span>
       </div>
       <div ref={addMenuRef} className="relative">
-        <button type="button" aria-label="Add" aria-expanded={addMenuOpen}
+        <button type="button" aria-label="Add" aria-expanded={addMenuOpen} aria-haspopup="menu"
           onClick={() => setAddMenuOpen((current) => !current)}
-          className="text-ink-2 hover:bg-soft hover:text-ink rounded-md p-1.5">
-          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 3v14M3 10h14" /></svg>
+          className={buttonClassName('primary', 'sm', 'h-10 w-10 !p-0 sm:w-auto sm:!px-4')}>
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M10 3v14M3 10h14" /></svg>
+          <span className="hidden sm:inline">New</span>
         </button>
         {addMenuOpen && <div className="border-line bg-panel absolute top-full right-0 z-30 mt-1 min-w-40 rounded-[14px] border-2 p-1.5 shadow-[3px_3px_0_var(--line)] animate-[fade-rise_160ms_ease-out]">
           <button type="button" className="hover:bg-soft min-h-11 w-full rounded-lg px-2.5 text-left"
@@ -185,13 +186,13 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
         </div>}
       </div>
     </div>
-    <Modal open={addNoteModalOpen} onClose={closeNoteModal} title="Add a note">
+    <Modal open={addNoteModalOpen} onClose={closeNoteModal} title="Add a note" size="lg">
       {addNoteModalOpen && <>
         {selectedWord ? <textarea aria-label="Add a note" value={text} maxLength={500} rows={4}
           onChange={(event) => setText(event.target.value)}
           placeholder="A grammar rule, a reminder, anything you want to keep…"
           className="border-line bg-panel text-ink w-full resize-y rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
-          : <RichEditor label="Add a note" value={text} onChange={setText}
+          : <RichEditor label="Add a note" value={text} onChange={setText} minHeight="lg"
             placeholder="A grammar rule, a reminder, anything you want to keep…" />}
         {selectedWord ? <div className="flex items-center gap-2">
           <span className="text-ink-3 font-mono text-xs">attached to:</span>
@@ -234,7 +235,7 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
           </div>}
         </>}
         {error && <p role="alert" className="text-ink-2 text-sm">{error}</p>}
-        <Button variant="primary" type="button" disabled={saving || !noteHtmlToPlainText(text).trim()} onClick={() => void add()}
+        <Button variant="primary" size="sm" type="button" disabled={saving || !noteHtmlToPlainText(text).trim()} onClick={() => void add()}
           className="self-start">{saving ? 'Adding…' : 'Add note'}</Button>
       </>}
     </Modal>
@@ -246,8 +247,8 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
           className="border-line bg-panel text-ink w-full rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
         {categoryError && <p role="alert" className="text-ink-2 text-sm">{categoryError}</p>}
         <div className="mt-2 flex justify-end gap-2.5">
-          <Button variant="secondary" type="button" onClick={closeCategoryModal}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={categoryPending || !categoryName.trim()}>{categoryPending ? 'Adding…' : 'Add'}</Button>
+          <Button variant="secondary" size="sm" type="button" onClick={closeCategoryModal}>Cancel</Button>
+          <Button variant="primary" size="sm" type="submit" disabled={categoryPending || !categoryName.trim()}>{categoryPending ? 'Adding…' : 'Add'}</Button>
         </div>
       </form>}
     </Modal>

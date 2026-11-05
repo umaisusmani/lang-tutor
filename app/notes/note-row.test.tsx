@@ -26,6 +26,11 @@ test('grammar notes safely render marks and category names', () => {
   expect(row.querySelector('strong')).toHaveTextContent('Bold');
   expect(row.querySelector('em')).toHaveTextContent('italic');
   expect(row.querySelector('u')).toHaveTextContent('underlined');
+  const actions = within(row).getAllByRole('button', { name: /(?:Edit|Remove) note/ });
+  expect(actions.map((button) => button.getAttribute('title'))).toEqual(['Edit note', 'Remove note']);
+  expect(actions[0].closest('div')?.parentElement).toBe(row.firstElementChild);
+  expect(within(row).queryByText('edit')).not.toBeInTheDocument();
+  expect(within(row).queryByText('remove')).not.toBeInTheDocument();
 });
 
 test('read-only rendering discards attributes and unsafe wrappers while keeping text', () => {

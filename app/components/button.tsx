@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react';
 
 type ButtonStyle = {
   variant?: 'primary' | 'secondary' | 'dark' | 'danger';
-  size?: 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg';
 };
 
 type ButtonProps = ButtonStyle & (
@@ -11,7 +11,7 @@ type ButtonProps = ButtonStyle & (
   | ({ href?: never } & ComponentProps<'button'>)
 );
 
-const base = 'inline-flex items-center justify-center gap-2 rounded-full border-2 border-line min-h-11 cursor-pointer disabled:cursor-default';
+const base = 'inline-flex items-center justify-center gap-2 rounded-full border-2 border-line cursor-pointer disabled:cursor-default';
 const styles = {
   primary: 'bg-yellow text-on-bright font-display tracking-[0.04em] shadow-[3px_3px_0_var(--line)] transition-[transform,box-shadow] duration-120 ease-out hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:opacity-50',
   secondary: 'bg-panel text-ink font-bold transition-[transform,box-shadow] duration-120 ease-out hover:shadow-[3px_3px_0_var(--line)] hover:-translate-x-px hover:-translate-y-px active:translate-x-0 active:translate-y-0 active:shadow-none disabled:opacity-50',
@@ -19,16 +19,23 @@ const styles = {
   danger: 'bg-orange text-on-bright font-bold transition-transform hover:shadow-[3px_3px_0_var(--line)] hover:-translate-x-px hover:-translate-y-px disabled:opacity-50',
 };
 
-export function Button(props: ButtonProps) {
-  const { variant = 'primary', size = 'md', className, href, ...rest } = props;
+export function buttonClassName(variant: NonNullable<ButtonStyle['variant']> = 'primary', size: NonNullable<ButtonStyle['size']> = 'md', extra?: string) {
   const sizeClass = variant === 'dark'
     ? [
-        /(?:^|\s)px-/.test(className ?? '') ? '' : 'px-3',
-        /(?:^|\s)py-/.test(className ?? '') ? '' : 'py-[5px]',
-        /(?:^|\s)text-(?:xs|sm|base|lg|xl|\d|\[)/.test(className ?? '') ? '' : 'text-[15px]',
+        'min-h-11',
+        /(?:^|\s)px-/.test(extra ?? '') ? '' : 'px-3',
+        /(?:^|\s)py-/.test(extra ?? '') ? '' : 'py-[5px]',
+        /(?:^|\s)text-(?:xs|sm|base|lg|xl|\d|\[)/.test(extra ?? '') ? '' : 'text-[15px]',
       ].filter(Boolean).join(' ')
-    : `px-4 py-3 ${size === 'lg' ? 'text-xl' : 'text-base'}`;
-  const classes = [base, styles[variant], sizeClass, className].filter(Boolean).join(' ');
+    : size === 'sm'
+      ? `min-h-9 px-4 py-1.5 ${variant === 'primary' ? 'text-base' : 'text-sm'}`
+      : `min-h-11 px-4 py-3 ${size === 'lg' ? 'text-xl' : 'text-base'}`;
+  return [base, styles[variant], sizeClass, extra].filter(Boolean).join(' ');
+}
+
+export function Button(props: ButtonProps) {
+  const { variant = 'primary', size = 'md', className, href, ...rest } = props;
+  const classes = buttonClassName(variant, size, className);
 
   if (href !== undefined) {
     return <Link href={href} {...rest as Omit<ComponentProps<typeof Link>, 'href'>} className={classes} />;

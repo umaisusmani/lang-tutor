@@ -9,12 +9,20 @@ import { Brand } from '@/app/components/brand';
 import { useConfirm } from '@/app/components/confirm-modal';
 import { InstallBanner } from '@/app/components/install-banner';
 import { WARNING_AT, useResetLabel } from '@/app/components/quota-banner';
-import { Pill, pillClassName } from '@/app/components/pill';
+import { pillClassName } from '@/app/components/pill';
 import { Select } from '@/app/components/select';
 import { notifyError } from '@/app/components/toaster';
 import { deleteConversationAction } from '@/app/conversations/actions';
 import { CEFR_LEVELS, isCefrLevel, type CefrLevel } from '@/lib/prompts';
 import type { Conversation } from '@/lib/types/db';
+
+function tabClassName(active: boolean, desktop = false) {
+  return `relative flex min-h-11 items-center font-mono text-xs font-semibold no-underline ${active ? 'text-ink' : 'text-ink-2'} ${desktop ? 'hover:text-ink' : ''}`;
+}
+
+function TabUnderline({ active }: { active: boolean }) {
+  return active && <span aria-hidden="true" className="bg-yellow absolute right-0 bottom-0 left-0 h-1 rounded-full" />;
+}
 
 function ConversationList({ conversations, conversationId, deletingId, onClose, onDelete }: {
   conversations: Conversation[];
@@ -264,24 +272,24 @@ export function SiteHeader({
               <div className="hidden items-center gap-1.5 sm:flex sm:gap-2.5">
                 <Link
                   href="/vocab"
-                  className="group/pill inline-flex min-h-11 items-center"
+                  className={tabClassName(activePage === 'vocab', true)}
                   aria-current={activePage === 'vocab' ? 'page' : undefined}
                 >
-                  <span className={pillClassName({ active: activePage === 'vocab' })}>
-                    vocab
-                    {dueCount > 0 && (
-                      <span
-                        className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
-                        aria-label={`${dueCount} words ready to review`}
-                      >
-                        {dueCount > 99 ? '99+' : dueCount}
-                      </span>
-                    )}
-                  </span>
+                  vocab
+                  {dueCount > 0 && (
+                    <span
+                      className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold no-underline"
+                      aria-label={`${dueCount} words ready to review`}
+                    >
+                      {dueCount > 99 ? '99+' : dueCount}
+                    </span>
+                  )}
+                  <TabUnderline active={activePage === 'vocab'} />
                 </Link>
-                <Link href="/notes" className="group/pill inline-flex min-h-11 items-center"
+                <Link href="/notes" className={tabClassName(activePage === 'notes', true)}
                   aria-current={activePage === 'notes' ? 'page' : undefined}>
-                  <span className={pillClassName({ active: activePage === 'notes' })}>notes</span>
+                  notes
+                  <TabUnderline active={activePage === 'notes'} />
                 </Link>
               </div>
             )}
@@ -290,20 +298,28 @@ export function SiteHeader({
               <div className="relative" onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setChatsOpen(false);
               }}>
-                <Pill
+                <button
                   ref={chatsTrigger}
                   type="button"
                   aria-expanded={chatsOpen}
                   aria-controls="conversation-panel"
+                  aria-current={activePage === 'chat' ? 'page' : undefined}
+                  aria-label={`chat${conversations.length > 0 ? ` · ${conversations.length}` : ''}`}
                   onClick={() => {
                     setAccountOpen(false);
                     setChatsOpen((v) => !v);
                   }}
-                  hitArea
-                  active={activePage === 'chat'}
+                  className="group/pill inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center disabled:cursor-default"
                 >
-                  chat{conversations.length > 0 && ` · ${conversations.length}`}
-                </Pill>
+                  <span aria-hidden="true" className={pillClassName({ active: activePage === 'chat', className: 'sm:hidden' })}>
+                    chat{conversations.length > 0 && ` · ${conversations.length}`}
+                  </span>
+                  <span aria-hidden="true" className={`${tabClassName(activePage === 'chat', true)} hidden gap-1 sm:flex`}>
+                    chat{conversations.length > 0 && ` · ${conversations.length}`}
+                    <span className="text-[9px] opacity-60">▾</span>
+                    <TabUnderline active={activePage === 'chat'} />
+                  </span>
+                </button>
 
                 {chatsOpen && (
                   <>
@@ -399,14 +415,14 @@ export function SiteHeader({
           {(['chat', 'vocab', 'notes'] as const).map((page) => (
             <Link key={page} href={page === 'chat' ? '/' : `/${page}`}
               aria-current={activePage === page ? 'page' : undefined}
-              className="text-ink-2 relative flex min-h-11 items-center font-mono text-xs font-semibold no-underline"
+              className={tabClassName(activePage === page)}
             >
-              <span className={activePage === page ? 'text-ink' : ''}>{page.charAt(0).toUpperCase() + page.slice(1)}</span>
+              <span>{page.charAt(0).toUpperCase() + page.slice(1)}</span>
               {page === 'vocab' && dueCount > 0 && (
                 <span className="bg-orange text-on-bright ml-1.5 inline-block min-w-[18px] rounded-full px-1.5 py-px text-center text-[10px] leading-[14px] font-bold"
                   aria-label={`${dueCount} words ready to review`}>{dueCount > 99 ? '99+' : dueCount}</span>
               )}
-              {activePage === page && <span aria-hidden="true" className="bg-yellow absolute right-0 bottom-0 left-0 h-1 rounded-full" />}
+              <TabUnderline active={activePage === page} />
             </Link>
           ))}
         </nav>

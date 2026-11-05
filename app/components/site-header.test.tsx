@@ -95,8 +95,25 @@ test('mobile navigation shows three tabs, an active underline and the vocab due 
 
 test('notes navigation is current in the header and mobile row', () => {
   renderHeader({ activePage: 'notes' });
-  expect(screen.getByRole('link', { name: 'notes', current: 'page' })).toHaveAttribute('href', '/notes');
+  const desktopNotes = screen.getByRole('link', { name: 'notes', current: 'page' });
+  expect(desktopNotes).toHaveAttribute('href', '/notes');
+  expect(desktopNotes).toHaveClass('font-mono', 'text-xs', 'text-ink');
+  expect(desktopNotes.querySelector('.bg-yellow')).toBeInTheDocument();
   expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('link', { name: 'Notes', current: 'page' })).toHaveAttribute('href', '/notes');
+});
+
+test('desktop tabs use text and an active underline while chat still opens its menu', () => {
+  renderHeader({ activePage: 'chat', dueCount: 7 });
+  const vocab = screen.getByRole('link', { name: /vocab/ });
+  expect(vocab).toHaveClass('font-mono', 'text-xs');
+  expect(vocab).not.toHaveClass('rounded-full');
+  expect(within(vocab).getByLabelText('7 words ready to review')).toBeInTheDocument();
+  const chat = screen.getByRole('button', { name: 'chat · 1' });
+  expect(chat).toHaveAttribute('aria-current', 'page');
+  expect(chat.querySelector('.sm\\:flex .bg-yellow')).toBeInTheDocument();
+  expect(chat).toHaveTextContent('▾');
+  fireEvent.click(chat);
+  expect(chat).toHaveAttribute('aria-expanded', 'true');
 });
 
 test('Escape closes account and chats popovers and returns focus to their triggers', () => {

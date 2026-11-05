@@ -58,3 +58,13 @@ test('backdrop clicks request a close, while clicks on content do not', () => {
   fireEvent.click(dialog);
   expect(onClose).toHaveBeenCalledOnce();
 });
+
+test('defaults to the 560px width and offers a wider large dialog', () => {
+  const view = render(<Modal open onClose={vi.fn()} title="Sized dialog">Content</Modal>);
+  const dialog = screen.getByRole('dialog', { name: 'Sized dialog' });
+  expect(dialog.className).toContain('w-[min(92vw,560px)]');
+  expect(dialog.className).toContain('max-h-[92dvh]');
+  expect(dialog.className).toContain('overflow-y-auto');
+  view.rerender(<Modal open onClose={vi.fn()} title="Sized dialog" size="lg">Content</Modal>);
+  expect(dialog.className).toContain('w-[min(94vw,760px)]');
+});

@@ -77,6 +77,9 @@ test('the title menu opens, then closes on Escape or outside click', () => {
   expect(screen.getByText('0 notes saved')).toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: 'Add a note' })).not.toBeInTheDocument();
   const trigger = screen.getByRole('button', { name: 'Add' });
+  expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  expect(trigger).toHaveClass('bg-yellow', 'w-10');
+  expect(trigger).toHaveTextContent('New');
   fireEvent.click(trigger);
   expect(trigger).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByRole('button', { name: 'Add note' })).toBeInTheDocument();
@@ -91,11 +94,13 @@ test('the title menu opens, then closes on Escape or outside click', () => {
 test('each title menu option opens its modal and closes the menu', () => {
   render(browser());
   const noteDialog = openAddNote();
+  expect(noteDialog.className).toContain('w-[min(94vw,760px)]');
   expect(screen.getByRole('button', { name: 'Add' })).toHaveAttribute('aria-expanded', 'false');
-  expect(within(noteDialog).getByRole('textbox', { name: 'Add a note' })).toBeInTheDocument();
+  expect(within(noteDialog).getByRole('textbox', { name: 'Add a note' }).className).toContain('min-h-56 sm:min-h-72');
   fireEvent(noteDialog, new Event('cancel', { cancelable: true }));
   expect(screen.queryByRole('dialog', { name: 'Add a note' })).not.toBeInTheDocument();
   const categoryDialog = openAddCategory();
+  expect(categoryDialog.className).toContain('w-[min(92vw,560px)]');
   expect(within(categoryDialog).getByRole('textbox', { name: 'Category name' })).toBeInTheDocument();
   fireEvent.click(within(categoryDialog).getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog', { name: 'Add a category' })).not.toBeInTheDocument();

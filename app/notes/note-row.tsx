@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
+import { useId, useState, useSyncExternalStore } from 'react';
 
 import { useConfirm } from '@/app/components/confirm-modal';
 import { Pill } from '@/app/components/pill';
+import { Select } from '@/app/components/select';
 import { notifyError } from '@/app/components/toaster';
-import { CategoryAssigner } from '@/app/notes/category-assigner';
 import { RichEditor } from '@/app/notes/rich-editor';
 import { deleteGrammarNoteAction, updateGrammarNoteAction, updateVocabNoteAction } from '@/app/vocab/actions';
 import { noteHtmlToPlainText, renderNoteHtml } from '@/lib/sanitize-note-html';
@@ -18,12 +18,11 @@ function SafeNoteDisplay({ html }: { html: string }) {
   return <>{inBrowser ? renderNoteHtml(html) : noteHtmlToPlainText(html)}</>;
 }
 
-export function NoteRow({ item, categories, onRemoved, onChanged, onCategoryCreated }: {
+export function NoteRow({ item, categories, onRemoved, onChanged }: {
   item: NoteItem;
   categories: NoteCategory[];
   onRemoved: () => void;
   onChanged: () => void;
-  onCategoryCreated: (category: NoteCategory) => void;
 }) {
   const { note } = item;
   const initialText = note.note ?? '';
@@ -34,6 +33,7 @@ export function NoteRow({ item, categories, onRemoved, onChanged, onCategoryCrea
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const categoryLabelId = useId();
   const confirm = useConfirm();
 
   async function save() {
@@ -90,8 +90,12 @@ export function NoteRow({ item, categories, onRemoved, onChanged, onCategoryCrea
         : <textarea aria-label="Edit note" value={draft} maxLength={500} rows={4}
           onChange={(event) => setDraft(event.target.value)}
           className="border-hair bg-panel text-ink focus:border-line w-full resize-y rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />}
-      {item.kind === 'grammar' && <CategoryAssigner categories={categories} selectedId={categoryDraft}
-        onSelect={setCategoryDraft} onCreated={onCategoryCreated} />}
+      {item.kind === 'grammar' && <div className="flex flex-col gap-1 text-sm">
+        <span id={categoryLabelId}>Category</span>
+        <Select variant="panel" value={categoryDraft ?? ''} onValueChange={(value) => setCategoryDraft(value || null)}
+          aria-labelledby={categoryLabelId}
+          options={[{ value: '', label: 'No category' }, ...categories.map((category) => ({ value: category.id, label: category.name }))]} />
+      </div>}
       {error && <p role="alert" className="text-ink-2 text-sm">{error}</p>}
       <div className="flex gap-2">
         <Pill hitArea disabled={pending || !(item.kind === 'grammar' ? noteHtmlToPlainText(draft).trim() : draft.trim())} onClick={() => void save()}>{pending ? 'saving…' : 'Save'}</Pill>

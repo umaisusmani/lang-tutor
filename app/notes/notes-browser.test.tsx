@@ -117,14 +117,20 @@ test('closing either modal keeps its unfinished draft for reopening', () => {
 });
 
 test('adds sanitized rich text with a selected managed category', async () => {
-  vi.mocked(listNoteCategoriesAction).mockResolvedValue([verbs]);
+  vi.mocked(listNoteCategoriesAction).mockResolvedValue([verbs, ideas]);
   vi.mocked(saveGrammarNoteAction).mockResolvedValue({ ok: true });
   const view = render(browser());
   const addBox = openAddNote();
   expect(screen.getByRole('button', { name: 'Add note' })).toBeDisabled();
   enterHtml('Add a note', '<strong>Use</strong> habe with ich.');
-  fireEvent.click(within(addBox).getByRole('button', { name: 'Add or choose a category' }));
-  fireEvent.click(await within(addBox).findByRole('button', { name: 'Verbs' }));
+  const categorySelect = within(addBox).getByRole('button', { name: 'Category No category' });
+  fireEvent.click(categorySelect);
+  const verbOption = await within(addBox).findByRole('option', { name: 'Verbs' });
+  expect(within(addBox).getAllByRole('option').map((option) => option.textContent?.replace('✓', '').trim()))
+    .toEqual(['No category', 'Ideas', 'Verbs']);
+  expect(within(addBox).queryByRole('textbox', { name: 'New category name' })).not.toBeInTheDocument();
+  fireEvent.click(verbOption);
+  expect(categorySelect).toHaveTextContent('Verbs');
   fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
   await waitFor(() => expect(saveGrammarNoteAction).toHaveBeenCalledWith('<strong>Use</strong> habe with ich.', undefined, 'verbs'));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add a note' })).not.toBeInTheDocument());
@@ -161,8 +167,8 @@ test('the category modal creates an unassigned category and updates the shared l
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add a category' })).not.toBeInTheDocument());
   expect(screen.getByRole('button', { name: 'Ideas' })).toBeInTheDocument();
   const noteDialog = openAddNote();
-  fireEvent.click(within(noteDialog).getByRole('button', { name: 'Add or choose a category' }));
-  expect(within(noteDialog).getByRole('button', { name: 'Ideas' })).toBeInTheDocument();
+  fireEvent.click(within(noteDialog).getByRole('button', { name: 'Category No category' }));
+  expect(within(noteDialog).getByRole('option', { name: 'Ideas' })).toBeInTheDocument();
 });
 
 test('the category modal reports creation errors inline', async () => {
@@ -193,18 +199,22 @@ test('filter chips show matching grammar notes and hide word notes', async () =>
   expect(listNoteCategoriesAction).toHaveBeenCalledTimes(1);
 });
 
-test('a category created while editing is immediately available in the add note modal', async () => {
+test('a category created in its modal is available when editing and adding notes', async () => {
   vi.mocked(createNoteCategoryAction).mockResolvedValue({ ok: true, category: ideas });
   render(browser([grammarNote]));
+  const categoryDialog = openAddCategory();
+  fireEvent.change(within(categoryDialog).getByRole('textbox', { name: 'Category name' }), { target: { value: 'Ideas' } });
+  fireEvent.click(within(categoryDialog).getByRole('button', { name: 'Add' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add a category' })).not.toBeInTheDocument());
   const row = screen.getByRole('article');
   fireEvent.click(within(row).getByRole('button', { name: 'Edit note' }));
-  fireEvent.click(within(row).getByRole('button', { name: 'Add or choose a category' }));
-  fireEvent.change(within(row).getByRole('textbox', { name: 'New category name' }), { target: { value: 'Ideas' } });
-  fireEvent.click(within(row).getByRole('button', { name: 'Add' }));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Ideas' })).toBeInTheDocument());
+  const rowSelect = within(row).getByRole('button', { name: 'Category No category' });
+  fireEvent.click(rowSelect);
+  fireEvent.click(within(row).getByRole('option', { name: 'Ideas' }));
+  expect(rowSelect).toHaveTextContent('Ideas');
   const addBox = openAddNote();
-  fireEvent.click(within(addBox).getByRole('button', { name: 'Add or choose a category' }));
-  expect(within(addBox).getByRole('button', { name: 'Ideas' })).toBeInTheDocument();
+  fireEvent.click(within(addBox).getByRole('button', { name: 'Category No category' }));
+  expect(within(addBox).getByRole('option', { name: 'Ideas' })).toBeInTheDocument();
 });
 
 test('editing rich text saves HTML and category ID', async () => {
@@ -214,8 +224,8 @@ test('editing rich text saves HTML and category ID', async () => {
   const row = screen.getByRole('article');
   fireEvent.click(within(row).getByRole('button', { name: 'Edit note' }));
   enterHtml('Edit note', '<u>Updated note.</u>');
-  fireEvent.click(within(row).getByRole('button', { name: 'Add or choose a category' }));
-  fireEvent.click(await within(row).findByRole('button', { name: 'Verbs' }));
+  fireEvent.click(within(row).getByRole('button', { name: 'Category No category' }));
+  fireEvent.click(await within(row).findByRole('option', { name: 'Verbs' }));
   fireEvent.click(within(row).getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(updateGrammarNoteAction).toHaveBeenCalledWith('grammar-1', '<u>Updated note.</u>', 'verbs'));
   expect(row.querySelector('u')).toHaveTextContent('Updated note.');

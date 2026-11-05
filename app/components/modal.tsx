@@ -29,7 +29,7 @@ export function Modal({ open, onClose, title, children }: {
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      className="border-line bg-panel text-ink m-auto w-[min(92vw,400px)] rounded-[18px] border-2 p-0 shadow-[4px_4px_0_var(--line)] backdrop:bg-black/45"
+      className="border-line bg-panel text-ink m-auto w-[min(92vw,560px)] rounded-[18px] border-2 p-0 shadow-[4px_4px_0_var(--line)] backdrop:bg-black/45"
     >
       <div className="flex flex-col gap-3 p-6">
         <h2 id={titleId} className="font-display text-[28px] leading-none font-black tracking-[0.02em]">

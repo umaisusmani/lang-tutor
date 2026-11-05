@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/app/components/button';
 import { Modal } from '@/app/components/modal';
 import { Pill, pillClassName } from '@/app/components/pill';
-import { CategoryAssigner } from '@/app/notes/category-assigner';
+import { Select } from '@/app/components/select';
 import { NoteRow, type NoteItem } from '@/app/notes/note-row';
 import { RichEditor } from '@/app/notes/rich-editor';
 import { createNoteCategoryAction, listNoteCategoriesAction, saveGrammarNoteAction, searchSavedWordsAction, updateVocabNoteAction } from '@/app/vocab/actions';
@@ -199,12 +199,15 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
             {selectedWord.lemma} ×
           </Pill>
         </div> : <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Pill onClick={() => {
-              if (attachOpen) resetAttachment();
-              setAttachOpen(!attachOpen);
-            }} aria-expanded={attachOpen}>attach to a saved word (optional)</Pill>
-            <CategoryAssigner categories={categories} selectedId={categoryId} onSelect={setCategoryId} onCreated={includeCategory} />
+          <Pill onClick={() => {
+            if (attachOpen) resetAttachment();
+            setAttachOpen(!attachOpen);
+          }} aria-expanded={attachOpen} className="self-start">attach to a saved word (optional)</Pill>
+          <div className="flex flex-col gap-1 text-sm">
+            <span id="add-note-category-label">Category</span>
+            <Select variant="panel" value={categoryId ?? ''} onValueChange={(value) => setCategoryId(value || null)}
+              aria-labelledby="add-note-category-label"
+              options={[{ value: '', label: 'No category' }, ...categories.map((category) => ({ value: category.id, label: category.name }))]} />
           </div>
           {attachOpen && <div className="flex flex-col gap-2">
             <label htmlFor="saved-word-search" className="text-ink-2 text-sm">Search saved words</label>
@@ -263,7 +266,6 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
       {items.map((item) => <NoteRow key={`${item.kind}-${item.note.id}-${item.note.note}`} item={item}
         categories={categories}
         onChanged={() => router.refresh()}
-        onCategoryCreated={includeCategory}
         onRemoved={() => {
           setRemoved((previous) => new Set(previous).add(`${item.kind}-${item.note.id}`));
           router.refresh();

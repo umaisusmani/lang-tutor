@@ -40,10 +40,10 @@ function setup(savedLemmas: ReadonlySet<string> = new Set()) {
   return { input, onAdded };
 }
 
-test('search is labelled and focused on mount without duplicate panel chrome', () => {
+test('search has a visible label and is focused on mount', () => {
   const { input } = setup();
   expect(input).toHaveFocus();
-  expect(screen.getByText('Search for a word')).toHaveClass('sr-only');
+  expect(screen.getByText('Search for a word')).toHaveClass('text-ink-2', 'text-sm');
   expect(screen.queryByText('Add a word')).not.toBeInTheDocument();
 });
 
@@ -131,13 +131,13 @@ test('starter add appears after preview, then saves the edited meaning and reset
   const { input, onAdded } = setup();
   const list = await typeAndFind(input, 'bahn');
   await userEvent.setup().click(within(list).getByRole('option', { name: 'der Bahnhof' }));
-  expect(screen.queryByRole('button', { name: 'Add der Bahnhof' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Add word' })).toBeDisabled();
   expect(screen.getByText('looking up the meaning…')).toBeInTheDocument();
   await act(async () => { resolvePreview({ translation: 'station' }); });
   const meaning = screen.getByRole('textbox', { name: 'Meaning' });
   expect(meaning).toHaveValue('station');
-  expect(screen.getByRole('button', { name: 'Add der Bahnhof' })).toBeInTheDocument();
-  await userEvent.setup().click(screen.getByRole('button', { name: 'Add der Bahnhof' }));
+  expect(screen.getByRole('button', { name: 'Add word' })).toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Add word' }));
   await waitFor(() => expect(addStarter).toHaveBeenCalledWith('der Bahnhof', 'station'));
   expect(onAdded).toHaveBeenCalledTimes(1);
   expect(screen.getByText('✓ der Bahnhof added')).toBeInTheDocument();
@@ -157,7 +157,7 @@ test('a missing preview lets the learner enter a meaning', async () => {
   await userEvent.setup().click(meaning);
   expect(meaning).toHaveFocus();
   await userEvent.setup().type(meaning, 'station');
-  await userEvent.setup().click(screen.getByRole('button', { name: 'Add der Bahnhof' }));
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Add word' }));
   await waitFor(() => expect(addStarter).toHaveBeenCalledWith('der Bahnhof', 'station'));
   expect(onAdded).toHaveBeenCalledTimes(1);
 });
@@ -175,7 +175,7 @@ test('AI word saves with its meaning without preview and Cancel resets', async (
 
   await typeAndFind(screen.getByRole('combobox'), 'aubergine');
   await userEvent.setup().click(screen.getByRole('option', { name: /die Aubergine.*eggplant/ }));
-  await userEvent.setup().click(screen.getByRole('button', { name: 'Add die Aubergine' }));
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Add word' }));
   await waitFor(() => expect(addLookup).toHaveBeenCalledWith(aubergine));
 });
 

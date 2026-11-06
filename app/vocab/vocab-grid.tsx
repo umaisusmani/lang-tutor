@@ -1,28 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { Pill } from '@/app/components/pill';
 import { Select } from '@/app/components/select';
 import { EditWord } from '@/app/vocab/edit-word';
 import { RemoveWordButton } from '@/app/vocab/remove-word-button';
-import { SuspendWordButton } from '@/app/vocab/suspend-word-button';
-import type { WordSchedule } from '@/lib/services/card.service';
 import type { VocabEntry } from '@/lib/types/db';
-
-function scheduleStatus(schedule: WordSchedule | undefined, now: number): string {
-  if (!schedule) return '';
-  if (schedule.suspended) return 'Suspended';
-  if (schedule.state === 0) return 'New (not started)';
-  if (!schedule.nextDue) return schedule.state === 2 ? 'Due now' : 'Learning';
-  const due = new Date(schedule.nextDue).getTime();
-  if (!Number.isFinite(due) || due <= now) return schedule.state === 2 ? 'Due now' : 'Learning · due now';
-  const minutes = Math.ceil((due - now) / 60_000);
-  if (schedule.state === 1 || schedule.state === 3) return `Learning · next in ${minutes}m`;
-  const days = Math.ceil((due - now) / 86_400_000);
-  return days <= 7 ? `Due in ${days} ${days === 1 ? 'day' : 'days'}`
-    : `Due ${new Date(due).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`;
-}
 
 /**
  * Saved words as flashcards: the German shows, the meaning is a click away,
@@ -34,9 +18,7 @@ function scheduleStatus(schedule: WordSchedule | undefined, now: number): string
  * toggle always leaves every card in the state it names. Not remembered
  * between visits on purpose: the page opens hidden, ready to test.
  */
-export function VocabGrid({ entries, dueWordIds, schedules }: {
-  entries: VocabEntry[]; dueWordIds: string[]; schedules: Record<string, WordSchedule>;
-}) {
+export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueWordIds: string[] }) {
   const [revealAll, setRevealAll] = useState(false);
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
   const [query, setQuery] = useState('');
@@ -44,11 +26,6 @@ export function VocabGrid({ entries, dueWordIds, schedules }: {
   const [sort, setSort] = useState('newest');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editing, setEditing] = useState<VocabEntry | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
   const activeFilterCount = Number(Boolean(query.trim())) + Number(filter !== 'all') + Number(sort !== 'newest');
   const due = new Set(dueWordIds);
   const search = query.trim().toLocaleLowerCase();
@@ -56,8 +33,7 @@ export function VocabGrid({ entries, dueWordIds, schedules }: {
     `${entry.lemma} ${entry.translation ?? ''} ${entry.example_sentence ?? ''}`.toLocaleLowerCase().includes(search)
     && (filter === 'all' || (filter === 'due' && due.has(entry.id))
       || (filter === 'missing' && !entry.translation?.trim())
-      || (filter === 'mistakes' && entry.source === 'mistake')
-      || (filter === 'suspended' && schedules[entry.id]?.suspended))
+      || (filter === 'mistakes' && entry.source === 'mistake'))
   )).sort((a, b) => sort === 'az'
     ? a.lemma.localeCompare(b.lemma, 'de')
     : sort === 'oldest' ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at));
@@ -91,7 +67,7 @@ export function VocabGrid({ entries, dueWordIds, schedules }: {
         <div className="flex flex-col gap-1 text-sm">
           <span id="vocab-filter-label">Show</span>
           <Select variant="panel" value={filter} onValueChange={setFilter} aria-labelledby="vocab-filter-label"
-            options={[{ value: 'all', label: 'All words' }, { value: 'due', label: 'In your next session' }, { value: 'suspended', label: 'Suspended' }, { value: 'mistakes', label: 'From corrections' }, { value: 'missing', label: 'Missing meaning' }]} />
+            options={[{ value: 'all', label: 'All words' }, { value: 'due', label: 'Ready to review' }, { value: 'mistakes', label: 'From corrections' }, { value: 'missing', label: 'Missing meaning' }]} />
         </div>
         <div className="flex flex-col gap-1 text-sm">
           <span id="vocab-sort-label">Sort</span>
@@ -138,9 +114,9 @@ export function VocabGrid({ entries, dueWordIds, schedules }: {
                 type="button"
                 onClick={() => toggleCard(entry.id)}
                 aria-expanded={revealed}
-                className="flex flex-1 cursor-pointer flex-col gap-1.5 px-4 pt-12 pb-9 text-left"
+                className={`flex flex-1 cursor-pointer flex-col gap-1.5 px-4 pt-3.5 text-left ${revealed ? 'pb-1' : 'pb-9'}`}
               >
-                <span className="pr-20 text-[17px] font-semibold break-words">{entry.lemma}</span>
+                <span className="pr-28 text-[17px] font-semibold break-words">{entry.lemma}</span>
                 {revealed ? (
                   <span className="flex animate-[fade-rise_160ms_ease-out] flex-col gap-1">
                     <span className="text-ink-2 text-sm">
@@ -157,13 +133,15 @@ export function VocabGrid({ entries, dueWordIds, schedules }: {
                 )}
               </button>
 
-              <span className="text-ink-3 absolute bottom-2.5 left-4 text-xs">
-                {!entry.translation?.trim() ? <>Missing meaning · <button type="button" onClick={() => setEditing(entry)} className="underline">Add meaning</button></>
-                  : scheduleStatus(schedules[entry.id], now)}
+              <span className="text-ink-3 pointer-events-none absolute bottom-2.5 left-4 text-xs">
+                {!entry.translation?.trim() ? 'Missing meaning · excluded from review' : due.has(entry.id) ? 'Ready to review' : 'Saved for later'}
               </span>
-              <div className="absolute top-2 right-3 flex items-center gap-1">
-                <Pill hitArea aria-label={`Edit ${entry.lemma}`} onClick={() => setEditing(entry)}>edit</Pill>
-                <SuspendWordButton entryId={entry.id} lemma={entry.lemma} suspended={Boolean(schedules[entry.id]?.suspended)} />
+              <div className="absolute top-3 right-3.5 flex items-center gap-1">
+                <Pill size="sm" hitArea aria-label={`Edit ${entry.lemma}`} title="Edit" onClick={() => setEditing(entry)}>
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="m10.5 3.5 2 2M2.5 13.5l3.2-.7 7.2-7.2a1.4 1.4 0 0 0-2-2L3.7 10.8l-1.2 2.7Z" />
+                  </svg>
+                </Pill>
                 <RemoveWordButton entryId={entry.id} lemma={entry.lemma} />
               </div>
             </div>

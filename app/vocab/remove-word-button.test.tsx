@@ -18,4 +18,6 @@ test('remove chip asks for confirmation before deleting the word', async () => {
   await waitFor(() => expect(deleteVocabAction).toHaveBeenCalledWith('word-1'));
   expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Remove "Haus"?' }));
   expect(confirm.mock.calls[0][0].description).toMatch(/removes all its review progress/i);
+  expect(confirm.mock.calls[0][0].description).toMatch(/Adding it again starts it as a new word/);
+  expect(confirm.mock.calls[0][0].description).not.toMatch(/suspend/i);
 });

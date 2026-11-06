@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
+import { Button } from '@/app/components/button';
 import { addLookedUpWordAction, addStarterWordAction, lookupWordsAction,
   previewStarterWordAction, searchStarterWordsAction, type DiscoverCard, type LookedUpWord } from '@/app/vocab/actions';
 
@@ -231,29 +232,29 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
 
   return (
     <section className="flex flex-col gap-3">
-      <label htmlFor={inputId} className="sr-only">Search for a word</label>
+      {!selected && <label htmlFor={inputId} className="text-ink-2 text-sm">Search for a word</label>}
       <div className="relative min-w-0">
         {selected ? <div ref={selectedRef} tabIndex={0} onKeyDown={handleSelectedKeyDown}
-          className="border-line bg-panel flex flex-wrap items-start gap-3 rounded-xl border-2 p-3 outline-offset-2">
-          <div className="min-w-0 flex-1">
+          className="border-line bg-panel flex flex-col gap-3 rounded-xl border-2 p-3 outline-offset-2">
+          <div className="min-w-0">
             <div className="font-display text-2xl leading-tight">{selected.word.lemma}</div>
             {lookingUp ? <span className="text-ink-2 inline-flex items-center gap-2 font-mono text-xs">
               <span aria-hidden="true" className="border-ink-3 h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
               looking up the meaning…
-            </span> : <input aria-label="Meaning" value={meaning} onChange={(event) => setMeaning(event.target.value)}
-              placeholder="Type a meaning" maxLength={500}
-              className="text-ink-2 w-full border-0 border-b border-transparent bg-transparent p-0 font-mono outline-none focus:border-ink-2" />}
+            </span> : <label className="text-ink-2 mt-3 flex flex-col gap-1 text-sm">Meaning
+              <input value={meaning} onChange={(event) => setMeaning(event.target.value)}
+                placeholder="Type a meaning" maxLength={500}
+                className="border-line bg-panel text-ink w-full rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
+            </label>}
             {(selected.word.example || selected.word.exampleTranslation) && <div className="text-ink-2 mt-2 text-sm">
               <p>{selected.word.example}</p>
               <p className="font-mono text-xs">{selected.word.exampleTranslation}</p>
             </div>}
           </div>
-          <div className="border-line bg-panel ml-auto flex shrink-0 overflow-hidden rounded-full border-2 shadow-[2px_2px_0_var(--line)]">
-            {!lookingUp && meaning.trim() && <button type="button" aria-label={`Add ${selected.word.lemma}`} title={`Add ${selected.word.lemma}`}
-              disabled={adding} onClick={() => void add()}
-              className="bg-yellow text-on-bright flex h-11 w-11 items-center justify-center text-xl disabled:opacity-50">✓</button>}
-            <button type="button" aria-label="Cancel" title="Cancel" onClick={cancel}
-              className="text-ink flex h-11 w-11 items-center justify-center text-xl">✕</button>
+          <div className="mt-2 flex justify-end gap-2.5">
+            <Button type="button" variant="secondary" size="sm" onClick={cancel}>Cancel</Button>
+            <Button type="button" variant="primary" size="sm"
+              disabled={adding || lookingUp || !meaning.trim()} onClick={() => void add()}>{adding ? 'Adding…' : 'Add word'}</Button>
           </div>
         </div> : <>
           <input ref={inputRef} id={inputId} type="text" value={query} autoFocus
@@ -265,10 +266,10 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
             aria-activedescendant={showMenu && active >= 0 ? `${listboxId}-${active}` : undefined}
             placeholder="Type a word in German or English…" autoComplete="off" autoCapitalize="none" autoCorrect="off"
             spellCheck={false} maxLength={50}
-            className="border-line bg-panel w-full rounded-xl border-2 px-3 py-2 pr-10" />
+            className="border-line bg-panel text-ink w-full rounded-xl border-2 px-3 py-2.5 pr-10 text-sm outline-none" />
           {searchPending && <span role="status" aria-label="Searching suggestions" className="border-ink-3 absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />}
           {showMenu && <ul role="listbox" id={listboxId}
-            className="border-line bg-panel mt-1 max-h-[320px] w-full overflow-y-auto rounded-xl border-2 p-1.5 shadow-[3px_3px_0_var(--line)] animate-[fade-rise_160ms_ease-out]">
+            className="border-line bg-panel mt-1 max-h-[320px] w-full overflow-y-auto rounded-xl border-2 p-1.5 animate-[fade-rise_160ms_ease-out]">
             {results.map((word, index) => <li key={`starter-${word.lemma}`} id={`${listboxId}-${index}`} role="option"
               aria-selected={active === index} aria-disabled={isSaved(word.lemma) ? 'true' : undefined}
               onMouseDown={(event) => event.preventDefault()} onClick={() => void select({ kind: 'starter', word })}

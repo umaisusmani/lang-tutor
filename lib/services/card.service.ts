@@ -9,7 +9,7 @@ import {
 } from '@/lib/srs';
 import { createClient } from '@/lib/supabase/server';
 import { pickNewWords, selectReviewWords } from '@/lib/review-session';
-import type { Card, CardSchedule, CardState, ReviewSurface, VocabEntry } from '@/lib/types/db';
+import type { Card, CardSchedule, ReviewSurface, VocabEntry } from '@/lib/types/db';
 
 /**
  * All reads and writes against `cards` and `review_logs`.
@@ -35,54 +35,6 @@ const REVIEW_ITEM_COLUMNS =
 /** Longest typed answer kept in review_logs -- it's for debugging the checker,
  * and it comes from the client. */
 const ANSWER_GIVEN_MAX = 200;
-
-export type WordSchedule = { suspended: boolean; state: CardState; nextDue: string | null };
-
-export async function getWordSchedules(userId: string): Promise<Record<string, WordSchedule>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from('cards')
-    .select('vocab_entry_id,state,due,suspended').eq('user_id', userId).not('vocab_entry_id', 'is', null);
-  if (error) {
-    console.error('[card.service] getWordSchedules failed:', error.message);
-    throw new Error('Could not load word schedules.');
-  }
-  const grouped: Record<string, { suspended: boolean; cards: { state: CardState; due: string; suspended: boolean }[] }> = {};
-  for (const card of data ?? []) {
-    if (!card.vocab_entry_id) continue;
-    const group = grouped[card.vocab_entry_id] ??= { suspended: true, cards: [] };
-    group.cards.push({ state: card.state as CardState, due: card.due, suspended: card.suspended });
-    if (!card.suspended) group.suspended = false;
-  }
-  const schedules: Record<string, WordSchedule> = {};
-  for (const [id, group] of Object.entries(grouped)) {
-    const eligible = group.suspended ? group.cards : group.cards.filter((card) => !card.suspended);
-    const priority = (state: CardState) => state === 1 || state === 3 ? 0 : state === 2 ? 1 : 2;
-    eligible.sort((a, b) => priority(a.state) - priority(b.state) || a.due.localeCompare(b.due));
-    schedules[id] = {
-      suspended: group.suspended,
-      state: eligible[0].state,
-      nextDue: group.suspended ? null : eligible.reduce<string | null>((earliest, card) =>
-        earliest === null || card.due < earliest ? card.due : earliest, null),
-    };
-  }
-  return schedules;
-}
-
-export async function setWordSuspended(userId: string, entryId: string, suspended: boolean): Promise<boolean> {
-  try {
-    const supabase = await createClient();
-    const { error } = await supabase.from('cards').update({ suspended })
-      .eq('vocab_entry_id', entryId).eq('user_id', userId);
-    if (error) {
-      console.error('[card.service] setWordSuspended failed:', error.message);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('[card.service] setWordSuspended failed:', err);
-    return false;
-  }
-}
 
 /**
  * The learner's day boundaries: used to bury words reviewed today and to

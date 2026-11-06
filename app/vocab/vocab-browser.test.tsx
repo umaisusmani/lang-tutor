@@ -50,7 +50,7 @@ const card: SessionCard = {
 };
 
 test('discovering words only changes the Discover words loading label', () => {
-  render(<VocabBrowser entries={[entry]} dueCount={1} dueWordIds={[entry.id]} schedules={{}} userId="user-1" heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser entries={[entry]} dueCount={1} dueWordIds={[entry.id]} userId="user-1" heading={<h1>Vocabulary</h1>} />);
 
   const reviewButton = screen.getByRole('button', { name: 'Review 1 due word' });
   const discoverButton = screen.getByRole('button', { name: 'Discover words' });
@@ -61,8 +61,12 @@ test('discovering words only changes the Discover words loading label', () => {
 });
 
 test('the add-word button opens a dialog with a focused search field and resets on reopen', () => {
-  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} schedules={{}} userId="user-1" heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} userId="user-1" heading={<h1>Vocabulary</h1>} />);
   const trigger = screen.getByRole('button', { name: 'Add a word' });
+  expect(trigger).toHaveTextContent('Add');
+  expect(trigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  expect(trigger.parentElement).toHaveClass('flex', 'items-start', 'justify-between');
+  expect(trigger.parentElement).toContainElement(screen.getByRole('heading', { name: 'Vocabulary' }));
   expect(screen.queryByRole('combobox', { name: 'Search for a word' })).not.toBeInTheDocument();
   fireEvent.click(trigger);
   const dialog = screen.getByRole('dialog', { name: 'Add a word' });
@@ -77,7 +81,7 @@ test('the add-word button opens a dialog with a focused search field and resets 
 });
 
 test('the add-word button is available with an empty vocabulary', () => {
-  render(<VocabBrowser entries={[]} dueCount={0} dueWordIds={[]} schedules={{}} userId="user-1" heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser entries={[]} dueCount={0} dueWordIds={[]} userId="user-1" heading={<h1>Vocabulary</h1>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Add a word' }));
   expect(within(screen.getByRole('dialog', { name: 'Add a word' })).getByRole('combobox', { name: 'Search for a word' })).toBeInTheDocument();
 });
@@ -85,7 +89,7 @@ test('the add-word button is available with an empty vocabulary', () => {
 test('an empty vocabulary offers discovery and stores skips for this account', async () => {
   localStorage.clear();
   vi.mocked(discoverWordsAction).mockResolvedValueOnce([{ lemma: 'Haus', example: 'Das Haus.', exampleTranslation: 'The house.' }]);
-  render(<VocabBrowser entries={[]} dueCount={0} dueWordIds={[]} schedules={{}} userId="user-1" heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser entries={[]} dueCount={0} dueWordIds={[]} userId="user-1" heading={<h1>Vocabulary</h1>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Discover words' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Skip word' }));
   expect(localStorage.getItem('starfinch_skipped_words:user-1')).toBe('["Haus"]');
@@ -94,14 +98,14 @@ test('an empty vocabulary offers discovery and stores skips for this account', a
 });
 
 test('backdrop click closes the add-word dialog', () => {
-  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} schedules={{}} userId="user-1" heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} userId="user-1" heading={<h1>Vocabulary</h1>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Add a word' }));
   fireEvent.click(screen.getByRole('dialog', { name: 'Add a word' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
 test('the single primary button says Practice when nothing is due', () => {
-  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} schedules={{}} userId="user-1" heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} userId="user-1" heading={<h1>Vocabulary</h1>} />);
   expect(screen.getByRole('button', { name: 'Practice' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Extra practice|Review due words/ })).not.toBeInTheDocument();
 });
@@ -111,7 +115,7 @@ test('finishing due words offers practice ahead in place', async () => {
     .mockResolvedValueOnce({ cards: [card], discover: [], extra: false })
     .mockResolvedValueOnce({ cards: [card], discover: [], extra: true });
   vi.mocked(gradeCardAction).mockResolvedValue({ status: 'ok', next: { ...card.schedule, state: 2, reps: 1 } });
-  render(<VocabBrowser entries={[entry]} dueCount={1} dueWordIds={[entry.id]} schedules={{}} userId="user-1" heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser entries={[entry]} dueCount={1} dueWordIds={[entry.id]} userId="user-1" heading={<h1>Vocabulary</h1>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Review 1 due word' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Show answer' }));
   fireEvent.click(screen.getByRole('button', { name: /3 Good/ }));
@@ -124,7 +128,7 @@ test('finishing due words offers practice ahead in place', async () => {
 test('a practice round returns to the list with a Practice summary', async () => {
   vi.mocked(startSessionAction).mockResolvedValue({ cards: [card], discover: [], extra: true });
   vi.mocked(gradeCardAction).mockResolvedValue({ status: 'ok', next: { ...card.schedule, state: 2, reps: 1 } });
-  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} schedules={{}} userId="user-1" heading={<h1>Vocabulary</h1>} />);
+  render(<VocabBrowser entries={[entry]} dueCount={0} dueWordIds={[]} userId="user-1" heading={<h1>Vocabulary</h1>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Practice' }));
   expect(await screen.findByText('Practising ahead: nothing here is due yet.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Show answer' }));

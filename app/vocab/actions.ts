@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 
-import { getPracticeQueue, getReviewQueue, recordReview, setWordSuspended, undoReview, type RecordReviewResult, type UndoReviewResult } from '@/lib/services/card.service';
+import { getPracticeQueue, getReviewQueue, recordReview, undoReview, type RecordReviewResult, type UndoReviewResult } from '@/lib/services/card.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
 import { deleteGrammarNote, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
 import { createNoteCategory, listNoteCategories } from '@/lib/services/note-category.service';
@@ -74,15 +74,6 @@ export async function updateVocabAction(entryId: string, fields: {
   const userId = await getCurrentUserId();
   if (!userId) return { ok: false };
   const ok = await updateVocabEntry(userId, entryId, fields);
-  if (ok) { revalidatePath('/vocab'); revalidatePath('/', 'layout'); }
-  return { ok };
-}
-
-export async function setWordSuspendedAction(entryId: string, suspended: boolean): Promise<{ ok: boolean }> {
-  if (typeof entryId !== 'string' || !entryId.trim() || typeof suspended !== 'boolean') return { ok: false };
-  const userId = await getCurrentUserId();
-  if (!userId) return { ok: false };
-  const ok = await setWordSuspended(userId, entryId, suspended);
   if (ok) { revalidatePath('/vocab'); revalidatePath('/', 'layout'); }
   return { ok };
 }

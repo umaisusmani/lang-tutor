@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { PageHeader } from '@/app/components/page-header';
 import { VocabBrowser } from '@/app/vocab/vocab-browser';
-import { getReviewQueue, getWordSchedules } from '@/lib/services/card.service';
+import { getReviewQueue } from '@/lib/services/card.service';
 import { listConversations } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
 import { getQuotaStatus } from '@/lib/services/session.service';
@@ -16,7 +16,6 @@ export default async function VocabPage() {
   const entries = await listVocab(user.id);
   const conversations = await listConversations(user.id);
   const dueCards = await getReviewQueue(user.id);
-  const schedules = await getWordSchedules(user.id);
   const dueCount = dueCards.length;
   const dueWordIds = dueCards.flatMap((card) => card.vocab_entry_id ? [card.vocab_entry_id] : []);
   const levelCookie = (await cookies()).get('cefr_level')?.value;
@@ -48,7 +47,7 @@ export default async function VocabPage() {
       />
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
         <main className="flex flex-1 flex-col gap-[22px] pt-6 pb-7">
-          <VocabBrowser entries={entries} dueCount={dueCount} dueWordIds={dueWordIds} schedules={schedules} userId={user.id} heading={heading} />
+          <VocabBrowser entries={entries} dueCount={dueCount} dueWordIds={dueWordIds} userId={user.id} heading={heading} />
         </main>
       </div>
     </div>

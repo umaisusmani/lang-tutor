@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { Button } from '@/app/components/button';
+import { Button, buttonClassName } from '@/app/components/button';
 import { Modal } from '@/app/components/modal';
 import { notifyError } from '@/app/components/toaster';
 import { discoverWordsAction, startSessionAction, type DiscoverCard, type SessionPayload } from '@/app/vocab/actions';
@@ -13,7 +13,6 @@ import { AddWord } from '@/app/vocab/add-word';
 import type { ReviewSummary } from '@/lib/review-session';
 import { VocabGrid } from '@/app/vocab/vocab-grid';
 import type { VocabEntry } from '@/lib/types/db';
-import type { WordSchedule } from '@/lib/services/card.service';
 
 const SKIPPED_KEY = 'starfinch_skipped_words';
 const SKIPPED_MAX = 500;
@@ -49,13 +48,11 @@ export function VocabBrowser({
   dueCount,
   heading,
   dueWordIds,
-  schedules,
   userId,
 }: {
   entries: VocabEntry[];
   dueCount: number;
   dueWordIds: string[];
-  schedules: Record<string, WordSchedule>;
   userId: string;
   /** The page title block, rendered here so it can share a row with the
    * start button (the page itself is a Server Component and can't see
@@ -144,12 +141,15 @@ export function VocabBrowser({
 
   return (
     <>
-      {heading}
-      <Button variant="secondary" type="button" onClick={(event) => {
-        event.currentTarget.focus();
-        setAddWordOpen(true);
-      }} className="self-start">Add a word</Button>
-      <Modal open={addWordOpen} onClose={() => setAddWordOpen(false)} title="Add a word">
+      <div className="flex items-start justify-between gap-3">
+        {heading}
+        <button type="button" aria-label="Add a word" onClick={() => setAddWordOpen(true)}
+          className={buttonClassName('primary', 'sm', 'h-10 w-10 !p-0 sm:w-auto sm:!px-4')}>
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M10 3v14M3 10h14" /></svg>
+          <span className="hidden sm:inline">Add</span>
+        </button>
+      </div>
+      <Modal open={addWordOpen} onClose={() => setAddWordOpen(false)} title="Add a word" size="lg">
         {addWordOpen && <AddWord savedLemmas={savedLemmas} onAdded={() => { setAddWordOpen(false); router.refresh(); }} />}
       </Modal>
       {(summary || notice) && (
@@ -191,7 +191,7 @@ export function VocabBrowser({
           </div>
         </>
       )}
-      <VocabGrid entries={entries} dueWordIds={dueWordIds} schedules={schedules} />
+      <VocabGrid entries={entries} dueWordIds={dueWordIds} />
     </>
   );
 }

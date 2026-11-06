@@ -48,22 +48,22 @@ function EditWordForm({ entry, onClose }: { entry: VocabEntry; onClose: () => vo
 
   return <form onSubmit={(event) => void save(event)} className="flex flex-col gap-4">
     <h3 className="font-display text-xl break-words">{entry.lemma}</h3>
-    <label className="flex flex-col gap-1 text-sm">Meaning
+    <label className="text-ink-2 flex flex-col gap-1 text-sm">Meaning
       <input autoFocus required maxLength={500} value={translation} onChange={(event) => setTranslation(event.target.value)}
-        className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
+        className="border-line bg-panel text-ink w-full rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
     </label>
-    <label className="flex flex-col gap-1 text-sm">Example sentence
+    <label className="text-ink-2 flex flex-col gap-1 text-sm">Example sentence
       <textarea maxLength={500} value={exampleSentence} onChange={(event) => setExampleSentence(event.target.value)}
-        className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
+        className="border-line bg-panel text-ink w-full rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
     </label>
-    <label className="flex flex-col gap-1 text-sm">Example translation
+    <label className="text-ink-2 flex flex-col gap-1 text-sm">Example translation
       <textarea maxLength={500} value={exampleTranslation} onChange={(event) => setExampleTranslation(event.target.value)}
-        className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
+        className="border-line bg-panel text-ink w-full rounded-xl border-2 px-3 py-2.5 text-sm outline-none" />
     </label>
     {error && <p role="alert" className="text-orange text-sm">{error}</p>}
-    <div className="flex justify-end gap-2">
-      <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-      <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+    <div className="mt-2 flex justify-end gap-2.5">
+      <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+      <Button type="submit" variant="primary" size="sm" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
     </div>
   </form>;
 }

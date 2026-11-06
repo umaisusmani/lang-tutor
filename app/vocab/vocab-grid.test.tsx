@@ -86,11 +86,11 @@ test('edit control opens the editor for an existing meaning', () => {
   else Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
 });
 
-test('cards use the three original status messages and have no suspend control', () => {
+test('cards show only review and missing-meaning statuses', () => {
   render(<VocabGrid entries={[entry, { ...entry, id: 'word-2', lemma: 'neu', translation: null }, { ...entry, id: 'word-3', lemma: 'alt' }]}
     dueWordIds={['word-1']} />);
   expect(screen.getByText('Ready to review')).toBeInTheDocument();
-  expect(screen.getByText('Saved for later')).toBeInTheDocument();
+  expect(screen.queryByText('Saved for later')).not.toBeInTheDocument();
   expect(screen.getByText('Missing meaning · excluded from review')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Suspend|Resume|Add meaning/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Show All words' }));

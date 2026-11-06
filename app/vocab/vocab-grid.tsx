@@ -89,14 +89,15 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
         {visible.map((entry) => {
           const revealed = revealAll !== flipped.has(entry.id);
+          const status = !entry.translation?.trim()
+            ? 'Missing meaning · excluded from review'
+            : due.has(entry.id) ? 'Ready to review' : null;
           return (
-            // The card is a div holding two buttons side by side, not one big
-            // button: remove can't sit inside the flip button (a button in a
-            // button is invalid HTML), and positioned over it would still
-            // trigger the flip on its way to the remove.
+            // Keep the controls separate from the flip button: nested buttons
+            // are invalid, and each action needs its own click target.
             <div
               key={entry.id}
-              className={`border-line relative flex min-h-[112px] flex-col rounded-[14px] border-2 transition-[background-color,box-shadow] ${
+              className={`group border-line relative flex min-h-[132px] flex-col rounded-[14px] border-2 transition-[background-color,box-shadow] ${
                 // `bg-soft` used to mark "revealed", but --soft sits only
                 // ~0.07 (light) / ~0.04 (dark) lightness away from --panel --
                 // close enough that the two card states read as nearly
@@ -114,18 +115,18 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
                 type="button"
                 onClick={() => toggleCard(entry.id)}
                 aria-expanded={revealed}
-                className={`flex flex-1 cursor-pointer flex-col gap-1.5 px-4 pt-3.5 text-left ${revealed ? 'pb-1' : 'pb-9'}`}
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col gap-1.5 px-4 pt-3.5 text-left ${status ? 'pb-1' : 'pb-3.5'}`}
               >
-                <span className="pr-28 text-[17px] font-semibold break-words">{entry.lemma}</span>
+                <span className="min-h-9 pr-20 text-[17px] font-semibold break-words">{entry.lemma}</span>
                 {revealed ? (
-                  <span className="flex animate-[fade-rise_160ms_ease-out] flex-col gap-1">
-                    <span className="text-ink-2 text-sm">
+                  <span className="flex min-w-0 animate-[fade-rise_160ms_ease-out] flex-col gap-1">
+                    <span className="text-ink-2 text-sm break-words">
                       {entry.translation ?? 'no translation saved'}
                     </span>
                     {/* Where the learner met the word. Words saved before
                         examples were recorded have none. */}
                     {entry.example_sentence && (
-                      <span className="text-ink-3 text-[13px] italic">{entry.example_sentence}</span>
+                      <span className="text-ink-3 text-[13px] break-words italic">{entry.example_sentence}</span>
                     )}
                   </span>
                 ) : (
@@ -133,15 +134,14 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
                 )}
               </button>
 
-              <span className="text-ink-3 pointer-events-none absolute bottom-2.5 left-4 text-xs">
-                {!entry.translation?.trim() ? 'Missing meaning · excluded from review' : due.has(entry.id) ? 'Ready to review' : 'Saved for later'}
-              </span>
-              <div className="absolute top-3 right-3.5 flex items-center gap-1">
-                <Pill size="sm" hitArea aria-label={`Edit ${entry.lemma}`} title="Edit" onClick={() => setEditing(entry)}>
-                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              {status && <span className="text-ink-3 px-4 pt-2 pb-3 text-xs">{status}</span>}
+              <div className="absolute top-3 right-3.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                <button type="button" aria-label={`Edit ${entry.lemma}`} title="Edit" onClick={() => setEditing(entry)}
+                  className="text-ink-3 hover:text-ink focus-visible:text-ink hover:bg-soft focus-visible:bg-soft flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent shadow-none transition-colors">
+                  <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="m10.5 3.5 2 2M2.5 13.5l3.2-.7 7.2-7.2a1.4 1.4 0 0 0-2-2L3.7 10.8l-1.2 2.7Z" />
                   </svg>
-                </Pill>
+                </button>
                 <RemoveWordButton entryId={entry.id} lemma={entry.lemma} />
               </div>
             </div>

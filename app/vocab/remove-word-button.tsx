@@ -4,11 +4,10 @@ import { useTransition } from 'react';
 
 import { useConfirm } from '@/app/components/confirm-modal';
 import { notifyError } from '@/app/components/toaster';
-import { Pill } from '@/app/components/pill';
 import { deleteVocabAction } from '@/app/vocab/actions';
 
 /**
- * The `remove` control on a /vocab row, now behind a confirmation.
+ * The remove control on a /vocab card, behind a confirmation.
  *
  * Its own client component because the list page is a Server Component, which
  * can't hold an onClick or call useConfirm(). It used to be a bare
@@ -46,15 +45,17 @@ export function RemoveWordButton({ entryId, lemma }: { entryId: string; lemma: s
   }
 
   return (
-    <Pill
+    <button
       type="button"
       onClick={handleClick}
       disabled={pending}
-      muted={pending}
-      hitArea
       aria-label={`Remove ${lemma}`}
+      title="Remove"
+      className="text-ink-3 enabled:hover:text-orange focus-visible:text-ink hover:bg-soft focus-visible:bg-soft flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent shadow-none transition-colors disabled:cursor-default disabled:opacity-50"
     >
-      {pending ? 'removing…' : 'remove'}
-    </Pill>
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M2.5 4.5h11M6 4.5v-2h4v2m-6.5 0 .6 9h7.8l.6-9M6.5 7v4M9.5 7v4" />
+      </svg>
+    </button>
   );
 }

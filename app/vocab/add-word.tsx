@@ -19,14 +19,15 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
   const previewRef = useRef(0);
   const lookupRef = useRef(0);
   const pendingRef = useRef(false);
-  const typedAtRef = useRef(0);
   const cacheRef = useRef(new Map<string, LookedUpWord[]>());
+  const remainingRef = useRef(new Map<string, number | undefined>());
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DiscoverCard[]>([]);
   const [lookupResults, setLookupResults] = useState<LookedUpWord[]>([]);
   const [lookupPending, setLookupPending] = useState(false);
   const [lookupDone, setLookupDone] = useState(false);
   const [lookupError, setLookupError] = useState('');
+  const [remaining, setRemaining] = useState<number | undefined>();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [selected, setSelected] = useState<Selected | null>(null);
@@ -40,10 +41,12 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
   const [searchedQuery, setSearchedQuery] = useState('');
   const [addedLemmas, setAddedLemmas] = useState<ReadonlySet<string>>(() => new Set());
 
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
   const isSaved = (lemma: string) => savedLemmas.has(lemma.toLowerCase()) || addedLemmas.has(lemma.toLowerCase());
   const options: Option[] = [
     ...results.map((word): Option => ({ kind: 'starter', word })),
-    ...(results.length ? [{ kind: 'more' } as Option] : []),
+    ...(query.trim().length >= 3 && searchedQuery === query && !lookupDone ? [{ kind: 'more' } as Option] : []),
     ...lookupResults.map((word): Option => ({ kind: 'lookup', word })),
   ];
   const showMenu = open && !selected && Boolean(query.trim()) && !searchPending;
@@ -54,6 +57,7 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
       setLookupResults(cacheRef.current.get(key)!);
       setLookupDone(true);
       setLookupError('');
+      setRemaining(remainingRef.current.get(key));
       setOpen(true);
       return;
     }
@@ -64,6 +68,8 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
     try {
       const response = await lookupWordsAction(value.trim());
       if (request !== lookupRef.current) return;
+      setRemaining(response.remaining);
+      remainingRef.current.set(key, response.remaining);
       if (response.error) setLookupError(response.error);
       else {
         cacheRef.current.set(key, response.words);
@@ -96,12 +102,6 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
   }, [query, selected]);
 
   useEffect(() => {
-    if (selected || query.trim().length < 3 || searchedQuery !== query || results.length || lookupDone || lookupPending || lookupError) return;
-    const timer = window.setTimeout(() => void runLookup(query), Math.max(0, 700 - (Date.now() - typedAtRef.current)));
-    return () => window.clearTimeout(timer);
-  }, [query, searchedQuery, results, selected, lookupDone, lookupPending, lookupError, runLookup]);
-
-  useEffect(() => {
     if (selected) selectedRef.current?.focus();
     else if (focusSearchRef.current) {
       inputRef.current?.focus();
@@ -113,7 +113,6 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
     requestRef.current++;
     previewRef.current++;
     lookupRef.current++;
-    typedAtRef.current = Date.now();
     setQuery(value);
     setSearchPending(Boolean(value.trim()));
     setSelected(null);
@@ -123,6 +122,7 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
     setLookupDone(cacheRef.current.has(lookupKey(value)));
     setLookupPending(false);
     setLookupError('');
+    setRemaining(remainingRef.current.get(lookupKey(value)));
     setError('');
     setAddedMessage('');
     setResults([]);
@@ -230,8 +230,8 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
   }
 
   return (
-    <section className="border-line bg-panel flex flex-col gap-3 rounded-2xl border-2 p-4">
-      <label htmlFor={inputId} className="font-display text-xl">Add a word</label>
+    <section className="flex flex-col gap-3">
+      <label htmlFor={inputId} className="sr-only">Search for a word</label>
       <div className="relative min-w-0">
         {selected ? <div ref={selectedRef} tabIndex={0} onKeyDown={handleSelectedKeyDown}
           className="border-line bg-panel flex flex-wrap items-start gap-3 rounded-xl border-2 p-3 outline-offset-2">
@@ -256,7 +256,7 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
               className="text-ink flex h-11 w-11 items-center justify-center text-xl">✕</button>
           </div>
         </div> : <>
-          <input ref={inputRef} id={inputId} type="text" value={query}
+          <input ref={inputRef} id={inputId} type="text" value={query} autoFocus
             onChange={(event) => changeQuery(event.target.value)} onKeyDown={handleSearchKeyDown}
             onFocus={() => { if (searchedQuery === query && query.trim()) setOpen(true); }}
             onBlur={() => { setOpen(false); setActive(-1); }}
@@ -268,7 +268,7 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
             className="border-line bg-panel w-full rounded-xl border-2 px-3 py-2 pr-10" />
           {searchPending && <span role="status" aria-label="Searching suggestions" className="border-ink-3 absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />}
           {showMenu && <ul role="listbox" id={listboxId}
-            className="border-line bg-panel absolute top-full z-20 mt-1 max-h-[320px] w-full overflow-y-auto rounded-xl border-2 p-1.5 shadow-[3px_3px_0_var(--line)] animate-[fade-rise_160ms_ease-out]">
+            className="border-line bg-panel mt-1 max-h-[320px] w-full overflow-y-auto rounded-xl border-2 p-1.5 shadow-[3px_3px_0_var(--line)] animate-[fade-rise_160ms_ease-out]">
             {results.map((word, index) => <li key={`starter-${word.lemma}`} id={`${listboxId}-${index}`} role="option"
               aria-selected={active === index} aria-disabled={isSaved(word.lemma) ? 'true' : undefined}
               onMouseDown={(event) => event.preventDefault()} onClick={() => void select({ kind: 'starter', word })}
@@ -276,15 +276,15 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
               <span className="min-w-0 font-semibold break-words">{word.lemma}</span>
               {isSaved(word.lemma) && <span className="shrink-0 font-mono text-[11px]">✓ saved</span>}
             </li>)}
-            {results.length > 0 && <li id={`${listboxId}-${results.length}`} role="option" aria-selected={active === results.length}
+            {query.trim().length >= 3 && searchedQuery === query && !lookupDone && <li id={`${listboxId}-${results.length}`} role="option" aria-selected={active === results.length}
               onMouseDown={(event) => event.preventDefault()} onClick={() => void select({ kind: 'more' })}
               className={`flex min-h-11 items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-xs cursor-pointer ${active === results.length ? 'bg-yellow text-on-bright' : 'hover:bg-soft'}`}>
               {lookupPending && <span aria-hidden="true" className="border-ink-3 h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />}
-              {lookupPending ? 'Looking up…' : 'See more results'}
+              {lookupPending ? 'Looking up…' : 'Search more words · uses one daily translation'}
             </li>}
             {lookupResults.length > 0 && <li aria-hidden="true" className="text-ink-3 px-2.5 pt-2 font-mono text-[10px] uppercase">More words</li>}
             {lookupResults.map((word, offset) => {
-              const index = results.length + (results.length ? 1 : 0) + offset;
+              const index = results.length + (query.trim().length >= 3 && searchedQuery === query && !lookupDone ? 1 : 0) + offset;
               return <li key={`lookup-${word.lemma}`} id={`${listboxId}-${index}`} role="option"
                 aria-selected={active === index} aria-disabled={isSaved(word.lemma) ? 'true' : undefined}
                 onMouseDown={(event) => event.preventDefault()} onClick={() => void select({ kind: 'lookup', word })}
@@ -295,8 +295,9 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
               </li>;
             })}
             {lookupError && <li role="alert" className="text-ink-2 px-2.5 py-2 text-sm">{lookupError}</li>}
+            {remaining !== undefined && <li className="text-ink-3 px-2.5 py-2 font-mono text-xs">{remaining} translations left today</li>}
             {!options.length && !lookupError && <li className="text-ink-3 px-2.5 py-2 text-sm">
-              {lookupPending || (query.trim().length >= 3 && !lookupDone) ? 'Looking up…' : 'No matches'}
+              {lookupPending ? 'Looking up…' : 'No matches'}
             </li>}
           </ul>}
         </>}

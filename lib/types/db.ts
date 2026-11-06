@@ -34,6 +34,7 @@ export interface VocabEntry {
   lemma: string;
   translation: string | null;
   example_sentence: string | null;
+  example_translation: string | null;
   note: string | null;
   source: VocabSource;
   created_at: string;

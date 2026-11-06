@@ -36,9 +36,16 @@ beforeEach(() => {
 function setup(savedLemmas: ReadonlySet<string> = new Set()) {
   const onAdded = vi.fn();
   render(<AddWord savedLemmas={savedLemmas} onAdded={onAdded} />);
-  const input = screen.getByRole('combobox', { name: 'Add a word' });
+  const input = screen.getByRole('combobox', { name: 'Search for a word' });
   return { input, onAdded };
 }
+
+test('search is labelled and focused on mount without duplicate panel chrome', () => {
+  const { input } = setup();
+  expect(input).toHaveFocus();
+  expect(screen.getByText('Search for a word')).toHaveClass('sr-only');
+  expect(screen.queryByText('Add a word')).not.toBeInTheDocument();
+});
 
 async function typeAndFind(input: HTMLElement, value: string) {
   await userEvent.setup().type(input, value);
@@ -90,25 +97,25 @@ test('search shows a loader from typing through the pending request', async () =
   expect(screen.queryByRole('status', { name: 'Searching suggestions' })).not.toBeInTheDocument();
 });
 
-test('zero results trigger lookup only after 700ms idle and show meanings', async () => {
+test('zero results wait for an explicit lookup', async () => {
   vi.useFakeTimers();
   search.mockResolvedValue([]);
   const { input } = setup();
   fireEvent.change(input, { target: { value: 'aubergine' } });
   await act(async () => { vi.advanceTimersByTime(150); });
+  await act(async () => { vi.advanceTimersByTime(1000); });
   expect(lookup).not.toHaveBeenCalled();
-  await act(async () => { vi.advanceTimersByTime(549); });
-  expect(lookup).not.toHaveBeenCalled();
-  await act(async () => { vi.advanceTimersByTime(1); });
+  fireEvent.click(screen.getByRole('option', { name: 'Search more words · uses one daily translation' }));
+  await act(async () => { await Promise.resolve(); });
   expect(lookup).toHaveBeenCalledTimes(1);
   expect(screen.getByRole('option', { name: /die Aubergine.*eggplant/ })).toBeInTheDocument();
-  expect(screen.getByText('More words')).toBeInTheDocument();
+  expect(screen.getByText('49 translations left today')).toBeInTheDocument();
 });
 
-test('See more results appends AI words and retyping the same query uses cache', async () => {
+test('Search more words · uses one daily translation appends AI words and retyping the same query uses cache', async () => {
   const { input } = setup();
   let list = await typeAndFind(input, 'aubergine');
-  await userEvent.setup().click(within(list).getByRole('option', { name: 'See more results' }));
+  await userEvent.setup().click(within(list).getByRole('option', { name: 'Search more words · uses one daily translation' }));
   expect(await screen.findByRole('option', { name: /die Aubergine.*eggplant/ })).toBeInTheDocument();
   expect(screen.getByText('More words')).toBeInTheDocument();
   fireEvent.change(input, { target: { value: '' } });
@@ -158,7 +165,7 @@ test('a missing preview lets the learner enter a meaning', async () => {
 test('AI word saves with its meaning without preview and Cancel resets', async () => {
   const { input } = setup();
   const list = await typeAndFind(input, 'aubergine');
-  await userEvent.setup().click(within(list).getByRole('option', { name: 'See more results' }));
+  await userEvent.setup().click(within(list).getByRole('option', { name: 'Search more words · uses one daily translation' }));
   await userEvent.setup().click(await screen.findByRole('option', { name: /die Aubergine.*eggplant/ }));
   expect(preview).not.toHaveBeenCalled();
   expect(screen.getByRole('textbox', { name: 'Meaning' })).toHaveValue('eggplant');
@@ -175,7 +182,7 @@ test('AI word saves with its meaning without preview and Cancel resets', async (
 test('an already saved AI result is labelled and cannot be selected', async () => {
   const { input } = setup(new Set(['die aubergine']));
   const list = await typeAndFind(input, 'aubergine');
-  await userEvent.setup().click(within(list).getByRole('option', { name: 'See more results' }));
+  await userEvent.setup().click(within(list).getByRole('option', { name: 'Search more words · uses one daily translation' }));
   const option = await screen.findByRole('option', { name: /die Aubergine.*eggplant.*saved/ });
   expect(option).toHaveAttribute('aria-disabled', 'true');
   await userEvent.setup().click(option);
@@ -212,7 +219,7 @@ test('Enter in the meaning adds, while Enter on Cancel cancels', async () => {
   await waitFor(() => expect(addStarter).toHaveBeenCalledTimes(1));
 
   list = await typeAndFind(screen.getByRole('combobox'), 'bahn');
-  await userEvent.setup().click(within(list).getByRole('option', { name: 'See more results' }));
+  await userEvent.setup().click(within(list).getByRole('option', { name: 'Search more words · uses one daily translation' }));
   await userEvent.setup().click(await screen.findByRole('option', { name: /die Aubergine.*eggplant/ }));
   screen.getByRole('button', { name: 'Cancel' }).focus();
   await userEvent.setup().keyboard('{Enter}');
@@ -224,7 +231,7 @@ test('lookup allowance errors appear in the dropdown', async () => {
   lookup.mockResolvedValue({ words: [], error: 'Translations are full for today. Try again tomorrow.' });
   const { input } = setup();
   const list = await typeAndFind(input, 'aubergine');
-  await userEvent.setup().click(within(list).getByRole('option', { name: 'See more results' }));
+  await userEvent.setup().click(within(list).getByRole('option', { name: 'Search more words · uses one daily translation' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Translations are full');
   expect(lookup).toHaveBeenCalledTimes(1);
 });

@@ -1,14 +1,15 @@
 import {
+  dayEnd,
   dayStart,
   gradeCard,
-  NEW_PER_DAY,
+  NEW_PER_SESSION,
   retrievability,
-  REVIEWS_PER_DAY,
+  REVIEWS_PER_SESSION,
   type Grade,
 } from '@/lib/srs';
 import { createClient } from '@/lib/supabase/server';
-import { selectReviewWords } from '@/lib/review-session';
-import type { Card, CardSchedule, ReviewSurface, VocabEntry } from '@/lib/types/db';
+import { pickNewWords, selectReviewWords } from '@/lib/review-session';
+import type { Card, CardSchedule, CardState, ReviewSurface, VocabEntry } from '@/lib/types/db';
 
 /**
  * All reads and writes against `cards` and `review_logs`.
@@ -25,21 +26,67 @@ import type { Card, CardSchedule, ReviewSurface, VocabEntry } from '@/lib/types/
 /** A due card plus what's needed to render it. `vocab_entry` is null on a
  * grammar card, which carries its own cloze_text/answer/hint. */
 export type ReviewItem = Card & {
-  vocab_entry: Pick<VocabEntry, 'term' | 'lemma' | 'translation' | 'example_sentence'> | null;
+  vocab_entry: Pick<VocabEntry, 'term' | 'lemma' | 'translation' | 'example_sentence' | 'example_translation'> | null;
 };
 
 const REVIEW_ITEM_COLUMNS =
-  '*, vocab_entry:vocab_entries(term, lemma, translation, example_sentence)';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+  '*, vocab_entry:vocab_entries(term, lemma, translation, example_sentence, example_translation)';
 
 /** Longest typed answer kept in review_logs -- it's for debugging the checker,
  * and it comes from the client. */
 const ANSWER_GIVEN_MAX = 200;
 
+export type WordSchedule = { suspended: boolean; state: CardState; nextDue: string | null };
+
+export async function getWordSchedules(userId: string): Promise<Record<string, WordSchedule>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('cards')
+    .select('vocab_entry_id,state,due,suspended').eq('user_id', userId).not('vocab_entry_id', 'is', null);
+  if (error) {
+    console.error('[card.service] getWordSchedules failed:', error.message);
+    throw new Error('Could not load word schedules.');
+  }
+  const grouped: Record<string, { suspended: boolean; cards: { state: CardState; due: string; suspended: boolean }[] }> = {};
+  for (const card of data ?? []) {
+    if (!card.vocab_entry_id) continue;
+    const group = grouped[card.vocab_entry_id] ??= { suspended: true, cards: [] };
+    group.cards.push({ state: card.state as CardState, due: card.due, suspended: card.suspended });
+    if (!card.suspended) group.suspended = false;
+  }
+  const schedules: Record<string, WordSchedule> = {};
+  for (const [id, group] of Object.entries(grouped)) {
+    const eligible = group.suspended ? group.cards : group.cards.filter((card) => !card.suspended);
+    const priority = (state: CardState) => state === 1 || state === 3 ? 0 : state === 2 ? 1 : 2;
+    eligible.sort((a, b) => priority(a.state) - priority(b.state) || a.due.localeCompare(b.due));
+    schedules[id] = {
+      suspended: group.suspended,
+      state: eligible[0].state,
+      nextDue: group.suspended ? null : eligible.reduce<string | null>((earliest, card) =>
+        earliest === null || card.due < earliest ? card.due : earliest, null),
+    };
+  }
+  return schedules;
+}
+
+export async function setWordSuspended(userId: string, entryId: string, suspended: boolean): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from('cards').update({ suspended })
+      .eq('vocab_entry_id', entryId).eq('user_id', userId);
+    if (error) {
+      console.error('[card.service] setWordSuspended failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[card.service] setWordSuspended failed:', err);
+    return false;
+  }
+}
+
 /**
- * The learner's day boundaries and how many new cards they've already started
- * today. Shared by the queue and the badge count so the two can't disagree.
+ * The learner's day boundaries: used to bury words reviewed today and to
+ * include review cards due before the next local 4am.
  */
 async function today(userId: string, now: Date) {
   const supabase = await createClient();
@@ -54,20 +101,11 @@ async function today(userId: string, now: Date) {
     .eq('user_id', userId)
     .single();
 
-  const start = dayStart(now, profile?.timezone ?? 'UTC');
-  const end = new Date(start.getTime() + DAY_MS);
+  const timeZone = profile?.timezone ?? 'UTC';
+  const start = dayStart(now, timeZone);
+  const end = dayEnd(now, timeZone);
 
-  // A review log with state 0 is a card's first-ever review: exactly one per
-  // card, so this counts new cards introduced, not answers given.
-  const { count, error } = await supabase
-    .from('review_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('state', 0)
-    .gte('reviewed_at', start.toISOString());
-  if (error) console.error('[card.service] new-today count failed:', error.message);
-
-  return { start, end, newLeft: Math.max(0, NEW_PER_DAY - (count ?? 0)) };
+  return { start, end };
 }
 
 /** Bury a word's other direction for today; due learning steps remain eligible. */
@@ -85,16 +123,16 @@ async function reviewedWordsSince(userId: string, start: Date): Promise<Set<stri
  * 1. Learning/relearning cards due now -- minute-level steps, most urgent.
  * 2. Review cards due by the end of today, lowest retrievability first, so
  *    with a backlog the cards most likely to be forgotten get seen.
- * 3. New cards, oldest saved first, up to what's left of today's allowance.
+ * 3. New cards, oldest saved first, up to `NEW_PER_SESSION` words.
  *
- * Capped at REVIEWS_PER_DAY, then shuffled: vocab and grammar cards are
+ * Capped at `REVIEWS_PER_SESSION`, then shuffled: vocab and grammar cards are
  * interleaved rather than shown in blocks by type, which costs more errors
  * during practice and gives better retention after (Nakata & Suzuki 2019).
  * The priority order decides which cards make the cut, not the order shown.
  */
 export async function getReviewQueue(userId: string, now = new Date()): Promise<ReviewItem[]> {
   const supabase = await createClient();
-  const { start, end, newLeft } = await today(userId, now);
+  const { start, end } = await today(userId, now);
   const reviewedWords = await reviewedWordsSince(userId, start);
 
   const base = () =>
@@ -102,10 +140,8 @@ export async function getReviewQueue(userId: string, now = new Date()): Promise<
 
   const [learning, review, fresh] = await Promise.all([
     base().in('state', [1, 3]).lte('due', now.toISOString()).order('due'),
-    base().eq('state', 2).lt('due', end.toISOString()).order('due').limit(REVIEWS_PER_DAY * 5),
-    newLeft > 0
-      ? base().eq('state', 0).order('created_at').limit(newLeft)
-      : Promise.resolve({ data: [], error: null }),
+    base().eq('state', 2).lt('due', end.toISOString()).order('due').limit(REVIEWS_PER_SESSION * 5),
+    base().eq('state', 0).order('created_at').limit(Math.max(40, NEW_PER_SESSION * 4)),
   ]);
 
   for (const result of [learning, review, fresh]) {
@@ -123,8 +159,8 @@ export async function getReviewQueue(userId: string, now = new Date()): Promise<
   const queue = selectReviewWords([
     ...((learning.data ?? []) as ReviewItem[]),
     ...byRecall.filter((card) => !reviewedWords.has(card.vocab_entry_id ?? '')),
-    ...((fresh.data ?? []) as ReviewItem[]).filter((card) => !reviewedWords.has(card.vocab_entry_id ?? '')),
-  ]).slice(0, REVIEWS_PER_DAY);
+    ...pickNewWords((fresh.data ?? []) as ReviewItem[], reviewedWords, NEW_PER_SESSION),
+  ]).slice(0, REVIEWS_PER_SESSION);
 
   return shuffle(queue);
 }
@@ -135,11 +171,13 @@ export const PRACTICE_SIZE = 10;
 /**
  * Cards to practice when nothing (more) is due -- Anki's "review ahead".
  *
- * Takes review cards not due until tomorrow or later, then new cards past
- * today's allowance. Words reviewed today and waiting learning steps are
- * excluded, so extra practice doesn't immediately repeat the completed round. Graded like a
- * due card; FSRS accounts for the shorter elapsed time, so an early "Good"
- * simply stretches the interval less than an on-time one would.
+ * Takes review cards not due until tomorrow or later, then new cards after
+ * the first `NEW_PER_SESSION` words offered by the regular queue. Words reviewed
+ * today and waiting learning steps are excluded, so extra practice doesn't
+ * immediately repeat the completed round. Graded like a due card; FSRS
+ * accounts for the shorter elapsed time, so an early "Good" simply stretches
+ * the interval less than an on-time one would.
+ * Each practice round is bounded by `limit`.
  */
 export async function getPracticeQueue(
   userId: string,
@@ -147,19 +185,19 @@ export async function getPracticeQueue(
   limit = PRACTICE_SIZE,
 ): Promise<ReviewItem[]> {
   const supabase = await createClient();
-  const { start, end, newLeft } = await today(userId, now);
+  const { start, end } = await today(userId, now);
   const reviewedWords = await reviewedWordsSince(userId, start);
 
   const base = () =>
     supabase.from('cards').select(REVIEW_ITEM_COLUMNS).eq('user_id', userId).eq('suspended', false);
 
   const [ahead, fresh] = await Promise.all([
-    base().eq('state', 2).gte('due', end.toISOString()).limit(500),
-    // Skip the first `newLeft` new cards: the regular queue already offers them.
+    base().eq('state', 2).gte('due', end.toISOString()).order('due').order('id').limit(500),
+    // Fetch enough rows to skip the first NEW_PER_SESSION words offered by the regular queue.
     base()
       .eq('state', 0)
       .order('created_at')
-      .range(newLeft, newLeft + limit - 1),
+      .limit(Math.max(40, (NEW_PER_SESSION + limit) * 4)),
   ]);
 
   for (const result of [ahead, fresh]) {
@@ -177,8 +215,9 @@ export async function getPracticeQueue(
   return shuffle(
     selectReviewWords([
       ...byRecall,
-      ...((fresh.data ?? []) as ReviewItem[]),
-    ].filter((card) => !reviewedWords.has(card.vocab_entry_id ?? ''))).slice(0, limit),
+      ...pickNewWords((fresh.data ?? []) as ReviewItem[], reviewedWords, limit, NEW_PER_SESSION),
+    ].filter((card) => !reviewedWords.has(card.vocab_entry_id ?? '')))
+      .slice(0, limit),
   );
 }
 
@@ -200,6 +239,27 @@ export type RecordReviewResult =
   | { status: 'stale' }
   | { status: 'not_found' }
   | { status: 'error' };
+
+export type UndoReviewResult =
+  | { status: 'ok'; schedule: CardSchedule }
+  | { status: 'stale' }
+  | { status: 'error' };
+
+/** Restores the most recent grade only if this card still has its saved version. */
+export async function undoReview(userId: string, cardId: string, expectedReps: number, previousDue: string): Promise<UndoReviewResult> {
+  if (!userId) return { status: 'error' };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('undo_review', {
+    p_card_id: cardId,
+    p_expected_reps: expectedReps,
+    p_previous_due: previousDue,
+  });
+  if (error) {
+    console.error('[card.service] undo_review failed:', error.message);
+    return { status: 'error' };
+  }
+  return data ? { status: 'ok', schedule: data as CardSchedule } : { status: 'stale' };
+}
 
 /**
  * Grades one card and writes the new schedule plus its log line, atomically,

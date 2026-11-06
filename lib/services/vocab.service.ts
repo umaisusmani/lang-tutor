@@ -173,6 +173,7 @@ export async function saveVocabEntry(
     lemma: string;
     translation: string;
     exampleSentence?: string;
+    exampleTranslation?: string;
     source: VocabSource;
   },
 ): Promise<boolean> {
@@ -185,6 +186,7 @@ export async function saveVocabEntry(
         lemma: entry.lemma,
         translation: entry.translation,
         example_sentence: entry.exampleSentence?.slice(0, EXAMPLE_SENTENCE_MAX) || null,
+        example_translation: entry.exampleTranslation?.slice(0, EXAMPLE_SENTENCE_MAX) || null,
         source: entry.source,
       },
       { onConflict: 'user_id,lemma', ignoreDuplicates: true },
@@ -229,6 +231,32 @@ export async function deleteVocabEntry(userId: string, entryId: string): Promise
   }
 }
 
+export async function updateVocabEntry(userId: string, entryId: string, fields: {
+  translation: string; exampleSentence: string | null; exampleTranslation: string | null;
+}): Promise<boolean> {
+  if (typeof fields?.translation !== 'string' || typeof fields.exampleSentence !== 'string' && fields.exampleSentence !== null
+    || typeof fields.exampleTranslation !== 'string' && fields.exampleTranslation !== null) return false;
+  const translation = fields.translation.trim();
+  const exampleSentence = fields.exampleSentence?.trim() || null;
+  const exampleTranslation = fields.exampleTranslation?.trim() || null;
+  if (!translation || translation.length > 500 || (exampleSentence?.length ?? 0) > EXAMPLE_SENTENCE_MAX
+    || (exampleTranslation?.length ?? 0) > EXAMPLE_SENTENCE_MAX) return false;
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from('vocab_entries').update({
+      translation, example_sentence: exampleSentence, example_translation: exampleTranslation,
+    }).eq('id', entryId).eq('user_id', userId);
+    if (error) {
+      console.error('[vocab.service] updateVocabEntry failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[vocab.service] updateVocabEntry failed:', err);
+    return false;
+  }
+}
+
 export async function updateVocabNote(userId: string, entryId: string, note: string | null): Promise<boolean> {
   if (note !== null && typeof note !== 'string') return false;
   const trimmed = note?.trim() || null;
@@ -250,11 +278,16 @@ export async function updateVocabNote(userId: string, entryId: string, note: str
 
 export async function listVocab(userId: string): Promise<VocabEntry[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vocab_entries')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[vocab.service] listVocab failed:', error.message);
+    throw new Error('Could not load your vocabulary.');
+  }
 
   return (data as VocabEntry[]) ?? [];
 }

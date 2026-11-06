@@ -17,4 +17,5 @@ test('remove chip asks for confirmation before deleting the word', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Remove Haus' }));
   await waitFor(() => expect(deleteVocabAction).toHaveBeenCalledWith('word-1'));
   expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Remove "Haus"?' }));
+  expect(confirm.mock.calls[0][0].description).toMatch(/removes all its review progress/i);
 });

@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/app/components/button';
 import { Pill } from '@/app/components/pill';
-import { gradeCardAction, type DiscoverCard as DiscoverWord, type SessionCard } from '@/app/vocab/actions';
+import { gradeCardAction, undoReviewAction, type DiscoverCard as DiscoverWord, type SessionCard } from '@/app/vocab/actions';
 import { DiscoverCard, useDiscoverMeanings } from '@/app/vocab/discover-card';
 import type { ReviewSummary } from '@/lib/review-session';
+import { maskTarget } from '@/lib/mask-target';
 import { formatInterval, Grades, previewIntervals, type Grade } from '@/lib/srs';
 
 const BUTTONS = [
@@ -17,6 +18,17 @@ const BUTTONS = [
 const SENTENCE_KEY = 'starfinch_front_sentence';
 
 type SessionItem = { kind: 'review'; card: SessionCard } | { kind: 'discover'; word: DiscoverWord };
+type UndoSnapshot = { queue: SessionItem[]; summary: ReviewSummary; card: SessionCard; expectedReps: number };
+
+function pendingLearning(items: SessionItem[]) {
+  const due = items.filter((item): item is Extract<SessionItem, { kind: 'review' }> =>
+    item.kind === 'review' && (item.card.schedule.state === 1 || item.card.schedule.state === 3));
+  return {
+    scheduledLater: due.length,
+    nextReviewAt: due.reduce<string | null>((earliest, item) =>
+      !earliest || item.card.schedule.due < earliest ? item.card.schedule.due : earliest, null),
+  };
+}
 
 function interleave(cards: SessionCard[], discover: DiscoverWord[]): SessionItem[] {
   const items: SessionItem[] = [];
@@ -50,7 +62,7 @@ export function FlashcardSession({
   onReload: () => void;
 }) {
   const [queue, setQueue] = useState<SessionItem[]>(() => interleave(initialCards, discover));
-  const total = initialCards.length + discover.length;
+  const total = initialCards.length;
   const { meanings, loading: meaningsLoading, error: meaningsError, retry } = useDiscoverMeanings(discover);
   const [shownAt, setShownAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,26 +73,60 @@ export function FlashcardSession({
   const [summary, setSummary] = useState<ReviewSummary>({
     reviewed: 0, added: 0, scheduledLater: 0, nextReviewAt: null, complete: false,
   });
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
+  const [undoError, setUndoError] = useState('');
   const surfaceRef = useRef<HTMLDivElement>(null);
   const savingRef = useRef(false);
+  const undoingRef = useRef(false);
   const startedAt = useRef(0);
   const current = queue[0];
-  const completed = total - queue.length;
+  const remaining = queue.filter((item) => item.kind === 'review').length;
+  const completed = total - remaining;
 
   useEffect(() => {
     startedAt.current = performance.now();
     surfaceRef.current?.focus();
   }, [current]);
 
-  function advance(next: ReviewSummary) {
-    setSummary(queue.length === 1 ? { ...next, complete: true } : next);
-    if (queue.length === 1) {
-      if (extra) onFinish({ ...next, complete: true });
+  function advance(next: ReviewSummary, nextQueue = queue.slice(1)) {
+    const finished = nextQueue.length === 0;
+    const updated = { ...next, complete: finished };
+    setSummary(updated);
+    if (finished) {
+      if (extra) onFinish(updated);
       else {
         setQueue([]);
         setDueComplete(true);
       }
-    } else setQueue((items) => items.slice(1));
+    } else setQueue(nextQueue);
+  }
+
+  function finishEarly() {
+    onFinish({ ...summary, ...pendingLearning(queue), complete: false });
+  }
+
+  async function handleUndo() {
+    if (!undoSnapshot || savingRef.current || undoingRef.current) return;
+    undoingRef.current = true;
+    setSaving(true);
+    setUndoError('');
+    try {
+      const result = await undoReviewAction(undoSnapshot.card.id, undoSnapshot.expectedReps, undoSnapshot.card.schedule.due);
+      if (result.status !== 'ok') throw new Error('Undo failed');
+      setQueue(undoSnapshot.queue.map((item) => item.kind === 'review' && item.card.id === undoSnapshot.card.id
+        ? { ...item, card: { ...item.card, schedule: result.schedule } } : item));
+      setSummary(undoSnapshot.summary);
+      setShownAt(null);
+      setDueComplete(false);
+      setError('');
+      setUndoSnapshot(null);
+    } catch {
+      setUndoError('Could not undo. The card changed or the review was already saved.');
+      setUndoSnapshot(null);
+    } finally {
+      undoingRef.current = false;
+      setSaving(false);
+    }
   }
 
   function revealAnswer() {
@@ -89,7 +135,7 @@ export function FlashcardSession({
   }
 
   async function handleGrade(rating: Grade, gradedAt: number) {
-    if (current?.kind !== 'review' || !shownAt || savingRef.current || needsReload) return;
+    if (current?.kind !== 'review' || !shownAt || savingRef.current || undoingRef.current || needsReload) return;
     const card = current.card;
     savingRef.current = true;
     setSaving(true);
@@ -111,16 +157,17 @@ export function FlashcardSession({
         return;
       }
       const later = result.next.state === 1 || result.next.state === 3;
+      const nextQueue = queue.slice(1);
+      if (later) nextQueue.splice(Math.min(3, nextQueue.length), 0,
+        { kind: 'review', card: { ...card, schedule: result.next } });
       const next = {
         ...summary,
-        reviewed: summary.reviewed + 1,
-        scheduledLater: summary.scheduledLater + Number(later),
-        nextReviewAt: later && (!summary.nextReviewAt || result.next.due < summary.nextReviewAt)
-          ? result.next.due : summary.nextReviewAt,
-        complete: queue.length === 1,
+        reviewed: summary.reviewed + Number(!later),
       };
+      setUndoSnapshot({ queue, summary, card, expectedReps: result.next.reps });
+      setUndoError('');
       setShownAt(null);
-      advance(next);
+      advance(next, nextQueue);
     } catch {
       setError('We could not confirm that your review was saved. Try the rating again; it will not be saved twice.');
     } finally {
@@ -141,8 +188,11 @@ export function FlashcardSession({
       aria-label="Vocabulary review"
       className="flex flex-col gap-5 outline-none"
       onKeyDown={(event) => {
-        if (current?.kind !== 'review' || event.target !== event.currentTarget || event.repeat || saving || needsReload) return;
-        if (!shownAt && (event.key === ' ' || event.key === 'Enter')) {
+        if (current?.kind !== 'review' || event.repeat || saving || needsReload) return;
+        const target = event.target as HTMLElement;
+        if (target.isContentEditable || target.closest('[contenteditable="true"], textarea, select')
+          || (target instanceof HTMLInputElement && target.type !== 'checkbox' && target.type !== 'radio')) return;
+        if (!shownAt && event.target === event.currentTarget && (event.key === ' ' || event.key === 'Enter')) {
           event.preventDefault();
           revealAnswer();
         } else if (shownAt && /^[1-4]$/.test(event.key)) {
@@ -155,18 +205,20 @@ export function FlashcardSession({
         <div>
           <h2 className="font-display text-2xl">{extra ? 'Practice' : 'Vocabulary review'}</h2>
           <p className="text-ink-2 text-sm" role="status">
-            {completed} of {total} cards · {queue.length} left
+            {completed} of {total} cards · {remaining} left
           </p>
           {extra && <p className="text-ink-2 text-sm">Practising ahead: nothing here is due yet.</p>}
         </div>
-        {!dueComplete && <Button variant="secondary" type="button" disabled={saving} onClick={() => onFinish({ ...summary, complete: false })}>
-          End review
-        </Button>}
+        <div className="flex flex-wrap gap-2">
+          {undoSnapshot && <Button variant="secondary" type="button" disabled={saving} onClick={() => void handleUndo()}>Undo last rating</Button>}
+          {!dueComplete && <Button variant="secondary" type="button" disabled={saving} onClick={finishEarly}>End review</Button>}
+        </div>
       </div>
+      {undoError && <p className="border-line bg-orange text-on-bright rounded-xl border-2 p-3" role="alert">{undoError}</p>}
       <div role="progressbar" aria-label="Review progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={completed}
         className="border-line bg-panel h-3 w-full overflow-hidden rounded-full border-2">
         <div className={`bg-yellow h-full transition-[width] duration-300 ease-out ${completed > 0 ? 'border-line border-r-2' : ''}`}
-          style={{ width: `${(completed / total) * 100}%` }} />
+          style={{ width: `${total ? (completed / total) * 100 : 100}%` }} />
       </div>
       {dueComplete ? <div className="border-line bg-panel mx-auto flex w-full max-w-[600px] flex-col gap-4 rounded-2xl border-2 p-6 shadow-[3px_3px_0_var(--line)]" role="status">
         <h3 className="font-display text-3xl">All due words done.</h3>
@@ -180,10 +232,13 @@ export function FlashcardSession({
           <Button variant="primary" disabled={keepingGoing} onClick={onKeepPractising}>{keepingGoing ? 'Loading…' : 'Keep practising'}</Button>
           <Button variant="secondary" onClick={() => onFinish(summary)}>Back to my words</Button>
         </div>
-      </div> : current?.kind === 'discover' ? <DiscoverCard key={current.word.lemma} word={current.word} meaning={meanings[current.word.lemma]}
+      </div> : current?.kind === 'discover' ? <div className="flex flex-col gap-2">
+        <p className="text-ink-2 text-center font-mono text-xs">Optional new word. It doesn&apos;t count towards your review.</p>
+        <DiscoverCard key={current.word.lemma} word={current.word} meaning={meanings[current.word.lemma]}
         loading={meaningsLoading} loadError={meaningsError} onRetry={() => void retry()}
-        onSkip={(lemma) => { onSkip(lemma); advance(summary); }}
-        onAdded={() => advance({ ...summary, added: summary.added + 1 })} /> : (
+        onSkip={(lemma) => { setUndoSnapshot(null); onSkip(lemma); advance(summary); }}
+        onAdded={() => { setUndoSnapshot(null); advance({ ...summary, added: summary.added + 1 }); }} />
+      </div> : (
       <div key={card?.id} className="border-line bg-panel mx-auto flex min-h-[300px] w-full max-w-[600px] animate-[fade-rise_180ms_ease-out] flex-col gap-6 rounded-2xl border-2 p-5 shadow-[3px_3px_0_var(--line)] sm:p-7">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <p className="text-ink-3 text-sm">{reverse ? 'Recall the German word' : 'Recall the English meaning'}</p>
@@ -197,12 +252,15 @@ export function FlashcardSession({
               Show sentence hint
             </label>
           )}
-          {!reverse && showSentence && <p className="text-ink-2 italic">{card?.exampleSentence}</p>}
+          {!reverse && showSentence && !shownAt && card?.exampleSentence && <p className="text-ink-2 italic">{maskTarget(card.exampleSentence, card.lemma)}</p>}
           {shownAt && (
             <div className="border-hair flex w-full animate-[fade-rise_180ms_ease-out] flex-col gap-3 border-t-2 pt-5" role="status">
               <p className="text-2xl font-semibold">{reverse ? card?.lemma : card?.translation}</p>
-              {card?.exampleSentence && (reverse || !showSentence) && (
+              {card?.exampleSentence && (
                 <p className="text-ink-2 italic">{card?.exampleSentence}</p>
+              )}
+              {card?.exampleSentence && card.exampleTranslation && (
+                <p className="text-ink-3 font-mono text-sm">{card.exampleTranslation}</p>
               )}
             </div>
           )}
@@ -225,16 +283,19 @@ export function FlashcardSession({
                 <button key={rating} type="button" disabled={saving || needsReload}
                   onClick={(event) => void handleGrade(rating, event.timeStamp)}
                   className={`border-line flex min-h-24 flex-col items-center justify-center gap-1 rounded-xl border-2 px-2 py-3 disabled:opacity-50 ${rating === Grades.Good ? 'bg-yellow text-on-bright shadow-[3px_3px_0_var(--line)] transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_var(--line)]' : 'bg-panel hover:bg-soft cursor-pointer'}`}>
-                  <span className="font-bold">{label}</span>
+                  <span className="font-bold"><kbd className="font-mono text-xs">{rating}</kbd> {label}</span>
                   <span className="text-xs">{help}</span>
-                  <span className="text-sm">{intervals && shownAt && formatInterval(shownAt, intervals[rating])}</span>
+                  <span className="text-sm">{intervals && shownAt && (() => {
+                    const interval = formatInterval(shownAt, intervals[rating]);
+                    return /^[0-9]+(?:d|mo|y)$/.test(interval) ? `~${interval}` : interval;
+                  })()}</span>
                 </button>
               ))}
             </div>
           </div>
         )}
         <p className="text-ink-3 text-center text-xs" role="status">
-          {saving ? 'Saving review…' : 'Shortcuts: focus the review area, then Space to reveal or 1–4 to rate.'}
+          {saving ? 'Saving review…' : 'Shortcuts: Space or Enter to reveal; 1–4 to rate from anywhere in the review.'}
         </p>
       </div>)}
     </div>

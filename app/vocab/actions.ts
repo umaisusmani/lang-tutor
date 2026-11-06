@@ -3,11 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 
-import { getPracticeQueue, getReviewQueue, recordReview, type RecordReviewResult } from '@/lib/services/card.service';
+import { getPracticeQueue, getReviewQueue, recordReview, setWordSuspended, undoReview, type RecordReviewResult, type UndoReviewResult } from '@/lib/services/card.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
 import { deleteGrammarNote, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
 import { createNoteCategory, listNoteCategories } from '@/lib/services/note-category.service';
-import { deleteVocabEntry, listVocab, saveVocabEntry, searchVocabEntries, updateVocabNote } from '@/lib/services/vocab.service';
+import { deleteVocabEntry, EXAMPLE_SENTENCE_MAX, listVocab, saveVocabEntry, searchVocabEntries, updateVocabEntry, updateVocabNote } from '@/lib/services/vocab.service';
 import { findStarterWord, pickStarterWords, searchStarterWords } from '@/lib/starter-vocab';
 import { translateStarterWord, translateStarterWords } from '@/lib/starter-vocab/translate';
 import { consumeTranslation } from '@/lib/services/translation.service';
@@ -34,6 +34,7 @@ export async function saveVocabAction(
     translation: string;
     /** The sentence the word was met in; optional so the deprecated chips still compile. */
     exampleSentence?: string;
+    exampleTranslation?: string;
   },
   source: VocabSource = 'new_word',
 ): Promise<{ ok: boolean }> {
@@ -58,6 +59,31 @@ export async function deleteVocabAction(entryId: string): Promise<{ ok: boolean 
     revalidatePath('/vocab');
     revalidatePath('/notes');
   }
+  return { ok };
+}
+
+export async function updateVocabAction(entryId: string, fields: {
+  translation: string; exampleSentence: string | null; exampleTranslation: string | null;
+}): Promise<{ ok: boolean }> {
+  if (typeof entryId !== 'string' || !entryId.trim() || !fields || typeof fields !== 'object'
+    || typeof fields.translation !== 'string' || !fields.translation.trim() || fields.translation.trim().length > 500
+    || (fields.exampleSentence !== null && typeof fields.exampleSentence !== 'string')
+    || (fields.exampleTranslation !== null && typeof fields.exampleTranslation !== 'string')
+    || (fields.exampleSentence?.trim().length ?? 0) > EXAMPLE_SENTENCE_MAX
+    || (fields.exampleTranslation?.trim().length ?? 0) > EXAMPLE_SENTENCE_MAX) return { ok: false };
+  const userId = await getCurrentUserId();
+  if (!userId) return { ok: false };
+  const ok = await updateVocabEntry(userId, entryId, fields);
+  if (ok) { revalidatePath('/vocab'); revalidatePath('/', 'layout'); }
+  return { ok };
+}
+
+export async function setWordSuspendedAction(entryId: string, suspended: boolean): Promise<{ ok: boolean }> {
+  if (typeof entryId !== 'string' || !entryId.trim() || typeof suspended !== 'boolean') return { ok: false };
+  const userId = await getCurrentUserId();
+  if (!userId) return { ok: false };
+  const ok = await setWordSuspended(userId, entryId, suspended);
+  if (ok) { revalidatePath('/vocab'); revalidatePath('/', 'layout'); }
   return { ok };
 }
 
@@ -122,6 +148,7 @@ export type SessionCard = {
   lemma: string;
   translation: string | null;
   exampleSentence: string | null;
+  exampleTranslation: string | null;
   schedule: CardSchedule;
 };
 
@@ -177,7 +204,7 @@ export async function addLookedUpWordAction(word: {
   try {
     const ok = await saveVocabEntry(userId, {
       term: lemma.trim(), lemma: lemma.trim(), translation: meaning.trim(),
-      exampleSentence: example?.trim(), source: 'new_word',
+      exampleSentence: example?.trim(), exampleTranslation: exampleTranslation?.trim(), source: 'new_word',
     });
     if (ok) revalidatePath('/', 'layout');
     return { ok };
@@ -242,6 +269,7 @@ export async function startSessionAction(
       lemma: item.vocab_entry.lemma,
       translation: item.vocab_entry.translation,
       exampleSentence: item.vocab_entry.example_sentence,
+      exampleTranslation: item.vocab_entry.example_translation,
       schedule: {
         state: item.state,
         due: item.due,
@@ -309,6 +337,7 @@ export async function addStarterWordAction(lemma: string, meaning: string): Prom
       lemma: word.lemma,
       translation,
       exampleSentence: word.example,
+      exampleTranslation: word.exampleTranslation,
       source: 'new_word',
     });
     if (ok) revalidatePath('/', 'layout');
@@ -341,6 +370,23 @@ export async function gradeCardAction(
 
   const result = await recordReview(userId, cardId, rating as Grade, meta);
   // The header's due badge is rendered by other pages' Server Components.
+  if (result.status === 'ok') revalidatePath('/', 'layout');
+  return result;
+}
+
+export async function undoReviewAction(
+  cardId: string,
+  expectedReps: number,
+  previousDue: string,
+): Promise<UndoReviewResult | { status: 'unauthenticated' }> {
+  if (typeof cardId !== 'string' || !cardId.trim()
+    || !Number.isInteger(expectedReps) || expectedReps < 0) return { status: 'error' };
+  if (typeof previousDue !== 'string') return { status: 'error' };
+  const previousDueDate = new Date(previousDue);
+  if (Number.isNaN(previousDueDate.getTime())) return { status: 'error' };
+  const userId = await getCurrentUserId();
+  if (!userId) return { status: 'unauthenticated' };
+  const result = await undoReview(userId, cardId, expectedReps, previousDueDate.toISOString());
   if (result.status === 'ok') revalidatePath('/', 'layout');
   return result;
 }

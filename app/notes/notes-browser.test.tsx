@@ -46,7 +46,7 @@ const grammarNote: GrammarNote = {
 };
 const wordNote: VocabEntry = {
   id: 'word-1', user_id: 'user-1', term: 'Hund', lemma: 'Hund', translation: 'dog',
-  example_sentence: null, note: 'Remember the article.', source: 'new_word', created_at: '2026-01-01T00:00:00.000Z',
+  example_sentence: null, example_translation: null, note: 'Remember the article.', source: 'new_word', created_at: '2026-01-01T00:00:00.000Z',
 };
 
 function browser(grammarNotes: GrammarNote[] = [], wordNotes: VocabEntry[] = []) {

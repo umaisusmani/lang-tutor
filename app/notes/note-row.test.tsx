@@ -43,7 +43,7 @@ test('read-only rendering discards attributes and unsafe wrappers while keeping 
 test('word notes remain literal plain text', () => {
   const note: VocabEntry = {
     id: 'word-1', user_id: 'user-1', term: 'Hund', lemma: 'Hund', translation: 'dog',
-    example_sentence: null, note: '**literal**', source: 'new_word', created_at: '2026-01-01',
+    example_sentence: null, example_translation: null, note: '**literal**', source: 'new_word', created_at: '2026-01-01',
   };
   render(<NoteRow item={{ kind: 'word', note }} categories={[category]}
     onRemoved={vi.fn()} onChanged={vi.fn()} />);

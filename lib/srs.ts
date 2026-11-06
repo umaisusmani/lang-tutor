@@ -21,13 +21,13 @@ import type { CardSchedule, CardState } from '@/lib/types/db';
  * result through the record_review RPC.
  */
 
-/** New cards introduced per learner-day. What stops 300 saved words turning
- * into 300 reviews tomorrow -- Anki's single most-cited lesson. */
-export const NEW_PER_DAY = 10;
+/** New words offered per review session. This sizes one round, with no daily
+ * cap: learners can start another session any time. */
+export const NEW_PER_SESSION = 10;
 
-/** Total cards per learner-day. Lower than Anki's default on purpose: reviews
- * here fit around conversation, they don't replace it. */
-export const REVIEWS_PER_DAY = 100;
+/** Maximum cards in one review session. This sizes one round, with no daily
+ * cap: learners can start another session any time. */
+export const REVIEWS_PER_SESSION = 100;
 
 /** A learner-day starts at 4am local time, as in Anki, so a late-night session
  * counts toward the day the learner thinks it belongs to. */
@@ -165,10 +165,14 @@ export function retrievability(row: CardSchedule, now: Date): number {
 export function dayStart(now: Date, timeZone: string): Date {
   const zone = isValidTimeZone(timeZone) ? timeZone : 'UTC';
 
-  // Shift back by the day-start hour, then take that moment's calendar date:
-  // 03:00 local belongs to the previous day, 05:00 to today.
-  const shifted = new Date(now.getTime() - DAY_START_HOUR * 3_600_000);
-  const { year, month, day } = wallClock(shifted, zone);
+  // Use the local clock directly: subtracting four elapsed hours crosses the
+  // spring DST jump and can put 04:00 local on the previous calendar date.
+  const local = wallClock(now, zone);
+  const date = new Date(Date.UTC(local.year, local.month - 1,
+    local.day - (local.hour < DAY_START_HOUR ? 1 : 0)));
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + 1;
+  const day = date.getUTCDate();
 
   // 04:00 on that date, as if the zone were UTC, then corrected by the zone's
   // offset. Corrected twice: the first guess can sit on the other side of a
@@ -177,6 +181,13 @@ export function dayStart(now: Date, timeZone: string): Date {
   let guess = naive - offsetMs(new Date(naive), zone);
   guess = naive - offsetMs(new Date(guess), zone);
   return new Date(guess);
+}
+
+/** The next local 4am after this learner-day, including 23h and 25h DST days. */
+export function dayEnd(now: Date, timeZone: string): Date {
+  const start = dayStart(now, timeZone);
+  // Across 23h and 25h DST days, thirty hours lands inside the next learner-day.
+  return dayStart(new Date(start.getTime() + 30 * 3_600_000), timeZone);
 }
 
 function isValidTimeZone(timeZone: string): boolean {

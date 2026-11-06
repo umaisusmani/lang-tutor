@@ -25,7 +25,7 @@ export function RemoveWordButton({ entryId, lemma }: { entryId: string; lemma: s
   async function handleClick() {
     const ok = await confirm({
       title: `Remove "${lemma}"?`,
-      description: "It'll be deleted from your vocab list. You can always save it again later.",
+      description: 'Deleting this word also removes all its review progress. Adding it again starts it as a new word. Suspend it instead to keep your progress.',
       confirmLabel: 'Remove',
       tone: 'danger',
     });

@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 
 import {
   cardToRow,
+  dayEnd,
   dayStart,
   formatInterval,
   gradeCard,
@@ -120,6 +121,26 @@ describe('dayStart (4am local)', () => {
       dayStart(at('2026-10-08T10:00:00Z'), 'Not/AZone').toISOString(),
       '2026-10-08T04:00:00.000Z',
     );
+  });
+
+  test('the next 4am follows local DST days', () => {
+    for (const [now, zone, hours, next] of [
+      ['2026-03-07T12:00:00Z', 'America/New_York', 23, '2026-03-08T08:00:00.000Z'],
+      ['2026-10-31T12:00:00Z', 'America/New_York', 25, '2026-11-01T09:00:00.000Z'],
+      ['2026-03-28T12:00:00Z', 'Europe/Berlin', 23, '2026-03-29T02:00:00.000Z'],
+      ['2026-10-24T12:00:00Z', 'Europe/Berlin', 25, '2026-10-25T03:00:00.000Z'],
+    ] as const) {
+      const start = dayStart(at(now), zone);
+      const end = dayEnd(at(now), zone);
+      assert.equal((end.getTime() - start.getTime()) / 3_600_000, hours, `${zone} ${now}`);
+      assert.equal(end.toISOString(), next);
+      assert.equal(end.toISOString(), dayStart(at(next), zone).toISOString());
+    }
+  });
+
+  test('4am after a spring clock change starts the new learner-day', () => {
+    assert.equal(dayStart(at('2026-03-29T02:30:00Z'), 'Europe/Berlin').toISOString(),
+      '2026-03-29T02:00:00.000Z');
   });
 });
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/app/components/button';
+import { Modal } from '@/app/components/modal';
 import { notifyError } from '@/app/components/toaster';
 import { discoverWordsAction, startSessionAction, type DiscoverCard, type SessionPayload } from '@/app/vocab/actions';
 import { FlashcardSession } from '@/app/vocab/flashcard-session';
@@ -12,6 +13,7 @@ import { AddWord } from '@/app/vocab/add-word';
 import type { ReviewSummary } from '@/lib/review-session';
 import { VocabGrid } from '@/app/vocab/vocab-grid';
 import type { VocabEntry } from '@/lib/types/db';
+import type { WordSchedule } from '@/lib/services/card.service';
 
 const SKIPPED_KEY = 'starfinch_skipped_words';
 const SKIPPED_MAX = 500;
@@ -19,19 +21,19 @@ const SKIPPED_MAX = 500;
 /** Starter words the learner skipped. Kept in this browser, not the database:
  * it's a preference about what to be offered, and losing it only means a
  * skipped word can be offered again. */
-function readSkipped(): string[] {
+function readSkipped(userId: string): string[] {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(SKIPPED_KEY) ?? '[]');
+    const parsed: unknown = JSON.parse(localStorage.getItem(`${SKIPPED_KEY}:${userId}`) ?? '[]');
     return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
   } catch {
     return [];
   }
 }
 
-function rememberSkipped(lemma: string) {
+function rememberSkipped(userId: string, lemma: string) {
   try {
-    const next = [...readSkipped().filter((l) => l !== lemma), lemma].slice(-SKIPPED_MAX);
-    localStorage.setItem(SKIPPED_KEY, JSON.stringify(next));
+    const next = [...readSkipped(userId).filter((l) => l !== lemma), lemma].slice(-SKIPPED_MAX);
+    localStorage.setItem(`${SKIPPED_KEY}:${userId}`, JSON.stringify(next));
   } catch {
     // Storage unavailable: the word may simply be offered again.
   }
@@ -47,10 +49,14 @@ export function VocabBrowser({
   dueCount,
   heading,
   dueWordIds,
+  schedules,
+  userId,
 }: {
   entries: VocabEntry[];
   dueCount: number;
   dueWordIds: string[];
+  schedules: Record<string, WordSchedule>;
+  userId: string;
   /** The page title block, rendered here so it can share a row with the
    * start button (the page itself is a Server Component and can't see
    * `starting`). */
@@ -68,6 +74,7 @@ export function VocabBrowser({
   const savedLemmas = useMemo(() => new Set(entries.map((entry) => entry.lemma.toLowerCase())), [entries]);
   const noticeRef = useRef<HTMLDivElement>(null);
   const startingRef = useRef(false);
+  const skipWord = (lemma: string) => rememberSkipped(userId, lemma);
 
   useEffect(() => { noticeRef.current?.focus(); }, [summary, notice]);
 
@@ -76,7 +83,7 @@ export function VocabBrowser({
     startingRef.current = true;
     setStarting(mode);
     try {
-      const loaded = await startSessionAction(mode, readSkipped());
+      const loaded = await startSessionAction(mode, readSkipped(userId));
       if (!loaded) throw new Error('Session unavailable');
       setSummary(null);
       if (loaded.cards.length === 0) {
@@ -103,7 +110,7 @@ export function VocabBrowser({
     startingRef.current = true;
     setStarting('discover');
     try {
-      const words = await discoverWordsAction(readSkipped());
+      const words = await discoverWordsAction(readSkipped(userId));
       if (words.length) setDiscovery(words);
       else setNotice('No new words to suggest at your level right now.');
     } catch {
@@ -116,7 +123,7 @@ export function VocabBrowser({
 
   if (cards) {
     return <FlashcardSession key={round} initialCards={cards.cards} discover={cards.discover} extra={cards.extra}
-      onSkip={rememberSkipped} onKeepPractising={() => void start('practice')} keepingGoing={starting === 'practice'}
+      onSkip={skipWord} onKeepPractising={() => void start('practice')} keepingGoing={starting === 'practice'}
       onReload={() => void start(cards.extra ? 'practice' : 'due')}
       onFinish={(result) => {
         setCards(null);
@@ -127,7 +134,7 @@ export function VocabBrowser({
       }} />;
   }
   if (discovery) {
-    return <DiscoverWords words={discovery} onSkip={rememberSkipped} onFinish={(added) => {
+    return <DiscoverWords words={discovery} onSkip={skipWord} onFinish={(added) => {
       setDiscovery(null);
       setSummary(null);
       setNotice(added ? `${added} new ${added === 1 ? 'word' : 'words'} added to your vocabulary.` : 'Back to your vocabulary.');
@@ -138,12 +145,13 @@ export function VocabBrowser({
   return (
     <>
       {heading}
-      <Button variant="secondary" type="button" aria-expanded={addWordOpen}
-        aria-controls="add-word-panel" onClick={() => setAddWordOpen((open) => !open)}
-        className="self-start sm:hidden">Add a word</Button>
-      <div id="add-word-panel" className={addWordOpen ? '' : 'hidden sm:block'}>
-        <AddWord savedLemmas={savedLemmas} onAdded={() => { setAddWordOpen(false); router.refresh(); }} />
-      </div>
+      <Button variant="secondary" type="button" onClick={(event) => {
+        event.currentTarget.focus();
+        setAddWordOpen(true);
+      }} className="self-start">Add a word</Button>
+      <Modal open={addWordOpen} onClose={() => setAddWordOpen(false)} title="Add a word">
+        {addWordOpen && <AddWord savedLemmas={savedLemmas} onAdded={() => { setAddWordOpen(false); router.refresh(); }} />}
+      </Modal>
       {(summary || notice) && (
         <div ref={noticeRef} tabIndex={-1} role="status"
           className={`border-line rounded-2xl border-2 p-5 outline-none ${summary ? 'bg-panel text-ink' : 'bg-yellow text-on-bright'}`}>
@@ -164,6 +172,7 @@ export function VocabBrowser({
           <p className="text-ink-2">In a chat, tap a German word and choose + to save it here, or add one yourself.</p>
           <div className="flex flex-wrap gap-3">
             <Button variant="primary" href="/?c=new">Start a chat →</Button>
+            <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void discover()}>{starting === 'discover' ? 'Loading…' : 'Discover words'}</Button>
           </div>
         </div>
       ) : (
@@ -182,7 +191,7 @@ export function VocabBrowser({
           </div>
         </>
       )}
-      <VocabGrid entries={entries} dueWordIds={dueWordIds} />
+      <VocabGrid entries={entries} dueWordIds={dueWordIds} schedules={schedules} />
     </>
   );
 }

@@ -56,15 +56,17 @@ export function DiscoverCard({ word, meaning, loading, loadError, onRetry, onSki
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [added, setAdded] = useState(false);
+  const [ownMeaning, setOwnMeaning] = useState('');
   const savingRef = useRef(false);
+  const chosenMeaning = meaning?.trim() || ownMeaning.trim();
 
   async function add() {
-    if (!meaning?.trim() || savingRef.current) return;
+    if (!chosenMeaning || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     setSaveError(false);
     try {
-      const result = await addStarterWordAction(word.lemma, meaning);
+      const result = await addStarterWordAction(word.lemma, chosenMeaning);
       if (!result.ok) throw new Error('Save failed');
       setAdded(true);
       await new Promise((resolve) => setTimeout(resolve, 180));
@@ -82,6 +84,9 @@ export function DiscoverCard({ word, meaning, loading, loadError, onRetry, onSki
       <p className="text-ink-3 font-mono text-xs uppercase tracking-wider">New word</p>
       <h3 className="font-display text-4xl break-words">{word.lemma}</h3>
       <p className="font-mono text-xl font-semibold" role="status">{meaning || (loading ? 'Loading meaning…' : 'Meaning unavailable')}</p>
+      {!meaning?.trim() && !loading && <input aria-label="Meaning" placeholder="Type your own meaning" maxLength={500}
+        value={ownMeaning} onChange={(event) => setOwnMeaning(event.target.value)}
+        className="border-line bg-panel w-full max-w-sm rounded-xl border-2 px-3 py-2 text-center" />}
       <p>{word.example}</p>
       <p className="text-ink-2 font-mono text-sm">{word.exampleTranslation}</p>
     </div>
@@ -90,7 +95,7 @@ export function DiscoverCard({ word, meaning, loading, loadError, onRetry, onSki
     </p>}
     {saveError && <p role="alert" className="text-ink rounded-xl border-2 border-orange p-3">Could not add this word. Please try again.</p>}
     <div className="flex flex-wrap justify-center gap-3">
-      <Button variant="primary" type="button" disabled={!meaning?.trim() || saving} onClick={() => void add()}>
+      <Button variant="primary" type="button" disabled={!chosenMeaning || saving} onClick={() => void add()}>
         {saving ? 'Adding…' : 'Add to my words'}
         {added && <span aria-hidden="true" className="animate-[fade-rise_160ms_ease-out]">✓</span>}
       </Button>

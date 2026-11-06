@@ -20,3 +20,16 @@ test('shows a success check before advancing to the next word', async () => {
   expect(onAdded).not.toHaveBeenCalled();
   await waitFor(() => expect(onAdded).toHaveBeenCalledOnce());
 });
+
+test('a learner can supply the meaning when loading failed', async () => {
+  vi.mocked(addStarterWordAction).mockResolvedValue({ ok: true });
+  render(<DiscoverCard word={{ lemma: 'Haus', example: 'Das Haus.', exampleTranslation: 'The house.' }}
+    loading={false} loadError meaning={undefined} onRetry={vi.fn()} onSkip={vi.fn()} onAdded={vi.fn()} />);
+  const add = screen.getByRole('button', { name: 'Add to my words' });
+  expect(add).toBeDisabled();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Meaning' }), { target: { value: '  house  ' } });
+  expect(add).toBeEnabled();
+  fireEvent.click(add);
+  await waitFor(() => expect(addStarterWordAction).toHaveBeenCalledWith('Haus', 'house'));
+  expect(screen.getByRole('button', { name: 'try again' })).toBeInTheDocument();
+});

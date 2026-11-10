@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import { Button } from '@/app/components/button';
+import { Modal } from '@/app/components/modal';
 import { Pill } from '@/app/components/pill';
 import { Select } from '@/app/components/select';
 import { EditWord } from '@/app/vocab/edit-word';
@@ -54,11 +56,30 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
 
   return (
     <div className="flex flex-col gap-3">
-      <Pill hitArea className="self-start sm:hidden" aria-expanded={filtersOpen}
-        aria-controls="vocab-filter-controls" onClick={() => setFiltersOpen((open) => !open)}>
+      <Pill hitArea className="self-start sm:hidden" onClick={() => setFiltersOpen(true)}>
         Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
       </Pill>
-      <div id="vocab-filter-controls" className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid sm:grid-cols-[1fr_auto_auto]`}>
+      <Modal open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filters" size="lg">
+        {filtersOpen && <div className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1 text-sm">
+            Search your words
+            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}
+              placeholder="German, English, or an example…" className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
+          </label>
+          <div className="flex flex-col gap-1 text-sm">
+            <span id="vocab-mobile-filter-label">Show</span>
+            <Select variant="panel" value={filter} onValueChange={setFilter} aria-labelledby="vocab-mobile-filter-label"
+              options={[{ value: 'all', label: 'All words' }, { value: 'due', label: 'Ready to review' }, { value: 'mistakes', label: 'From corrections' }, { value: 'missing', label: 'Missing meaning' }]} />
+          </div>
+          <div className="flex flex-col gap-1 text-sm">
+            <span id="vocab-mobile-sort-label">Sort</span>
+            <Select variant="panel" value={sort} onValueChange={setSort} aria-labelledby="vocab-mobile-sort-label"
+              options={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'az', label: 'A–Z' }]} />
+          </div>
+          <Button type="button" variant="primary" onClick={() => setFiltersOpen(false)}>Apply</Button>
+        </div>}
+      </Modal>
+      <div className="hidden gap-3 sm:grid sm:grid-cols-[1fr_auto_auto]">
         <label className="flex flex-col gap-1 text-sm">
           Search your words
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}

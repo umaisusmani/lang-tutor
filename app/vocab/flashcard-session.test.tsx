@@ -79,6 +79,58 @@ test('a new word appears after three reviews with its batched meaning and can be
 
 const props = { discover: [], extra: false, onFinish: vi.fn(), onReload: vi.fn(), onKeepPractising: vi.fn(), onSkip: vi.fn() };
 
+test('a one-card learning step stays at zero until a Good grade graduates it', async () => {
+  vi.mocked(gradeCardAction)
+    .mockResolvedValueOnce({ status: 'ok', next: { ...card.schedule, state: 1, learning_steps: 0, reps: 1 } })
+    .mockResolvedValueOnce({ status: 'ok', next: { ...card.schedule, state: 2, learning_steps: 0, reps: 2 } });
+  render(<FlashcardSession initialCards={[card]} {...props} />);
+  const progress = screen.getByRole('progressbar');
+  fireEvent.click(screen.getByRole('button', { name: 'Show answer' }));
+  fireEvent.click(screen.getByRole('button', { name: /1 Again/ }));
+  await waitFor(() => expect(gradeCardAction).toHaveBeenCalledTimes(1));
+  expect(screen.getByText('0 of 1 cards · 1 left')).toBeInTheDocument();
+  expect(screen.getByText(/Learning cards return until they graduate/)).toBeInTheDocument();
+  expect(progress).toHaveAttribute('aria-valuenow', '0');
+  fireEvent.click(screen.getByRole('button', { name: 'Show answer' }));
+  fireEvent.click(screen.getByRole('button', { name: /3 Good/ }));
+  expect(await screen.findByText('All due words done.')).toBeInTheDocument();
+  expect(screen.getByText('1 of 1 cards · 0 left')).toBeInTheDocument();
+  expect(progress).toHaveAttribute('aria-valuenow', '1');
+  expect(gradeCardAction).toHaveBeenLastCalledWith('card-1', 3, expect.objectContaining({ expectedReps: 1 }));
+});
+
+test('duplicate card IDs are reviewed once and undo restores one copy', async () => {
+  vi.mocked(gradeCardAction)
+    .mockResolvedValueOnce({ status: 'ok', next: { ...card.schedule, state: 1, reps: 1 } })
+    .mockResolvedValueOnce({ status: 'ok', next: { ...card.schedule, state: 2, reps: 2 } });
+  vi.mocked(undoReviewAction).mockResolvedValue({ status: 'ok', schedule: card.schedule });
+  render(<FlashcardSession initialCards={[card, { ...card }]} {...props} />);
+  const progress = screen.getByRole('progressbar');
+  expect(screen.getByText('0 of 1 cards · 1 left')).toBeInTheDocument();
+  expect(progress).toHaveAttribute('aria-valuemax', '1');
+  fireEvent.click(screen.getByRole('button', { name: 'Show answer' }));
+  fireEvent.click(screen.getByRole('button', { name: /1 Again/ }));
+  await waitFor(() => expect(gradeCardAction).toHaveBeenCalledTimes(1));
+  expect(screen.getByText('0 of 1 cards · 1 left')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Undo last rating' }));
+  await waitFor(() => expect(undoReviewAction).toHaveBeenCalledTimes(1));
+  expect(screen.getByText('0 of 1 cards · 1 left')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Show answer' }));
+  fireEvent.click(screen.getByRole('button', { name: /3 Good/ }));
+  expect(await screen.findByText('All due words done.')).toBeInTheDocument();
+  expect(progress).toHaveAttribute('aria-valuenow', '1');
+  expect(gradeCardAction).toHaveBeenCalledTimes(2);
+});
+
+test('progress total stays with the mounted queue if props change', () => {
+  const second = { ...card, id: 'card-2', lemma: 'Baum' };
+  const { rerender } = render(<FlashcardSession initialCards={[card, second]} {...props} />);
+  rerender(<FlashcardSession initialCards={[card]} {...props} />);
+  expect(screen.getByText('0 of 2 cards · 2 left')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '2');
+});
+
 test('learning cards return after other cards and count as finished only when learned', async () => {
   const second = { ...card, id: 'card-2', lemma: 'Baum', translation: 'tree', exampleSentence: null, exampleTranslation: null };
   vi.mocked(gradeCardAction)

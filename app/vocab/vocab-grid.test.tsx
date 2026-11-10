@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { VocabGrid } from '@/app/vocab/vocab-grid';
 import type { VocabEntry } from '@/lib/types/db';
@@ -8,14 +8,20 @@ vi.mock('@/app/vocab/remove-word-button', () => ({ RemoveWordButton: () => null 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('@/app/components/toaster', () => ({ notifyError: vi.fn() }));
 vi.mock('@/app/vocab/actions', () => ({ updateVocabAction: vi.fn() }));
-afterEach(cleanup);
-
 const showModalDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
 const closeDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
 function mockDialogs() {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value(this: HTMLDialogElement) { this.setAttribute('open', ''); } });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value(this: HTMLDialogElement) { this.removeAttribute('open'); } });
 }
+beforeEach(mockDialogs);
+afterEach(() => {
+  cleanup();
+  if (showModalDescriptor) Object.defineProperty(HTMLDialogElement.prototype, 'showModal', showModalDescriptor);
+  else Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
+  if (closeDescriptor) Object.defineProperty(HTMLDialogElement.prototype, 'close', closeDescriptor);
+  else Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+});
 
 const entry: VocabEntry = {
   id: 'word-1', user_id: 'user-1', term: 'Haus', lemma: 'Haus', translation: 'house',
@@ -41,23 +47,45 @@ test('revealed cards show meanings without personal notes', () => {
   expect(screen.queryByRole('option', { name: 'My notes' })).not.toBeInTheDocument();
 });
 
-test('mobile Filters toggle controls the search panel and marks active criteria', () => {
+test('mobile Filters opens a dialog with live search, Show, and Sort controls that Apply closes', () => {
   render(<VocabGrid entries={[entry]} dueWordIds={[]} />);
-  const toggle = screen.getByRole('button', { name: 'Filters' });
-  const controls = document.getElementById('vocab-filter-controls');
-  expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  expect(controls).toHaveClass('hidden', 'sm:grid');
-  fireEvent.click(toggle);
-  expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  expect(controls).toHaveClass('grid');
-  fireEvent.change(screen.getByRole('searchbox', { name: 'Search your words' }), { target: { value: 'missing' } });
-  fireEvent.click(toggle);
-  expect(screen.getByRole('button', { name: 'Filters (1)' })).toHaveAttribute('aria-expanded', 'false');
-  expect(controls).toHaveClass('hidden');
+  const trigger = screen.getByRole('button', { name: 'Filters' });
+  expect(trigger).not.toHaveAttribute('aria-expanded');
+  expect(trigger).not.toHaveAttribute('aria-controls');
+  fireEvent.click(trigger);
+
+  const dialog = screen.getByRole('dialog', { name: 'Filters' });
+  expect(within(dialog).getByRole('searchbox', { name: 'Search your words' })).toBeInTheDocument();
+  expect(within(dialog).getByRole('button', { name: 'Show All words' })).toBeInTheDocument();
+  expect(within(dialog).getByRole('button', { name: 'Sort Newest first' })).toBeInTheDocument();
+
+  fireEvent.change(within(dialog).getByRole('searchbox', { name: 'Search your words' }), { target: { value: 'missing' } });
+  expect(screen.getByRole('status')).toHaveTextContent('0 of 1 words shown');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Show All words' }));
+  fireEvent.click(within(dialog).getByRole('option', { name: 'Ready to review' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Sort Newest first' }));
+  fireEvent.click(within(dialog).getByRole('option', { name: 'A–Z' }));
+  expect(screen.getByRole('button', { name: 'Filters (3)' })).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }));
+  expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Filters (3)' }));
+  const reopenedDialog = screen.getByRole('dialog', { name: 'Filters' });
+  expect(within(reopenedDialog).getByRole('searchbox', { name: 'Search your words' })).toHaveValue('missing');
+  expect(within(reopenedDialog).getByRole('button', { name: 'Show Ready to review' })).toBeInTheDocument();
+  expect(within(reopenedDialog).getByRole('button', { name: 'Sort A–Z' })).toBeInTheDocument();
+});
+
+test('desktop filter bar keeps its inline controls', () => {
+  const { container } = render(<VocabGrid entries={[entry]} dueWordIds={[]} />);
+  const inlineBar = container.querySelector('.sm\\:grid');
+  expect(inlineBar).toHaveClass('hidden', 'sm:grid', 'sm:grid-cols-[1fr_auto_auto]');
+  expect(inlineBar).not.toHaveAttribute('id');
+  expect(within(inlineBar as HTMLElement).getByRole('searchbox', { name: 'Search your words' })).toBeInTheDocument();
+  expect(within(inlineBar as HTMLElement).getByRole('button', { name: 'Show All words' })).toBeInTheDocument();
+  expect(within(inlineBar as HTMLElement).getByRole('button', { name: 'Sort Newest first' })).toBeInTheDocument();
 });
 
 test('the icon edit control opens the editor for a missing meaning', () => {
-  mockDialogs();
   render(<VocabGrid entries={[{ ...entry, translation: null }]} dueWordIds={[]} />);
   const edit = screen.getByRole('button', { name: 'Edit Haus' });
   expect(edit).toHaveAttribute('title', 'Edit');
@@ -66,24 +94,13 @@ test('the icon edit control opens the editor for a missing meaning', () => {
   fireEvent.click(edit);
   expect(screen.getByRole('dialog', { name: 'Edit word' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Haus' })).toBeInTheDocument();
-  cleanup();
-  if (showModalDescriptor) Object.defineProperty(HTMLDialogElement.prototype, 'showModal', showModalDescriptor);
-  else Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-  if (closeDescriptor) Object.defineProperty(HTMLDialogElement.prototype, 'close', closeDescriptor);
-  else Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
 });
 
 test('edit control opens the editor for an existing meaning', () => {
-  mockDialogs();
   render(<VocabGrid entries={[entry]} dueWordIds={[]} />);
   fireEvent.click(screen.getByRole('button', { name: 'Edit Haus' }));
   expect(screen.getByRole('dialog', { name: 'Edit word' })).toBeInTheDocument();
   expect(screen.getByRole('textbox', { name: 'Meaning' })).toHaveValue('house');
-  cleanup();
-  if (showModalDescriptor) Object.defineProperty(HTMLDialogElement.prototype, 'showModal', showModalDescriptor);
-  else Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-  if (closeDescriptor) Object.defineProperty(HTMLDialogElement.prototype, 'close', closeDescriptor);
-  else Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
 });
 
 test('cards show only review and missing-meaning statuses', () => {

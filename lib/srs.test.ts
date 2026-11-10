@@ -75,6 +75,18 @@ describe('learning steps (1m, 10m)', () => {
     assert.ok(next.scheduled_days >= 1, `scheduled ${next.scheduled_days} days`);
   });
 
+  test('Again followed by Good consumes both learning steps and graduates', () => {
+    const again = gradeCard(newCard(), Grades.Again, now).next;
+    assert.equal(again.state, 1);
+    assert.equal(again.learning_steps, 0);
+    const firstGood = gradeCard(again, Grades.Good, new Date(again.due)).next;
+    assert.equal(firstGood.state, 1);
+    assert.equal(firstGood.learning_steps, 1);
+    const secondGood = gradeCard(firstGood, Grades.Good, new Date(firstGood.due)).next;
+    assert.equal(secondGood.state, 2);
+    assert.equal(secondGood.learning_steps, 0);
+  });
+
   test('Again on a review card sends it to relearning and counts a lapse', () => {
     let card = gradeCard(newCard(), Grades.Good, now).next;
     card = gradeCard(card, Grades.Good, new Date(card.due)).next;

@@ -20,6 +20,16 @@ const SENTENCE_KEY = 'starfinch_front_sentence';
 type SessionItem = { kind: 'review'; card: SessionCard } | { kind: 'discover'; word: DiscoverWord };
 type UndoSnapshot = { queue: SessionItem[]; summary: ReviewSummary; card: SessionCard; expectedReps: number };
 
+function uniqueReviews(items: SessionItem[]): SessionItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (item.kind !== 'review') return true;
+    if (seen.has(item.card.id)) return false;
+    seen.add(item.card.id);
+    return true;
+  });
+}
+
 function pendingLearning(items: SessionItem[]) {
   const due = items.filter((item): item is Extract<SessionItem, { kind: 'review' }> =>
     item.kind === 'review' && (item.card.schedule.state === 1 || item.card.schedule.state === 3));
@@ -61,8 +71,8 @@ export function FlashcardSession({
   onFinish: (summary: ReviewSummary) => void;
   onReload: () => void;
 }) {
-  const [queue, setQueue] = useState<SessionItem[]>(() => interleave(initialCards, discover));
-  const total = initialCards.length;
+  const [queue, setQueue] = useState<SessionItem[]>(() => uniqueReviews(interleave(initialCards, discover)));
+  const [total] = useState(() => new Set(initialCards.map((card) => card.id)).size);
   const { meanings, loading: meaningsLoading, error: meaningsError, retry } = useDiscoverMeanings(discover);
   const [shownAt, setShownAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
@@ -81,7 +91,7 @@ export function FlashcardSession({
   const startedAt = useRef(0);
   const current = queue[0];
   const remaining = queue.filter((item) => item.kind === 'review').length;
-  const completed = total - remaining;
+  const completed = Math.max(0, total - remaining);
 
   useEffect(() => {
     startedAt.current = performance.now();
@@ -113,7 +123,7 @@ export function FlashcardSession({
     try {
       const result = await undoReviewAction(undoSnapshot.card.id, undoSnapshot.expectedReps, undoSnapshot.card.schedule.due);
       if (result.status !== 'ok') throw new Error('Undo failed');
-      setQueue(undoSnapshot.queue.map((item) => item.kind === 'review' && item.card.id === undoSnapshot.card.id
+      setQueue(uniqueReviews(undoSnapshot.queue).map((item) => item.kind === 'review' && item.card.id === undoSnapshot.card.id
         ? { ...item, card: { ...item.card, schedule: result.schedule } } : item));
       setSummary(undoSnapshot.summary);
       setShownAt(null);
@@ -157,7 +167,7 @@ export function FlashcardSession({
         return;
       }
       const later = result.next.state === 1 || result.next.state === 3;
-      const nextQueue = queue.slice(1);
+      const nextQueue = queue.slice(1).filter((item) => item.kind !== 'review' || item.card.id !== card.id);
       if (later) nextQueue.splice(Math.min(3, nextQueue.length), 0,
         { kind: 'review', card: { ...card, schedule: result.next } });
       const next = {
@@ -207,6 +217,8 @@ export function FlashcardSession({
           <p className="text-ink-2 text-sm" role="status">
             {completed} of {total} cards · {remaining} left
           </p>
+          {queue.some((item) => item.kind === 'review' && (item.card.schedule.state === 1 || item.card.schedule.state === 3))
+            && <p className="text-ink-2 text-sm">Learning cards return until they graduate. You can end review and come back when they are due.</p>}
           {extra && <p className="text-ink-2 text-sm">Practising ahead: nothing here is due yet.</p>}
         </div>
         <div className="flex flex-wrap gap-2">

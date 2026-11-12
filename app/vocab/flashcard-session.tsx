@@ -1,5 +1,7 @@
 'use client';
 
+import { activeLanguage } from '@/lib/languages';
+
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/app/components/button';
 import { Pill } from '@/app/components/pill';
@@ -253,7 +255,7 @@ export function FlashcardSession({
       </div> : (
       <div key={card?.id} className="border-line bg-panel mx-auto flex min-h-[300px] w-full max-w-[600px] animate-[fade-rise_180ms_ease-out] flex-col gap-6 rounded-2xl border-2 p-5 shadow-[3px_3px_0_var(--line)] sm:p-7">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-          <p className="text-ink-3 text-sm">{reverse ? 'Recall the German word' : 'Recall the English meaning'}</p>
+          <p className="text-ink-3 text-sm">{reverse ? `Recall the ${activeLanguage.name} word` : 'Recall the English meaning'}</p>
           <p className="font-display text-4xl leading-tight break-words">{reverse ? card?.translation : card?.lemma}</p>
           {!reverse && card?.exampleSentence && (
             <label className="text-ink-2 flex items-center gap-2 text-sm">

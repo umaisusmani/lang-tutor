@@ -87,7 +87,7 @@ function WordMenu({
 }
 
 /**
- * Renders German text word by word: hover a word for its meaning, click (or
+ * Renders target-language text word by word: hover a word for its meaning, click (or
  * tap -- there's no hover on touch) to pin the menu with the save button.
  *
  * Words are flex items with a gap rather than text separated by whitespace, so

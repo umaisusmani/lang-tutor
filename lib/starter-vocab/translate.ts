@@ -1,3 +1,4 @@
+import { activeLanguage } from '@/lib/languages';
 import { groq } from '@ai-sdk/groq';
 import { generateObject } from 'ai';
 import { z } from 'zod';
@@ -24,7 +25,7 @@ export async function translateStarterWord(
     model: groq(MODEL),
     schema: z.object({ translation: z.string() }),
     system:
-      'You translate one German dictionary word into English for a learner\'s vocabulary list. ' +
+      `You translate one ${activeLanguage.promptLanguageName} dictionary word into English for a learner\'s vocabulary list. ` +
       'Reply with the short dictionary meaning only: 1-3 words, no article for nouns ' +
       '("the bank" -> "bank"), "to ..." for verbs. Use the example sentence only to choose the right sense.',
     prompt: `Word: ${word.lemma}\nExample: ${word.example}\nExample translation: ${word.exampleTranslation}`,
@@ -47,7 +48,7 @@ export async function translateStarterWords(
     model: groq(MODEL),
     schema: z.object({ translations: z.array(z.object({ lemma: z.string(), translation: z.string() })) }),
     system:
-      'Translate each German dictionary word into English for a learner. Return one translation per lemma. ' +
+      `Translate each ${activeLanguage.promptLanguageName} dictionary word into English for a learner. Return one translation per lemma. ` +
       'Each translation must be a short dictionary meaning of 1-3 words, with no article for nouns ' +
       '("the bank" -> "bank") and "to ..." for verbs. Use example sentences only to choose the right sense.',
     prompt: JSON.stringify(words.map(({ lemma, example, exampleTranslation }) => ({ lemma, example, exampleTranslation }))),

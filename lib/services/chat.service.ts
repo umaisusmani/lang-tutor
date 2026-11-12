@@ -1,3 +1,4 @@
+import { activeLanguage } from '@/lib/languages';
 import { convertToModelMessages, streamText, type UIMessageStreamWriter } from 'ai';
 
 import type { LangTutorUIMessage, NoticeSource } from '@/lib/chat-types';
@@ -224,7 +225,7 @@ export async function runChatTurn(
           } catch (writeErr) {
             console.error('[correction] status write failed:', writeErr);
           }
-          notify(writer, 'correction', "Couldn't check your German this time.");
+          notify(writer, 'correction', `Couldn't check your ${activeLanguage.name} this time.`);
         })
     : Promise.resolve();
 

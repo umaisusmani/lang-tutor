@@ -71,6 +71,36 @@
   --on-accent: #ffffff;
 }
 
+/* Turkish uses #f0544f as its signature bright fill with dark text (4.87:1).
+ * Buttons use a darker accent derivative because #f0544f with light text is
+ * only 3.03:1. Dark selectors outrank the German OS-dark selector and repeat
+ * every Turkish light token so the selected palette wins in either theme. */
+:root[data-lang="tr"] {
+  --paper: #fdf0ec; --panel: #fffaf8; --ink: #2e1714; --ink-2: #a87a72;
+  --ink-3: #85655e; --explain-ink: #8a5a50; --line: #2e1714;
+  --hair: #f0d5cc; --accent: #b43f3b; --accent-ink: #9c3733;
+  --yellow: #f0544f; --orange: #f7a072; --soft: #fae6e0; --dot: #f2dcd5;
+  --on-bright: #2e1714; --on-accent: #fdf0ec;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-lang="tr"]:not([data-theme="light"]) {
+    --paper: #161312; --panel: #201b1a; --ink: #ece7e5; --ink-2: #8f8784;
+    --ink-3: #948b88; --explain-ink: #a09592; --line: #332b29;
+    --hair: #2a2321; --accent: #c4463f; --accent-ink: #f2837c;
+    --yellow: #f0544f; --orange: #f7a072; --soft: #282120; --dot: #1e1918;
+    --on-bright: #161312; --on-accent: #ffffff;
+  }
+}
+
+:root[data-lang="tr"][data-theme="dark"] {
+  --paper: #161312; --panel: #201b1a; --ink: #ece7e5; --ink-2: #8f8784;
+  --ink-3: #948b88; --explain-ink: #a09592; --line: #332b29;
+  --hair: #2a2321; --accent: #c4463f; --accent-ink: #f2837c;
+  --yellow: #f0544f; --orange: #f7a072; --soft: #282120; --dot: #1e1918;
+  --on-bright: #161312; --on-accent: #ffffff;
+}
+
 @theme inline {
   --color-paper: var(--paper);
   --color-panel: var(--panel);
@@ -88,12 +118,12 @@
   --color-on-bright: var(--on-bright);
   --color-on-accent: var(--on-accent);
 
-  /* Three voices: Bricolage Grotesque for UI and German, DM Mono for English
+  /* Three voices: Bricolage Grotesque for UI and the target language, DM Mono for English
      glosses / labels / metadata, Londrina Solid for display -- the wordmark,
      headings, eyebrows and primary buttons. `font-display` in markup. */
   --font-sans: var(--font-bricolage);
   --font-mono: var(--font-dm-mono);
-  --font-display: var(--font-londrina);
+  --font-display: var(--font-active-display);
 }
 
 /*

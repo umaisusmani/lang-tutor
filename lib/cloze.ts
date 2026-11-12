@@ -27,8 +27,7 @@ export type VocabPrompt =
       lemma: string | null;
     }
   | {
-      /** No usable sentence: English meaning → German dictionary form.
-       * Still trains gender, since a noun's lemma carries its article. */
+      /** No usable sentence: English meaning → target-language dictionary form. */
       kind: 'recall';
       translation: string;
       answer: string;
@@ -90,6 +89,7 @@ function findWord(sentence: string, term: string): { start: number; end: number 
  */
 function emphasizeParticle(rest: string, lemma: string, answer: string): ClozeSegment[] {
   if (!rest) return [];
+  if (!activeLanguage.emphasizeSeparableParticle) return [{ text: rest }];
   const verb = lowercaseTargetText(bareLemma(lemma));
   const tokens = rest.split(/(\s+)/);
   let particleAt = -1;
@@ -117,13 +117,13 @@ function emphasizeParticle(rest: string, lemma: string, answer: string): ClozeSe
  * a reflexive "sich", a verb's trailing preposition ("sich freuen auf"). */
 function bareLemma(lemma: string): string {
   const words = lemma.trim().split(/\s+/);
-  const start = /^(der|die|das|sich)$/i.test(words[0] ?? '') ? 1 : 0;
+  const start = activeLanguage.lemmaPrefixes.some((prefix) => prefix.toLocaleLowerCase(activeLanguage.localeTag) === lowercaseTargetText(words[0] ?? '')) ? 1 : 0;
   return words[start] ?? lemma;
 }
 
 export type AnswerCheck = {
   correct: boolean;
-  /** Right word, but a capital letter where German needs one (or the
+  /** Right word, but a capital letter where the target language needs one (or the
    * reverse). Still correct -- a gentle note, not a failed card. */
   capitalization?: true;
 };
@@ -132,17 +132,18 @@ export type AnswerCheck = {
  * Whether the typed answer matches. Correct maps to Good, wrong to Again;
  * the UI always offers an "I was right" override for typos and synonyms.
  *
- * Forgiving where keyboards are the problem, not the German:
+ * Forgiving where keyboards are the problem, using the active pack's rules:
  * - surrounding punctuation and extra spaces are ignored
  * - ae/oe/ue/ss count as ä/ö/ü/ß, for keyboards without them
  * - case is ignored, but a capitalization difference is reported, since
- *   noun capitalization is part of knowing a German noun
+ *   capitalization matters when the active pack requires it
  */
 export function checkAnswer(given: string, expected: string): AnswerCheck {
   const g = tidy(given);
   const e = tidy(expected);
   if (!g || fold(g) !== fold(e)) return { correct: false };
 
+  if (!activeLanguage.reportCapitalization) return { correct: true };
   const capitalOf = (s: string) => s[0] !== lowercaseTargetText(s[0]);
   return capitalOf(g) === capitalOf(e) ? { correct: true } : { correct: true, capitalization: true };
 }

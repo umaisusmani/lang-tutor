@@ -1,5 +1,7 @@
 'use client';
 
+import { activeLanguage } from '@/lib/languages';
+
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
 import { Button } from '@/app/components/button';
@@ -11,7 +13,7 @@ type Option = { kind: 'starter'; word: DiscoverCard } | { kind: 'lookup'; word: 
 type Selected = Extract<Option, { kind: 'starter' | 'lookup' }>;
 const lookupKey = (value: string) => lowercaseTargetText(value.trim().replace(/\s+/g, ' '));
 
-export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<string>; onAdded: () => void }) {
+export function AddWord({ savedLemmas, hasStarterWords = true, onAdded }: { savedLemmas: ReadonlySet<string>; hasStarterWords?: boolean; onAdded: () => void }) {
   const inputId = useId();
   const listboxId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +50,7 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
   const isSaved = (lemma: string) => savedLemmas.has(lowercaseTargetText(lemma)) || addedLemmas.has(lowercaseTargetText(lemma));
   const options: Option[] = [
     ...results.map((word): Option => ({ kind: 'starter', word })),
-    ...(query.trim().length >= 3 && searchedQuery === query && !lookupDone ? [{ kind: 'more' } as Option] : []),
+    ...(hasStarterWords && query.trim().length >= 3 && searchedQuery === query && !lookupDone ? [{ kind: 'more' } as Option] : []),
     ...lookupResults.map((word): Option => ({ kind: 'lookup', word })),
   ];
   const showMenu = open && !selected && Boolean(query.trim()) && !searchPending;
@@ -99,9 +101,10 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
       setOpen(document.activeElement === inputRef.current);
       setSearchedQuery(query);
       setAnnouncement(words.length ? `${words.length} suggestions` : 'No matches');
+      if (!hasStarterWords && !words.length) void runLookup(query);
     }, 150);
     return () => window.clearTimeout(timer);
-  }, [query, selected]);
+  }, [query, selected, hasStarterWords, runLookup]);
 
   useEffect(() => {
     if (selected) selectedRef.current?.focus();
@@ -265,7 +268,7 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
             role="combobox" aria-autocomplete="list" aria-expanded={showMenu}
             aria-busy={searchPending} aria-controls={listboxId}
             aria-activedescendant={showMenu && active >= 0 ? `${listboxId}-${active}` : undefined}
-            placeholder="Type a word in German or English…" autoComplete="off" autoCapitalize="none" autoCorrect="off"
+            placeholder={`Type a word in ${activeLanguage.name} or English…`} autoComplete="off" autoCapitalize="none" autoCorrect="off"
             spellCheck={false} maxLength={50}
             className="border-line bg-panel text-ink w-full rounded-xl border-2 px-3 py-2.5 pr-10 text-sm outline-none" />
           {searchPending && <span role="status" aria-label="Searching suggestions" className="border-ink-3 absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />}

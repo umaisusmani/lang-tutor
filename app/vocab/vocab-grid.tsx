@@ -12,7 +12,7 @@ import { activeLanguage } from '@/lib/languages';
 import type { VocabEntry } from '@/lib/types/db';
 
 /**
- * Saved words as flashcards: the German shows, the meaning is a click away,
+ * Saved words as flashcards: the target-language word shows, the meaning is a click away,
  * so the list doubles as self-testing rather than a page of answers.
  *
  * State is "show all" plus the cards flipped away from it. A card is revealed
@@ -65,7 +65,7 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
           <label className="flex flex-col gap-1 text-sm">
             Search your words
             <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}
-              placeholder="German, English, or an example…" className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
+              placeholder={`${activeLanguage.name}, English, or an example…`} className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
           </label>
           <div className="flex flex-col gap-1 text-sm">
             <span id="vocab-mobile-filter-label">Show</span>
@@ -84,7 +84,7 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
         <label className="flex flex-col gap-1 text-sm">
           Search your words
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}
-            placeholder="German, English, or an example…" className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
+            placeholder={`${activeLanguage.name}, English, or an example…`} className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
         </label>
         <div className="flex flex-col gap-1 text-sm">
           <span id="vocab-filter-label">Show</span>

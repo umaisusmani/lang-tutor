@@ -20,8 +20,8 @@ const CorrectionSchema = z.object({
   hasMistake: z.boolean(),
   // The learner used English for words they didn't know -- invited by the UI,
   // so it's not a mistake: it doesn't set hasMistake and isn't recorded in
-  // mistake_history. It still produces a `correction` (the all-German
-  // version), shown under an "in German" label instead of a mistake type.
+  // mistake_history. It still produces a `correction` (the all-target-language
+  // version), shown under an "in target-language" label instead of a mistake type.
   // Absent on corrections stored before it existed; read as false.
   usedEnglish: z.boolean(),
   mistakeType: z.enum(MISTAKE_TYPES).nullable(),

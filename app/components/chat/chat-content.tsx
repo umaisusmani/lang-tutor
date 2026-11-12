@@ -1,5 +1,7 @@
 'use client';
 
+import { activeLanguage } from '@/lib/languages';
+
 import type { ChatStatus } from 'ai';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -29,11 +31,17 @@ import type { VocabSource } from '@/lib/types/db';
 const MISTAKE_TYPE_LABELS: Record<(typeof MISTAKE_TYPES)[number], string> = {
   word_order: 'word order',
   case_declension: 'case',
+  case_suffix: 'case suffix',
   gender_article: 'gender / article',
+  vowel_harmony: 'vowel harmony',
   verb_conjugation: 'verb conjugation',
   auxiliary_verb: 'auxiliary verb',
+  tense_aspect: 'tense / aspect',
   preposition: 'preposition',
+  postposition: 'postposition',
   adjective_ending: 'adjective ending',
+  possessive_suffix: 'possessive suffix',
+  buffer_consonant: 'buffer consonant',
   plural_form: 'plural form',
   word_choice: 'word choice',
   other: 'grammar',
@@ -87,11 +95,11 @@ export function ChatWelcome({
           {remaining !== null && ` · ${remaining} ${signedIn ? 'messages left' : 'free messages'}`}
         </span>
         <h1 className="font-display text-[52px] leading-none font-black tracking-[0.02em]">
-          Sag einfach <span className="text-accent">etwas</span>.
+          {activeLanguage.chatWelcomeHeading.beforeAccent}<span className="text-accent">{activeLanguage.chatWelcomeHeading.accent}</span>{activeLanguage.chatWelcomeHeading.afterAccent}
         </h1>
         <p className="text-ink-2 max-w-[52ch] text-base leading-relaxed">
-          Chat with {persona.name} in German, however rough. Don&apos;t know a word? Just write it
-          in English and you&apos;ll see how to say it in German. Every reply comes with a
+          Chat with {persona.name} in {activeLanguage.name}, however rough. Don&apos;t know a word? Just write it
+          in English and you&apos;ll see how to say it in {activeLanguage.name}. Every reply comes with a
           translation, and a correction when something&apos;s off.
         </p>
       </div>
@@ -100,15 +108,15 @@ export function ChatWelcome({
         <span className="text-ink-3 font-mono text-[10px] tracking-[0.08em] uppercase">
           or start with
         </span>
-        {starters.map(([de, en]) => (
+        {starters.map(([target, en]) => (
           <button
-            key={de}
+            key={target}
             type="button"
             disabled={disabled}
-            onClick={() => onSend(de)}
+            onClick={() => onSend(target)}
             className="border-line bg-panel hover:shadow-[3px_3px_0_var(--line)] flex cursor-pointer flex-col gap-[3px] rounded-[14px] border-2 px-4 py-3.5 text-left transition-transform hover:-translate-x-px hover:-translate-y-px"
           >
-            <span className="text-ink text-[17px]">{de}</span>
+            <span className="text-ink text-[17px]">{target}</span>
             <span className="text-ink-3 font-mono text-[11px]">{en}</span>
           </button>
         ))}
@@ -267,7 +275,7 @@ export function ChatThread({
 
               {checking && (
                 <span className="text-ink-3 animate-[fade-rise_240ms_ease-out] font-mono text-[10px] tracking-[0.06em]">
-                  checking your German…
+                  checking your {activeLanguage.name}…
                 </span>
               )}
               {checkedClean && (
@@ -277,7 +285,7 @@ export function ChatThread({
               )}
               {correctionFailed && (
                 <span className="font-mono text-[11px] text-red-600 dark:text-red-400">
-                  Couldn&apos;t check your German this time.
+                  Couldn&apos;t check your {activeLanguage.name} this time.
                 </span>
               )}
 
@@ -383,7 +391,7 @@ function CorrectionCard({
   const count = changed.size;
   const summary = count === 0
     ? '1 correction'
-    : `${count} ${count === 1 ? 'word' : 'words'} ${correction.hasMistake ? 'fixed' : 'in German'}`;
+    : `${count} ${count === 1 ? 'word' : 'words'} ${correction.hasMistake ? 'fixed' : `in ${activeLanguage.name}`}`;
 
   return (
     <div className="border-line bg-panel relative animate-[fade-rise_240ms_ease-out] rounded-[14px] border-2 px-4 shadow-[3px_3px_0_var(--line)]">
@@ -396,7 +404,7 @@ function CorrectionCard({
           ? correction.mistakeType
             ? MISTAKE_TYPE_LABELS[correction.mistakeType]
             : 'grammar'
-          : 'in German'}
+          : `in ${activeLanguage.name}`}
       </span>
       <button
         type="button"
@@ -509,8 +517,8 @@ export function ChatComposer({
               value={input}
               onChange={(event) => onInputChange(event.currentTarget.value)}
               disabled={capped}
-              aria-label="Message in German"
-              placeholder="Schreib auf Deutsch… English words are fine too"
+              aria-label={`Message in ${activeLanguage.name}`}
+              placeholder={activeLanguage.composerPlaceholder}
               className="border-line bg-panel text-ink placeholder:text-ink-3 focus:shadow-[3px_3px_0_var(--line)] min-w-0 flex-1 rounded-full border-2 px-[18px] py-3 text-base outline-none transition-shadow duration-150 disabled:opacity-60"
             />
             <Button
@@ -519,7 +527,7 @@ export function ChatComposer({
               disabled={busy || capped || !input.trim()}
               className="flex-none px-[22px] py-3 text-xl active:translate-x-px active:translate-y-px"
             >
-              Senden
+              {activeLanguage.sendButtonLabel}
             </Button>
           </div>
         </>

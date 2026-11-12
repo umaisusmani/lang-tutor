@@ -26,6 +26,7 @@ export function createServiceRoleClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
   return new PostgrestClient(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1`, {
+    schema: process.env.SUPABASE_SCHEMA ?? process.env.NEXT_PUBLIC_SUPABASE_SCHEMA ?? 'public',
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,

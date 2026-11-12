@@ -2,6 +2,7 @@
 
 import { Button } from '@/app/components/button';
 import { Pill } from '@/app/components/pill';
+import { activeLanguage } from '@/lib/languages';
 import { useInstallPrompt } from '@/app/hooks/use-install-prompt';
 
 export function InstallBanner() {
@@ -18,7 +19,7 @@ export function InstallBanner() {
         className="gap-2 !border-0 !bg-transparent !px-1.5 !py-0 !text-[13px] !shadow-none"
       >
         <span aria-hidden className="bg-yellow border-line flex h-8 w-8 items-center justify-center rounded-[10px] border-2 font-display text-xl leading-none text-on-bright">S</span>
-        Install Starvogel
+        Install {activeLanguage.appName}
       </Button>
       <Pill type="button" hitArea aria-label="Dismiss" onClick={dismiss} className="text-ink">×</Pill>
     </div>

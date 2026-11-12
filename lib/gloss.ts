@@ -13,7 +13,7 @@ const GLOSS_MODEL = 'openai/gpt-oss-120b';
  *
  * `lemma` is the dictionary form (e.g. "Kinder" -> "Kind"), added so the vocab
  * tracker (lib/services/vocab.service.ts) has something to key saved words on
- * without a separate lemmatization pass. German's inflection and compounding
+ * without a separate lemmatization pass. target-language's inflection and compounding
  * make rule-based lemmatizers unreliable, and there's no mature one in the
  * Node ecosystem anyway -- but the model already has to understand a word's
  * base form to translate it correctly, so asking for the lemma alongside the
@@ -40,7 +40,7 @@ export const WordGlossSchema = z.array(
 export type WordGloss = z.infer<typeof WordGlossSchema>;
 
 /**
- * Translates a German sentence (or short passage) as a whole, and breaks it
+ * Translates a target-language sentence (or short passage) as a whole, and breaks it
  * into a word-by-word English gloss. Pure function, same reasoning as detectCorrection() in lib/tutor.ts:
  * no HTTP objects, so it's callable directly from both the chat route and any
  * future eval script.

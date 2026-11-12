@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { activeLanguage } from '@/lib/languages';
 
 /**
  * Logo tile + wordmark lockup, shared by the chat, login and vocab headers.
@@ -18,7 +19,7 @@ export function Brand({ compactOnMobile = false }: { compactOnMobile?: boolean }
       </div>
       <div className={`flex flex-col ${compactOnMobile ? 'max-[379px]:hidden' : ''}`}>
         <span className="font-display text-ink text-2xl leading-[1.1] tracking-[0.04em]">
-          Starvogel
+          {activeLanguage.appName}
         </span>
       </div>
     </Link>

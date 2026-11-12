@@ -1,5 +1,7 @@
 'use client';
 
+import { activeLanguage } from '@/lib/languages';
+
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -219,7 +221,7 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
                 setMatches([]);
                 setSearching(Boolean(event.target.value.trim()));
               }}
-              placeholder="Type a German word…"
+              placeholder={`Type a ${activeLanguage.name} word…`}
               className="border-line bg-panel rounded-xl border-2 px-3 py-2" />
             {searching && <span className="text-ink-3 font-mono text-xs" role="status">Searching…</span>}
             {matches.length > 0 && <div className="flex flex-wrap gap-2" aria-label="Saved word matches">

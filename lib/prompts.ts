@@ -12,6 +12,7 @@ import {
   lemmaRules as LEMMA_RULES,
   personaWording,
   promptLanguageName,
+  activeLanguage,
 } from '@/lib/languages';
 
 export const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
@@ -75,7 +76,7 @@ ${LEVEL_GUIDANCE[level]}`;
 export function buildWordLookupSystemPrompt(): string {
   return `A learner typed a word they want to add to their ${promptLanguageName} vocabulary. The input may be ${promptLanguageName}, possibly misspelled, or English. Return up to five ${promptLanguageName} dictionary entries, with the most likely intended entry first. If the input is nonsense, return an empty words list.
 
-For each entry return "lemma", "meaning", "example", and "exampleTranslation". The meaning is a short English dictionary meaning of 1-4 words, with "to ..." for verbs and no article for nouns. The example is one short, natural ${promptLanguageName} sentence at A2-B1 level using the lemma, and exampleTranslation is its English translation.
+For each entry return "lemma", "meaning", "example", and "exampleTranslation". The meaning is a short English dictionary meaning of 1-4 words, with "to ..." for verbs and ${activeLanguage.wordLookupNounMeaning}. The example is one short, natural ${promptLanguageName} sentence at A2-B1 level using the lemma, and exampleTranslation is its English translation.
 
 Apply these lemma rules to each entry. Where the rules mention "lemmaTranslation", use that guidance for "meaning":
 ${LEMMA_RULES}`;
@@ -91,12 +92,7 @@ Decide whether the message contains a genuine grammar mistake worth flagging.
 
 ${STRICTNESS_BY_LEVEL[level]}
 
-Do not flag spelling conventions by themselves. Treat missing ${promptLanguageName} noun or
-sentence capitalization as acceptable. Learners may lack an umlaut keyboard:
-accept a plain a/o/u in place of ä/ö/ü, and ss in place of ß, when the intended
-word is clear from context. These are not grammar mistakes, wrong prepositions,
-or English stand-ins. For example, "Was ist das buch uber" should not get a
-correction just for "buch" and "uber". Do not rewrite an understandable
+${activeLanguage.correctionOrthography} Do not rewrite an understandable
 message solely to make it more formal or idiomatic.
 
 IMPORTANT: You will see a fixed list of mistake categories below because you
@@ -109,20 +105,7 @@ label a mistake you already decided was worth flagging.
 If there IS a mistake, classify it into exactly one category. When several
 things are slightly off, pick the single most relevant one using this
 priority, and these disambiguation rules:
-- "case_declension" covers any wrong or missing case marking on an article,
-  adjective, noun, or pronoun -- INCLUDING when it's fused into a contracted
-  preposition (e.g. missing "zur" instead of "zu der", or "im" instead of
-  "in dem"). Use this whenever the core issue is the case ending itself.
-- "preposition" is ONLY for when the wrong preposition word was chosen
-  entirely (e.g. "für" used where "über" belongs after "sich freuen").
-  If the preposition word is correct and only its case-marking is off,
-  that's "case_declension", not "preposition".
-- "word_choice" is for a wrong word or false-friend translation where the
-  sentence's grammar is otherwise fine (e.g. translating "I am hot" as
-  "Ich bin heiß" instead of "Mir ist heiß"). Don't pick "word_order" or
-  another structural category just because the sentence also has an
-  unremarkable word placement -- if the central problem is vocabulary, it's
-  "word_choice".
+${activeLanguage.correctionCategoryRules}
 
 Also:
 - "correction" is the full corrected sentence, not just the fixed word or fragment.
@@ -130,8 +113,7 @@ Also:
 - "correctionTranslation" is a natural English translation of "correction"
   as a whole sentence (idiomatic, not word by word).
 - "correctionGloss" is a word-by-word English translation of EVERY word in
-  "correction", in order, including small function words (articles,
-  auxiliaries, pronouns) -- not just the content words. Each entry is
+  "correction", in order, including small function words ${activeLanguage.correctionGlossFunctionWords} -- not just the content words. Each entry is
   {word, lemma, lemmaTranslation, translation} where "word" is copied exactly
   as it appears in "correction" (same capitalization), WITHOUT any leading or
   trailing punctuation -- no sentence-final periods, commas, or question
@@ -148,14 +130,13 @@ the verb in its clause, then check for missing or wrong words and endings.
 A sentence can be understandable and still contain a mistake worth correcting.
 
 English words -- a separate question from hasMistake. Learners are told they
-may write English for words they don't know yet ("Ich habe einen dog").
+may write English for words they don't know yet ${activeLanguage.correctionEnglishExamples.standIn}.
 Learners often mix ${promptLanguageName} and English or write broken sentences. First work out
 what they meant to say; make "correction" express that meaning in natural ${promptLanguageName}
 at this level, keeping their own words where possible. A word valid in ${promptLanguageName}
-in context is ${promptLanguageName} even if it is also English (e.g. "was", "will", "also",
-"bald", "hat") -- not an English stand-in.
+in context is ${promptLanguageName} even if it is also English ${activeLanguage.correctionEnglishExamples.sharedWords} -- not an English stand-in.
 - "usedEnglish" is true when English words stand in for ${promptLanguageName} ones. Names,
-  brands, and loanwords ${promptLanguageName} really uses ("Handy", "Computer", "okay") don't
+  brands, and loanwords ${promptLanguageName} really uses ${activeLanguage.correctionEnglishExamples.loanwords} don't
   count.
 - An English stand-in is never a mistake and never "word_choice". Decide
   hasMistake exactly as above, as if each English word were the right ${promptLanguageName}
@@ -164,7 +145,7 @@ in context is ${promptLanguageName} even if it is also English (e.g. "was", "wil
   "correction" is still filled in -- the whole sentence in ${promptLanguageName}, with the
   English words replaced (plus the fix, if hasMistake) -- along with its
   correctionTranslation, correctionGloss, and an explanation naming the
-  ${promptLanguageName} word(s), with the article for nouns ("dog" is "der Hund").`;
+  ${promptLanguageName} word(s)${activeLanguage.correctionEnglishExamples.nounArticle}.`;
 }
 
 /** A different checklist for a second look at a clean verdict. */
@@ -174,15 +155,13 @@ export function buildCorrectionSecondLookPrompt(level: CefrLevel): string {
 Check the learner's message independently before returning a clean verdict.
 First look for English stand-ins, including a single English noun, adjective,
 or activity inside an otherwise ${promptLanguageName} sentence. Then read each ${promptLanguageName} clause
-for a clear verb, word-order, case, article, or word-choice error. Do not require
-the meaning to be unclear before flagging a clear error. Ignore capitalization,
-missing umlauts, and ss for ß here too; "uber" in a ${promptLanguageName} sentence can mean
-"über", not an English stand-in. If either check finds something, produce the
+${activeLanguage.secondLookErrorTypes}. Do not require
+the meaning to be unclear before flagging a clear error. ${activeLanguage.secondLookOrthography} If either check finds something, produce the
 full corrected ${promptLanguageName} sentence and all accompanying fields.`;
 }
 
 /** System prompt for the per-reply word-gloss pass (lib/gloss.ts). Glosses
- * whatever German text it's given -- the tutor's reply here, but the schema
+ * whatever target-language text it's given -- the tutor's reply here, but the schema
  * and prompt are shared with the correction pass's own gloss field, so the
  * two features behave identically to the learner. */
 export function buildGlossSystemPrompt(): string {
@@ -193,7 +172,7 @@ text, as a fluent translator would write it -- not word by word.
 
 Then break the text into individual words ("words"), in the order they
 appear, and give a short English translation for each one -- including small function words
-(articles, auxiliaries, pronouns, conjunctions), not just content words.
+${activeLanguage.glossFunctionWords}, not just content words.
 
 Rules:
 - "word" must be copied exactly as it appears in the source text (same
@@ -202,9 +181,7 @@ Rules:
   is punctuation that is part of the word's own spelling, like an apostrophe
   in a contraction.
 - Translate each word as it functions in THIS sentence, not just its most
-  common dictionary meaning -- e.g. a separable-prefix verb split across the
-  sentence should have its prefix glossed as part of the verb's meaning, not
-  translated as a standalone preposition.
+  common dictionary meaning -- ${activeLanguage.glossSplitVerbExample}
 - One entry per word, even when several words share a lemma (see below). Do
   not merge multi-word phrases into a single entry, and do not skip any word
   in the source text.
@@ -227,13 +204,11 @@ export function buildGrammarExplanationPrompt(
     kind === 'reply'
       ? `You'll get a ${promptLanguageName} message the learner just received in a conversation.
 Explain the 2-4 grammar points in it most worth noticing for a learner at
-this level: things like verb position, case after a preposition, a separable
-verb, a tense, an adjective ending. Skip anything trivial for this level.`
+this level: ${activeLanguage.explanationGrammarExamples} Skip anything trivial for this level.`
       : `You'll get what the learner wrote ("Learner wrote") and the corrected
 ${promptLanguageName} ("Correct"). Explain the grammar rule behind the change, so the
 learner can get it right next time -- the why, not just the what. If English
-words were replaced by ${promptLanguageName} ones, give each ${promptLanguageName} word (with its article
-for nouns) and, if useful, one short note on using it. Then give one more
+words were replaced by ${promptLanguageName} ones, give each ${promptLanguageName} word ${activeLanguage.explanationNounArticle} and, if useful, one short note on using it. Then give one more
 short example sentence that follows the same rule.`;
 
   return `You are a friendly ${promptLanguageName} teacher explaining grammar to a learner at CEFR ${level}.

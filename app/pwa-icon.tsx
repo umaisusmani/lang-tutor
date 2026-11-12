@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { activeLanguage } from '@/lib/languages';
 
 export function pwaIcon(size: number) {
   return new ImageResponse(
@@ -8,7 +9,7 @@ export function pwaIcon(size: number) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#f5c842',
+      background: activeLanguage.pwaIconColors.background,
       fontFamily: 'Arial, sans-serif',
     }}>
       <div style={{
@@ -17,11 +18,11 @@ export function pwaIcon(size: number) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        border: `${Math.round(size * 0.035)}px solid #2c1a0e`,
+        border: `${Math.round(size * 0.035)}px solid ${activeLanguage.pwaIconColors.ink}`,
         borderRadius: size * 0.2,
-        color: '#2c1a0e',
+        color: activeLanguage.pwaIconColors.ink,
         fontSize: size * 0.5,
-        WebkitTextStroke: `${Math.round(size * 0.04)}px #2c1a0e`,
+        WebkitTextStroke: `${Math.round(size * 0.04)}px ${activeLanguage.pwaIconColors.ink}`,
       }}>S</div>
     </div>,
     { width: size, height: size },

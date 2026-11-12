@@ -1,5 +1,7 @@
 'use client';
 
+import { activeLanguage, translatorDirections } from '@/lib/languages';
+
 import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/app/components/button';
@@ -73,7 +75,7 @@ export function ChatSidePanel({
   const [turns, setTurns] = useState<PanelTurn[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [translationDirection, setTranslationDirection] = useState<TranslationDirection>('en-de');
+  const [translationDirection, setTranslationDirection] = useState<TranslationDirection>(translatorDirections.englishToTarget);
   const [translationDraft, setTranslationDraft] = useState('');
   const [translationResult, setTranslationResult] = useState('');
   const [translationEntry, setTranslationEntry] = useState<WordGloss[number] | null>(null);
@@ -82,7 +84,7 @@ export function ChatSidePanel({
   const [translating, setTranslating] = useState(false);
   const translationRequestRef = useRef<AbortController | null>(null);
   const translationTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const germanSide = translationDirection === 'de-en' ? translationDraft.trim() : translationResult;
+  const targetSide = translationDirection === translatorDirections.targetToEnglish ? translationDraft.trim() : translationResult;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const blocked = quota.reason !== null || remaining === 0;
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -128,7 +130,7 @@ export function ChatSidePanel({
 
   function swapTranslationDirection() {
     cancelTranslation();
-    setTranslationDirection((current) => current === 'de-en' ? 'en-de' : 'de-en');
+    setTranslationDirection((current) => current === translatorDirections.targetToEnglish ? translatorDirections.englishToTarget : translatorDirections.targetToEnglish);
     setTranslationResult('');
     setTranslationEntry(null);
     setTranslationError('');
@@ -263,7 +265,7 @@ export function ChatSidePanel({
       <dialog
         ref={dialogRef}
         id="chat-side-panel"
-        aria-label="German learning tools"
+        aria-label={`${activeLanguage.name} learning tools`}
         onCancel={(event) => { event.preventDefault(); onClose(); }}
         onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
         className="border-line bg-paper text-ink fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-none border-0 p-0 sm:w-[min(90vw,480px)] sm:border-l-2 backdrop:bg-black/40"
@@ -326,14 +328,14 @@ export function ChatSidePanel({
                 <div className="my-auto flex flex-col gap-4">
                   <div>
                     <p className="font-display text-ink text-[22px] tracking-[0.04em]">
-                      Ask about German
+                      Ask about {activeLanguage.name}
                     </p>
                     <p className="text-ink-2 mt-1 text-sm leading-relaxed">
-                      Ask a question or paste a German sentence for a quick translation and grammar note.
+                      Ask a question or paste a {activeLanguage.name} sentence for a quick translation and grammar note.
                     </p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {['How do I say “See you tomorrow” in German?', 'What does “Guten Appetit” mean?', 'How do I greet a friend in German?'].map((example) => (
+                    {activeLanguage.askExamples.map((example) => (
                       <button
                         key={example}
                         type="button"
@@ -382,7 +384,7 @@ export function ChatSidePanel({
                 }}
                 maxLength={500}
                 rows={2}
-                aria-label="Ask a German question"
+                aria-label={`Ask a ${activeLanguage.name} question`}
                 placeholder="Ask or paste a sentence…"
                 className="border-hair bg-panel text-ink placeholder:text-ink-3 focus:border-line resize-none rounded-xl border-2 px-3 py-2.5 text-sm outline-none"
               />
@@ -415,7 +417,7 @@ export function ChatSidePanel({
 
               <div className="border-hair bg-panel flex items-center justify-between gap-2 rounded-xl border-2 p-2">
                 <span className="text-ink flex-1 text-center text-sm font-semibold">
-                  {translationDirection === 'de-en' ? 'German' : 'English'}
+                  {translationDirection === translatorDirections.targetToEnglish ? activeLanguage.name : 'English'}
                 </span>
                 <button
                   type="button"
@@ -426,7 +428,7 @@ export function ChatSidePanel({
                   ⇄
                 </button>
                 <span className="text-ink flex-1 text-center text-sm font-semibold">
-                  {translationDirection === 'de-en' ? 'English' : 'German'}
+                  {translationDirection === translatorDirections.targetToEnglish ? 'English' : activeLanguage.name}
                 </span>
               </div>
 
@@ -452,8 +454,8 @@ export function ChatSidePanel({
                   }}
                   maxLength={200}
                   rows={3}
-                  aria-label={`Text to translate from ${translationDirection === 'de-en' ? 'German' : 'English'}`}
-                  placeholder={translationDirection === 'de-en' ? 'Type German here…' : 'Type English here…'}
+                  aria-label={`Text to translate from ${translationDirection === translatorDirections.targetToEnglish ? activeLanguage.name : 'English'}`}
+                  placeholder={translationDirection === translatorDirections.targetToEnglish ? `Type ${activeLanguage.name} here…` : 'Type English here…'}
                   className="border-hair bg-panel text-ink placeholder:text-ink-3 focus:border-line w-full resize-none rounded-xl border-2 px-3 py-2.5 text-sm outline-none"
                 />
                 <div className="flex items-center justify-between gap-2">
@@ -480,12 +482,12 @@ export function ChatSidePanel({
 
               <div className="border-hair bg-panel min-h-28 rounded-xl border-2 p-4" aria-live="polite">
                 <p className="text-ink-3 font-mono text-[10px] uppercase tracking-wide">
-                  {translationDirection === 'de-en' ? 'English' : 'German'}
+                  {translationDirection === translatorDirections.targetToEnglish ? 'English' : activeLanguage.name}
                 </p>
-                {translationDirection === 'en-de' && translationResult && !translating ? (
+                {translationDirection === translatorDirections.englishToTarget && translationResult && !translating ? (
                   <TranslatableResult
-                    key={germanSide}
-                    text={germanSide}
+                    key={targetSide}
+                    text={targetSide}
                     initialUnits={translationEntry ? [translationEntry] : undefined}
                     canSave={canSave}
                     isSaved={isSaved}
@@ -499,10 +501,10 @@ export function ChatSidePanel({
                   <p className="text-ink-3 mt-2 text-sm">{translating ? 'Translating…' : 'Your translation appears here.'}</p>
                 )}
               </div>
-              {translationDirection === 'de-en' && translationResult && !translating && (
+              {translationDirection === translatorDirections.targetToEnglish && translationResult && !translating && (
                 <TranslationWords
-                  key={`${translationDirection}:${germanSide}`}
-                  germanText={germanSide}
+                  key={`${translationDirection}:${targetSide}`}
+                  germanText={targetSide}
                   initialUnits={translationEntry ? [translationEntry] : undefined}
                   canSave={canSave}
                   isSaved={isSaved}

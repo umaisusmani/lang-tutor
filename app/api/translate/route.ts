@@ -1,6 +1,7 @@
 import { getCurrentUserId } from '@/lib/services/profile.service';
 import { consumeTranslation } from '@/lib/services/translation.service';
 import type { WordGloss } from '@/lib/gloss';
+import { translatorDirections } from '@/lib/languages';
 import { lowercaseTargetText } from '@/lib/language-case';
 import { hasTranslatorEnv, parseTranslationInput, translateWithAzure, TranslatorError } from '@/lib/translator';
 
@@ -45,13 +46,13 @@ export async function POST(req: Request) {
     const { translation, dictionary } = await translateWithAzure(input.text, input.direction);
     let entry: WordGloss[number] | undefined;
     if (dictionary && dictionary.posTag !== 'NOUN') {
-      const german = input.direction === 'de-en' ? dictionary.source : dictionary.target;
-      const english = input.direction === 'de-en' ? dictionary.target : dictionary.source;
+      const target = input.direction === translatorDirections.targetToEnglish ? dictionary.source : dictionary.target;
+      const english = input.direction === translatorDirections.targetToEnglish ? dictionary.target : dictionary.source;
       const meaning = dictionary.posTag === 'VERB' && !/^to\s+/i.test(english)
         ? `to ${english}` : english;
       entry = {
-        word: lowercaseTargetText(german),
-        lemma: lowercaseTargetText(german),
+        word: lowercaseTargetText(target),
+        lemma: lowercaseTargetText(target),
         translation: meaning,
         lemmaTranslation: meaning,
       };

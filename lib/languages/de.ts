@@ -1,5 +1,6 @@
 import type { PersonaProfile } from '@/lib/personas';
 import type { LanguagePack } from '@/lib/languages/types';
+import type { Starter } from '@/lib/constants';
 
 /**
  * The mistake-type taxonomy. Single source of truth — referenced by the
@@ -228,10 +229,107 @@ that share a lemma share its lemmaTranslation.`;
 // Persona-specific conversation detail used after the generic character guidance.
 const PERSONA_WORDING = 'Walks by the Rhine are an occasional detail, not a default topic. If you mention one, it is along the riverside promenade.';
 
+const STARTERS: readonly Starter[] = [
+  // Everyday small talk
+  ['Wie war dein Wochenende?', 'How was your weekend?'],
+  ['Was hast du heute gemacht?', 'What did you do today?'],
+  ['Wie ist das Wetter bei dir?', "What's the weather like where you are?"],
+  ['Wann stehst du normalerweise auf?', 'When do you usually get up?'],
+  ['Ich bin heute ein bisschen müde.', "I'm a little tired today."],
+  ['Was hast du am Wochenende vor?', 'What are you doing this weekend?'],
+  ['Was ist deine liebste Jahreszeit und warum?', "What's your favorite season and why?"],
+
+  // About me
+  ['Ich lerne seit drei Monaten Deutsch.', "I've been learning German for three months."],
+  ['Ich wohne in einer kleinen Wohnung.', 'I live in a small apartment.'],
+  ['Hast du Geschwister?', 'Do you have siblings?'],
+  ['Was machst du beruflich?', 'What do you do for a living?'],
+  ['Erzähl mir etwas über deine Familie.', 'Tell me something about your family.'],
+  ['Ich lese gerade ein Buch auf Deutsch.', "I'm currently reading a book in German."],
+  ['Ich habe ein neues Hobby angefangen.', "I've started a new hobby."],
+
+  // Food, music, films
+  ['Was isst du am liebsten zum Frühstück?', 'What do you like to eat for breakfast most?'],
+  ['Ich koche gern. Hast du ein einfaches Rezept für mich?', 'I like cooking. Do you have a simple recipe for me?'],
+  ['Ich suche ein gutes Restaurant. Hast du einen Tipp?', "I'm looking for a good restaurant. Do you have a tip?"],
+  ['Welche Musik hörst du gern?', 'What music do you like listening to?'],
+  ['Was ist dein Lieblingsfilm?', "What's your favorite movie?"],
+  ['Hast du Lust, über Sport zu sprechen?', 'Do you feel like talking about sports?'],
+
+  // Travel and getting around
+  ['Ich möchte im Sommer nach Deutschland reisen.', "I'd like to travel to Germany in the summer."],
+  ['Kannst du mir eine Stadt in Deutschland empfehlen?', 'Can you recommend a city in Germany to me?'],
+  ['Wie komme ich am besten zum Bahnhof?', "What's the best way to get to the train station?"],
+  ['Ich habe gestern einen langen Spaziergang gemacht.', 'Yesterday I took a long walk.'],
+
+  // Language help
+  ['Kannst du mir bei der Grammatik helfen?', 'Can you help me with grammar?'],
+  ['Wie sagt man "I\'m looking forward to it" auf Deutsch?', 'How do you say "I\'m looking forward to it" in German?'],
+  ['Was ist der Unterschied zwischen wissen und kennen?', 'What\'s the difference between "wissen" and "kennen"?'],
+  ['Ich verstehe nicht, wann man der, die oder das benutzt.', "I don't understand when to use der, die or das."],
+
+  // A bit more ambitious
+  ['Was würdest du machen, wenn du viel Geld hättest?', 'What would you do if you had a lot of money?'],
+  ['Ich habe morgen ein Vorstellungsgespräch.', 'I have a job interview tomorrow.'],
+];
+
+const correctionOrthography = `Do not flag spelling conventions by themselves. Treat missing German noun or
+sentence capitalization as acceptable. Learners may lack an umlaut keyboard:
+accept a plain a/o/u in place of ä/ö/ü, and ss in place of ß, when the intended
+word is clear from context. These are not grammar mistakes, wrong prepositions,
+or English stand-ins. For example, "Was ist das buch uber" should not get a
+correction just for "buch" and "uber".`;
+
+const correctionCategoryRules = `- "case_declension" covers any wrong or missing case marking on an article,
+  adjective, noun, or pronoun -- INCLUDING when it's fused into a contracted
+  preposition (e.g. missing "zur" instead of "zu der", or "im" instead of
+  "in dem"). Use this whenever the core issue is the case ending itself.
+- "preposition" is ONLY for when the wrong preposition word was chosen
+  entirely (e.g. "für" used where "über" belongs after "sich freuen").
+  If the preposition word is correct and only its case-marking is off,
+  that's "case_declension", not "preposition".
+- "word_choice" is for a wrong word or false-friend translation where the
+  sentence's grammar is otherwise fine (e.g. translating "I am hot" as
+  "Ich bin heiß" instead of "Mir ist heiß"). Don't pick "word_order" or
+  another structural category just because the sentence also has an
+  unremarkable word placement -- if the central problem is vocabulary, it's
+  "word_choice".`;
+
 export const de: LanguagePack<typeof MISTAKE_TYPES> = {
   code: 'de',
   name: 'German',
   promptLanguageName: 'German',
+  appName: 'Starvogel',
+  appDescription: 'Practice German conversation with an AI tutor that explains your mistakes.',
+  themeColor: '#f7efe4',
+  backgroundColor: '#f7efe4',
+  pwaIconColors: { background: '#f5c842', ink: '#2c1a0e' },
+  displayFace: 'londrina-solid',
+  composerPlaceholder: 'Schreib auf Deutsch… English words are fine too',
+  chatWelcomeHeading: { beforeAccent: 'Sag einfach ', accent: 'etwas', afterAccent: '.' },
+  sendButtonLabel: 'Senden',
+  askExamples: ['How do I say “See you tomorrow” in German?', 'What does “Guten Appetit” mean?', 'How do I greet a friend in German?'],
+  starters: STARTERS,
+  correctionOrthography,
+  correctionCategoryRules,
+  correctionEnglishExamples: {
+    standIn: '("Ich habe einen dog")',
+    sharedWords: '(e.g. "was", "will", "also",\n"bald", "hat")',
+    loanwords: '("Handy", "Computer", "okay")',
+    nounArticle: ', with the article for nouns ("dog" is "der Hund")',
+  },
+  secondLookErrorTypes: 'for a clear verb, word-order, case, article, or word-choice error',
+  secondLookOrthography: 'Ignore capitalization,\nmissing umlauts, and ss for ß here too; "uber" in a German sentence can mean\n"über", not an English stand-in.',
+  correctionGlossFunctionWords: '(articles,\n  auxiliaries, pronouns)',
+  glossFunctionWords: '(articles, auxiliaries, pronouns, conjunctions)',
+  wordLookupNounMeaning: 'no article for nouns',
+  explanationNounArticle: '(with its article\nfor nouns)',
+  explanationGrammarExamples: 'things like verb position, case after a preposition, a separable\nverb, a tense, an adjective ending.',
+  glossSplitVerbExample: 'e.g. a separable-prefix verb split across the\n  sentence should have its prefix glossed as part of the verb\'s meaning, not\n  translated as a standalone preposition.',
+  lemmaPrefixes: ['der', 'die', 'das', 'sich'],
+  emphasizeSeparableParticle: true,
+  reportCapitalization: true,
+  maskStrategy: 'german-stem',
   localeTag: 'de',
   // \w is ASCII-only, so these letters must also count as word characters
   // when punctuation is stripped from the edges of a German word.

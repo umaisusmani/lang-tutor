@@ -8,6 +8,7 @@ import { listConversations } from '@/lib/services/conversation.service';
 import { getCurrentUser, resolveCefrLevel } from '@/lib/services/profile.service';
 import { getQuotaStatus } from '@/lib/services/session.service';
 import { listVocab } from '@/lib/services/vocab.service';
+import { hasStarterWords } from '@/lib/starter-vocab';
 
 export default async function VocabPage() {
   const user = await getCurrentUser();
@@ -47,7 +48,7 @@ export default async function VocabPage() {
       />
       <div className="flex w-full max-w-[860px] flex-1 flex-col">
         <main className="flex flex-1 flex-col gap-[22px] pt-6 pb-7">
-          <VocabBrowser entries={entries} dueCount={dueCount} dueWordIds={dueWordIds} userId={user.id} heading={heading} />
+          <VocabBrowser entries={entries} dueCount={dueCount} dueWordIds={dueWordIds} userId={user.id} heading={heading} hasStarterWords={hasStarterWords} />
         </main>
       </div>
     </div>

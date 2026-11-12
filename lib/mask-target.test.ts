@@ -15,3 +15,12 @@ test('masks a regular inflection using the stem', () => {
 test('short lemmas match only a whole word', () => {
   assert.equal(maskTarget('Ab sofort fahren wir ab. Aber später.', 'ab'), '____ sofort fahren wir ____. Aber später.');
 });
+
+test('suffixing masks exact short lemmas without matching longer words', () => {
+  assert.equal(maskTarget('ev evet', 'ev', 'suffixing'), '____ evet');
+});
+
+test('suffixing masks forms sharing a long stem', () => {
+  assert.equal(maskTarget('kitap kitaplar', 'kitap', 'suffixing'), '____ ____');
+  assert.equal(maskTarget('gitmek gitti', 'gitmek', 'suffixing'), '____ ____');
+});

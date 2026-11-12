@@ -1,5 +1,7 @@
 'use client';
 
+import { activeLanguage } from '@/lib/languages';
+
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -50,11 +52,13 @@ export function VocabBrowser({
   heading,
   dueWordIds,
   userId,
+  hasStarterWords = true,
 }: {
   entries: VocabEntry[];
   dueCount: number;
   dueWordIds: string[];
   userId: string;
+  hasStarterWords?: boolean;
   /** The page title block, rendered here so it can share a row with the
    * start button (the page itself is a Server Component and can't see
    * `starting`). */
@@ -151,7 +155,7 @@ export function VocabBrowser({
         </button>
       </div>
       <Modal open={addWordOpen} onClose={() => setAddWordOpen(false)} title="Add a word" size="lg">
-        {addWordOpen && <AddWord savedLemmas={savedLemmas} onAdded={() => { setAddWordOpen(false); router.refresh(); }} />}
+        {addWordOpen && <AddWord savedLemmas={savedLemmas} hasStarterWords={hasStarterWords} onAdded={() => { setAddWordOpen(false); router.refresh(); }} />}
       </Modal>
       {(summary || notice) && (
         <div ref={noticeRef} tabIndex={-1} role="status"
@@ -170,10 +174,10 @@ export function VocabBrowser({
       {entries.length === 0 ? (
         <div className="border-hair bg-panel flex flex-col items-start gap-3 rounded-2xl border-2 p-6">
           <h2 className="font-display text-2xl">Your vocabulary starts with one word</h2>
-          <p className="text-ink-2">In a chat, tap a German word and choose + to save it here, or add one yourself.</p>
+          <p className="text-ink-2">In a chat, tap a {activeLanguage.name} word and choose + to save it here, or add one yourself.</p>
           <div className="flex flex-wrap gap-3">
             <Button variant="primary" href="/?c=new">Start a chat →</Button>
-            <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void discover()}>{starting === 'discover' ? 'Loading…' : 'Discover words'}</Button>
+            {hasStarterWords && <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void discover()}>{starting === 'discover' ? 'Loading…' : 'Discover words'}</Button>}
           </div>
         </div>
       ) : (
@@ -187,7 +191,7 @@ export function VocabBrowser({
               <Button variant="primary" type="button" disabled={starting !== null} onClick={() => void start(dueCount > 0 ? 'due' : 'practice')}>
                 {starting === 'due' || starting === 'practice' ? 'Loading…' : dueCount > 0 ? `Review ${dueCount} due ${dueCount === 1 ? 'word' : 'words'}` : 'Practice'}
               </Button>
-              <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void discover()}>{starting === 'discover' ? 'Loading…' : 'Discover words'}</Button>
+              {hasStarterWords && <Button variant="secondary" type="button" disabled={starting !== null} onClick={() => void discover()}>{starting === 'discover' ? 'Loading…' : 'Discover words'}</Button>}
             </div>
           </div>
         </>

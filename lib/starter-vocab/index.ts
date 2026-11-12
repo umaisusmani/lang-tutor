@@ -5,13 +5,16 @@ import { activeLanguage } from '@/lib/languages';
 import a1 from './a1.json';
 import a2 from './a2.json';
 import b1 from './b1.json';
+import trA1 from './tr-a1.json';
+import trA2 from './tr-a2.json';
+import trB1 from './tr-b1.json';
 
 /**
  * Starter vocabulary: the Goethe-Institut word lists (A1-B1), parsed by
  * scripts/import-wordlist.ts. Offered in flashcard sessions as "new word"
  * cards the learner can add to their vocab.
  *
- * Each word has a German example and that example's English translation, but
+ * Each word has a target-language example and its English translation, but
  * no translation of the word itself -- that's fetched when a word is added
  * (see translate.ts), so only words the learner wants cost an LLM call.
  *
@@ -20,19 +23,26 @@ import b1 from './b1.json';
  */
 export type StarterWord = { lemma: string; example: string; exampleTranslation: string };
 
-const LISTS = { A1: a1, A2: a2, B1: b1 } as Record<string, StarterWord[]>;
+// Turkish lists stay server-side and empty until an authored word list exists.
+const LISTS_BY_LANGUAGE: Record<typeof activeLanguage.code, Record<string, StarterWord[]>> = {
+  de: { A1: a1, A2: a2, B1: b1 },
+  tr: { A1: trA1, A2: trA2, B1: trB1 },
+};
+const LISTS = LISTS_BY_LANGUAGE[activeLanguage.code];
 const ORDER = ['A1', 'A2', 'B1'] as const;
+export const hasStarterWords = ORDER.some((level) => LISTS[level].length > 0);
 
 const BY_LEMMA = new Map<string, StarterWord>(
   ORDER.flatMap((level) => LISTS[level]).map((w) => [lowercaseTargetText(w.lemma), w]),
 );
 
 function searchKey(value: string): string {
-  return lowercaseTargetText(value.trim().replace(/\s+/g, ' '))
-    .replace(/^(?:der|die|das)\s+(?=\S)/, '')
-    .replace(/^sich\s+(?=\S)/, '')
+  const withoutPrefix = activeLanguage.lemmaPrefixes.reduce((key, prefix) =>
+    key.startsWith(`${prefix} `) ? key.slice(prefix.length + 1) : key,
+    lowercaseTargetText(value.trim().replace(/\s+/g, ' ')));
+  return activeLanguage.foldPairs.reduce((key, [from, to]) => key.replaceAll(from, to), withoutPrefix
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/ß/g, 'ss');
+  );
 }
 
 const SEARCH_INDEX = [...BY_LEMMA.values()].map((word) => {
@@ -79,8 +89,9 @@ function fuzzyDistance(key: string, candidates: string[], max: number): number {
   return best;
 }
 
-/** Finds starter words by their German lemma, regardless of article or diacritics. */
+/** Finds starter words by their target-language lemma, regardless of prefixes or diacritics. */
 export function searchStarterWords(query: string, limit = 8): StarterWord[] {
+  if (!hasStarterWords) return [];
   const key = searchKey(query);
   if (!key || key.length > 50 || !Number.isFinite(limit) || limit <= 0) return [];
 
@@ -120,6 +131,7 @@ export function pickStarterWords(
   count: number,
   rng: () => number = Math.random,
 ): StarterWord[] {
+  if (!hasStarterWords) return [];
   const own = Math.min(ORDER.indexOf(level as (typeof ORDER)[number]), ORDER.length - 1);
   const ownIndex = own === -1 ? ORDER.length - 1 : own; // B2, C1 -> B1
   const free = (index: number) =>

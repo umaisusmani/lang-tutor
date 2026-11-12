@@ -1,11 +1,13 @@
 import { de } from '@/lib/languages/de';
+import { tr } from '@/lib/languages/tr';
 import type { LanguagePack } from '@/lib/languages/types';
 
-// Register the planned tr pack here when it is added.
-const packs: Record<string, LanguagePack<typeof de.mistakeTypes>> = { de };
+type PackMistakes = typeof de.mistakeTypes | typeof tr.mistakeTypes;
+type PackCode = typeof de.code | typeof tr.code;
+const packs: Record<PackCode, LanguagePack<PackMistakes, PackCode>> = { de, tr };
 
-export const activeLanguage: LanguagePack<typeof de.mistakeTypes> =
-  packs[process.env.NEXT_PUBLIC_APP_LANGUAGE ?? 'de'] ?? de;
+export const activeLanguage: LanguagePack<PackMistakes, PackCode> =
+  packs[(process.env.NEXT_PUBLIC_APP_LANGUAGE ?? 'de') as PackCode] ?? de;
 
 export const {
   code, name, promptLanguageName, mistakeTypes, stopwords, fallbackPersona,

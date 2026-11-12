@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, DM_Mono, Londrina_Solid } from "next/font/google";
+import { Baloo_2, Bricolage_Grotesque, DM_Mono, Londrina_Solid } from "next/font/google";
+import type { CSSProperties } from "react";
 import "./globals.css";
 import { ConfirmProvider } from "@/app/components/confirm-modal";
 import { AppToaster } from "@/app/components/toaster";
+import { activeLanguage } from "@/lib/languages";
 
 // The type split is semantic, not decorative: Bricolage Grotesque carries UI
-// and German, DM Mono marks English glosses, labels and metadata -- "this is
+// and the target language, DM Mono marks English glosses, labels and metadata -- "this is
 // scaffolding or translation" -- and Londrina Solid is the display voice for
 // the wordmark, headings and primary buttons.
 const bricolage = Bricolage_Grotesque({
@@ -30,17 +32,28 @@ const londrina = Londrina_Solid({
   weight: ["400", "900"],
 });
 
+const baloo = Baloo_2({
+  variable: "--font-baloo",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "800"],
+  preload: false,
+});
+
+const displayFont = activeLanguage.displayFace === 'baloo-2' ? baloo : londrina;
+
 export const metadata: Metadata = {
-  title: "Starvogel",
-  description: "Practice German conversation with an AI tutor that explains your mistakes.",
-  appleWebApp: { capable: true, title: "Starvogel", statusBarStyle: "default" },
+  title: activeLanguage.appName,
+  description: activeLanguage.appDescription,
+  appleWebApp: { capable: true, title: activeLanguage.appName, statusBarStyle: "default" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${bricolage.variable} ${dmMono.variable} ${londrina.variable} h-full antialiased`}
+      data-lang={activeLanguage.code}
+      className={`${bricolage.variable} ${dmMono.variable} ${displayFont.variable} h-full antialiased`}
+      style={{ '--font-active-display': `var(${activeLanguage.displayFace === 'baloo-2' ? '--font-baloo' : '--font-londrina'})` } as CSSProperties}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

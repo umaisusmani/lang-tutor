@@ -27,7 +27,7 @@ export function replySettings(
       : buildConversationSystemPrompt(level, persona),
     providerOptions: {
       // Groq defaults to raw reasoning, which can put the model's planning
-      // into the same text stream as the German reply.
+      // into the same text stream as the target-language reply.
       groq: { reasoningEffort: 'low' as const, reasoningFormat: 'hidden' as const },
     },
   };

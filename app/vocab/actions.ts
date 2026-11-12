@@ -135,7 +135,7 @@ export async function searchSavedWordsAction(query: string): Promise<{ id: strin
  * back, and the schedule the grade buttons preview their intervals from. */
 export type SessionCard = {
   id: string;
-  /** forward: German -> meaning. reverse: meaning -> German. */
+  /** forward: target-language word -> meaning. reverse: meaning -> target-language word. */
   direction: CardDirection;
   lemma: string;
   translation: string | null;

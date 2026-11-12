@@ -2,7 +2,7 @@ import type { Correction } from '@/lib/tutor';
 
 /**
  * Whether a correction has a card to show: a real mistake, or English words
- * to put into German. Both need the corrected sentence -- a verdict without
+ * to put into target-language. Both need the corrected sentence -- a verdict without
  * one is omitted after a second look (see chat.service.ts), not shown as a card.
  *
  * Its own module, not lib/tutor.ts, because app/chat.tsx needs it too and

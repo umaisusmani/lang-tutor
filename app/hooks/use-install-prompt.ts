@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { activeLanguage } from '@/lib/languages';
 import { useConfirm } from '@/app/components/confirm-modal';
 
 type InstallEvent = Event & {
@@ -73,7 +74,7 @@ export function useInstallPrompt() {
     }
     if (mode === 'ios') {
       await confirm({
-        title: 'Install Starvogel',
+        title: `Install ${activeLanguage.appName}`,
         description: 'Tap the Share button, then "Add to Home Screen".',
         confirmLabel: 'Got it',
         cancelLabel: 'Close',

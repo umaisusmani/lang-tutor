@@ -1,4 +1,5 @@
 import type { WordGloss } from '@/lib/gloss';
+import { lowercaseTargetText } from '@/lib/language-case';
 
 /** Turns word glosses that share a dictionary lemma into one saveable unit. */
 export function groupGlossIntoUnits(words: WordGloss): WordGloss {
@@ -6,7 +7,7 @@ export function groupGlossIntoUnits(words: WordGloss): WordGloss {
 
   for (const entry of words) {
     if (!entry.lemma.trim() || !entry.lemmaTranslation.trim()) continue;
-    const key = entry.lemma.trim().replace(/\s+/g, ' ').toLowerCase();
+    const key = lowercaseTargetText(entry.lemma.trim().replace(/\s+/g, ' '));
     let group = groups.get(key);
     if (!group) {
       group = {

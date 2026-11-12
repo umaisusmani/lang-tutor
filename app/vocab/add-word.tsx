@@ -5,10 +5,11 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } f
 import { Button } from '@/app/components/button';
 import { addLookedUpWordAction, addStarterWordAction, lookupWordsAction,
   previewStarterWordAction, searchStarterWordsAction, type DiscoverCard, type LookedUpWord } from '@/app/vocab/actions';
+import { lowercaseTargetText } from '@/lib/language-case';
 
 type Option = { kind: 'starter'; word: DiscoverCard } | { kind: 'lookup'; word: LookedUpWord } | { kind: 'more' };
 type Selected = Extract<Option, { kind: 'starter' | 'lookup' }>;
-const lookupKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+const lookupKey = (value: string) => lowercaseTargetText(value.trim().replace(/\s+/g, ' '));
 
 export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<string>; onAdded: () => void }) {
   const inputId = useId();
@@ -44,7 +45,7 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const isSaved = (lemma: string) => savedLemmas.has(lemma.toLowerCase()) || addedLemmas.has(lemma.toLowerCase());
+  const isSaved = (lemma: string) => savedLemmas.has(lowercaseTargetText(lemma)) || addedLemmas.has(lowercaseTargetText(lemma));
   const options: Option[] = [
     ...results.map((word): Option => ({ kind: 'starter', word })),
     ...(query.trim().length >= 3 && searchedQuery === query && !lookupDone ? [{ kind: 'more' } as Option] : []),
@@ -206,7 +207,7 @@ export function AddWord({ savedLemmas, onAdded }: { savedLemmas: ReadonlySet<str
         ? await addStarterWordAction(current.word.lemma, meaning.trim())
         : await addLookedUpWordAction({ ...current.word, meaning: meaning.trim() });
       if (!result.ok) throw new Error('Save failed');
-      setAddedLemmas((previous) => new Set([...previous, current.word.lemma.toLowerCase()]));
+      setAddedLemmas((previous) => new Set([...previous, lowercaseTargetText(current.word.lemma)]));
       focusSearchRef.current = true;
       changeQuery('');
       setAddedMessage(`✓ ${current.word.lemma} added`);

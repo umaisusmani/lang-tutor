@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pill } from '@/app/components/pill';
 import { WordPopover } from '@/app/components/word-popover';
 import type { WordGloss } from '@/lib/gloss';
+import { lowercaseTargetText } from '@/lib/language-case';
 import { stripPunctuation } from '@/lib/text';
 import type { VocabSource } from '@/lib/types/db';
 
@@ -22,12 +23,12 @@ function mapTokensToUnits(tokens: string[], units: WordGloss): Array<WordGloss[n
   const assigned: Array<WordGloss[number] | null> = tokens.map(() => null);
   let cursor = 0;
   for (const unit of units) {
-    const unitTokens = unit.word.split(/\s+/).filter(Boolean).map((word) => stripPunctuation(word).toLowerCase());
+    const unitTokens = unit.word.split(/\s+/).filter(Boolean).map((word) => lowercaseTargetText(stripPunctuation(word)));
     if (unitTokens.length === 0) continue;
     for (let start = cursor; start <= tokens.length - unitTokens.length; start++) {
       let matches = true;
       for (let k = 0; k < unitTokens.length; k++) {
-        if (stripPunctuation(tokens[start + k]).toLowerCase() !== unitTokens[k]) {
+        if (lowercaseTargetText(stripPunctuation(tokens[start + k])) !== unitTokens[k]) {
           matches = false;
           break;
         }
@@ -207,7 +208,7 @@ function Result({ text, initialUnits, canSave, isSaved, onSaveWord, onRemaining,
                 <span className="font-semibold">{selectedUnit.word}</span>
                 <span className="text-ink-2 font-mono text-[11px]">{selectedUnit.lemmaTranslation}</span>
               </span>
-              {selectedUnit.lemma && selectedUnit.lemma.toLowerCase() !== selectedUnit.word.toLowerCase() && (
+              {selectedUnit.lemma && lowercaseTargetText(selectedUnit.lemma) !== lowercaseTargetText(selectedUnit.word) && (
                 <span className="text-ink-3 font-mono text-[10.5px]">
                   dictionary form: <span className="text-ink font-semibold">{selectedUnit.lemma}</span>
                 </span>

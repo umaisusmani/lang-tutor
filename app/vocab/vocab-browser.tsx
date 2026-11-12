@@ -10,6 +10,7 @@ import { discoverWordsAction, startSessionAction, type DiscoverCard, type Sessio
 import { FlashcardSession } from '@/app/vocab/flashcard-session';
 import { DiscoverWords } from '@/app/vocab/discover-words';
 import { AddWord } from '@/app/vocab/add-word';
+import { lowercaseTargetText } from '@/lib/language-case';
 import type { ReviewSummary } from '@/lib/review-session';
 import { VocabGrid } from '@/app/vocab/vocab-grid';
 import type { VocabEntry } from '@/lib/types/db';
@@ -68,7 +69,7 @@ export function VocabBrowser({
   const [summaryMode, setSummaryMode] = useState<'due' | 'practice'>('due');
   const [notice, setNotice] = useState('');
   const [addWordOpen, setAddWordOpen] = useState(false);
-  const savedLemmas = useMemo(() => new Set(entries.map((entry) => entry.lemma.toLowerCase())), [entries]);
+  const savedLemmas = useMemo(() => new Set(entries.map((entry) => lowercaseTargetText(entry.lemma))), [entries]);
   const noticeRef = useRef<HTMLDivElement>(null);
   const startingRef = useRef(false);
   const skipWord = (lemma: string) => rememberSkipped(userId, lemma);

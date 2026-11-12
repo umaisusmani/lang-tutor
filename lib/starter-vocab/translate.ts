@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { logUsage, type UsageContext } from '@/lib/services/usage.service';
 import type { StarterWord } from '@/lib/starter-vocab';
+import { lowercaseTargetText } from '@/lib/language-case';
 
 const MODEL = 'openai/gpt-oss-120b';
 
@@ -55,10 +56,10 @@ export async function translateStarterWords(
   });
 
   await logUsage('gloss', MODEL, usage, usageContext);
-  const requested = new Map(words.map((word) => [word.lemma.toLowerCase(), word.lemma]));
+  const requested = new Map(words.map((word) => [lowercaseTargetText(word.lemma), word.lemma]));
   const translations: Record<string, string> = {};
   for (const item of object.translations) {
-    const lemma = requested.get(item.lemma.trim().toLowerCase());
+    const lemma = requested.get(lowercaseTargetText(item.lemma.trim()));
     const translation = item.translation.trim().slice(0, 80);
     if (lemma && translation) translations[lemma] = translation;
   }

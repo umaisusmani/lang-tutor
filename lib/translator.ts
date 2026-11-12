@@ -1,7 +1,11 @@
-export type TranslationDirection = 'de-en' | 'en-de';
+import { translatorDirections } from '@/lib/languages';
+
+export type TranslationDirection =
+  | typeof translatorDirections.targetToEnglish
+  | typeof translatorDirections.englishToTarget;
 
 export function isTranslationDirection(value: unknown): value is TranslationDirection {
-  return value === 'de-en' || value === 'en-de';
+  return value === translatorDirections.targetToEnglish || value === translatorDirections.englishToTarget;
 }
 
 export function parseTranslationInput(value: unknown): { text: string; direction: TranslationDirection } | null {
@@ -45,7 +49,9 @@ export async function translateWithAzure(
   const region = process.env.AZURE_TRANSLATOR_REGION;
   if (!key || !region) throw new TranslatorError('unavailable');
 
-  const [from, to] = direction.split('-');
+  const [from, to] = direction === translatorDirections.targetToEnglish
+    ? [translatorDirections.azureLanguageCode, 'en']
+    : ['en', translatorDirections.azureLanguageCode];
   const headers = {
     'Ocp-Apim-Subscription-Key': key,
     'Ocp-Apim-Subscription-Region': region,

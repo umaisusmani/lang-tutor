@@ -1,3 +1,4 @@
+import { lowercaseTargetText } from '@/lib/language-case';
 import { isStopword } from '@/lib/stopwords';
 import { createClient } from '@/lib/supabase/server';
 import type { VocabEntry, VocabSource } from '@/lib/types/db';
@@ -81,7 +82,7 @@ export async function getSavedLemmas(userId: string, lemmas: string[]): Promise<
           console.error('[vocab.service] getSavedLemmas batch failed:', error.message);
           return [];
         }
-        return (data ?? []).map((r) => r.lemma.toLowerCase());
+        return (data ?? []).map((r) => lowercaseTargetText(r.lemma));
       }),
     );
 
@@ -118,7 +119,7 @@ export async function getVocabCandidates(
     // than saving an inflected form as if it were a dictionary entry) rather
     // than crashing the whole page render.
     if (!lemma || isStopword(lemma)) return false;
-    const key = lemma.toLowerCase();
+    const key = lowercaseTargetText(lemma);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

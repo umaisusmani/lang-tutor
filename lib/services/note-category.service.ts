@@ -1,3 +1,4 @@
+import { lowercaseTargetText } from '@/lib/language-case';
 import { createClient } from '@/lib/supabase/server';
 import type { NoteCategory } from '@/lib/types/db';
 
@@ -31,7 +32,7 @@ export async function createNoteCategory(userId: string, name: string): Promise<
     if (!error) return data as NoteCategory;
     if (error.code === '23505') {
       return (await listNoteCategories(userId)).find((category) =>
-        category.name.toLowerCase() === clean.toLowerCase()) ?? null;
+        lowercaseTargetText(category.name) === lowercaseTargetText(clean)) ?? null;
     }
     console.error('[note-category.service] createNoteCategory failed:', error.message);
   } catch (error) {

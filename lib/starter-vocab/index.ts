@@ -1,4 +1,6 @@
 import { type CefrLevel } from '@/lib/prompts';
+import { lowercaseTargetText } from '@/lib/language-case';
+import { activeLanguage } from '@/lib/languages';
 
 import a1 from './a1.json';
 import a2 from './a2.json';
@@ -22,11 +24,11 @@ const LISTS = { A1: a1, A2: a2, B1: b1 } as Record<string, StarterWord[]>;
 const ORDER = ['A1', 'A2', 'B1'] as const;
 
 const BY_LEMMA = new Map<string, StarterWord>(
-  ORDER.flatMap((level) => LISTS[level]).map((w) => [w.lemma.toLowerCase(), w]),
+  ORDER.flatMap((level) => LISTS[level]).map((w) => [lowercaseTargetText(w.lemma), w]),
 );
 
 function searchKey(value: string): string {
-  return value.trim().replace(/\s+/g, ' ').toLowerCase()
+  return lowercaseTargetText(value.trim().replace(/\s+/g, ' '))
     .replace(/^(?:der|die|das)\s+(?=\S)/, '')
     .replace(/^sich\s+(?=\S)/, '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -97,14 +99,14 @@ export function searchStarterWords(query: string, limit = 8): StarterWord[] {
   ranked.sort((a, b) => a.rank - b.rank
     || a.distance - b.distance
     || a.word.lemma.length - b.word.lemma.length
-    || a.word.lemma.localeCompare(b.word.lemma, 'de'));
+    || a.word.lemma.localeCompare(b.word.lemma, activeLanguage.localeTag));
   return ranked.slice(0, limit).map(({ word }) => word);
 }
 
 /** Looks a word up by lemma; the server uses this so it never trusts a
  * client-sent example or translation. */
 export function findStarterWord(lemma: string): StarterWord | null {
-  return BY_LEMMA.get(lemma.trim().toLowerCase()) ?? null;
+  return BY_LEMMA.get(lowercaseTargetText(lemma.trim())) ?? null;
 }
 
 /**
@@ -122,7 +124,7 @@ export function pickStarterWords(
   const ownIndex = own === -1 ? ORDER.length - 1 : own; // B2, C1 -> B1
   const free = (index: number) =>
     shuffle(
-      (LISTS[ORDER[index]] ?? []).filter((w) => !savedLemmas.has(w.lemma.toLowerCase())),
+      (LISTS[ORDER[index]] ?? []).filter((w) => !savedLemmas.has(lowercaseTargetText(w.lemma))),
       rng,
     );
 

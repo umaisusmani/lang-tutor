@@ -8,6 +8,7 @@ import { Pill } from '@/app/components/pill';
 import { Select } from '@/app/components/select';
 import { EditWord } from '@/app/vocab/edit-word';
 import { RemoveWordButton } from '@/app/vocab/remove-word-button';
+import { activeLanguage } from '@/lib/languages';
 import type { VocabEntry } from '@/lib/types/db';
 
 /**
@@ -37,7 +38,7 @@ export function VocabGrid({ entries, dueWordIds }: { entries: VocabEntry[]; dueW
       || (filter === 'missing' && !entry.translation?.trim())
       || (filter === 'mistakes' && entry.source === 'mistake'))
   )).sort((a, b) => sort === 'az'
-    ? a.lemma.localeCompare(b.lemma, 'de')
+    ? a.lemma.localeCompare(b.lemma, activeLanguage.localeTag)
     : sort === 'oldest' ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at));
 
   function toggleCard(id: string) {

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 
+import { lowercaseTargetText } from '@/lib/language-case';
 import { getPracticeQueue, getReviewQueue, recordReview, undoReview, type RecordReviewResult, type UndoReviewResult } from '@/lib/services/card.service';
 import { getCurrentUserId, resolveCefrLevel } from '@/lib/services/profile.service';
 import { deleteGrammarNote, saveGrammarNote, updateGrammarNote } from '@/lib/services/grammar-note.service';
@@ -218,9 +219,9 @@ const DISCOVER_PER_SESSION = 10;
 async function pickUnseenWords(userId: string, skippedLemmas: string[], count: number): Promise<DiscoverCard[]> {
   if (!count) return [];
   const level = await resolveCefrLevel(userId, (await cookies()).get('cefr_level')?.value);
-  const saved = new Set((await listVocab(userId)).map((e) => e.lemma.toLowerCase()));
+  const saved = new Set((await listVocab(userId)).map((e) => lowercaseTargetText(e.lemma)));
   for (const lemma of skippedLemmas.slice(0, 1000)) {
-    if (typeof lemma === 'string') saved.add(lemma.toLowerCase());
+    if (typeof lemma === 'string') saved.add(lowercaseTargetText(lemma));
   }
   return pickStarterWords(level, saved, count);
 }

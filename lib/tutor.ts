@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { WordGlossSchema } from '@/lib/gloss';
 import { hasCorrectionCard } from '@/lib/correction-card';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
+import { lowercaseTargetText } from '@/lib/language-case';
 import {
   buildCorrectionSecondLookPrompt,
   buildCorrectionSystemPrompt,
@@ -46,8 +47,7 @@ export function suppressOrthographicOnlyCorrection(
   if (!result.correction || (!result.hasMistake && !result.usedEnglish)) return result;
 
   const words = (text: string) =>
-    text
-      .toLowerCase()
+    lowercaseTargetText(text)
       .normalize('NFD')
       .replace(/\p{M}/gu, '')
       .replace(/ß/g, 'ss')

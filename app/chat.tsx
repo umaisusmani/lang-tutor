@@ -24,6 +24,7 @@ import { createNoteCategoryAction, listNoteCategoriesAction, saveGrammarNoteActi
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
 import type { WordGloss } from '@/lib/gloss';
+import { lowercaseTargetText } from '@/lib/language-case';
 import type { PersonaProfile } from '@/lib/personas';
 import type { CefrLevel } from '@/lib/prompts';
 import { sentenceContaining } from '@/lib/text';
@@ -134,10 +135,10 @@ export default function Chat({
    * only as steady as the model's, and a ✓ that depends on that flickers.
    */
   const savedLemmas = useMemo(() => {
-    const set = new Set(initialSavedLemmas.map((l) => l.toLowerCase()));
+    const set = new Set(initialSavedLemmas.map((l) => lowercaseTargetText(l)));
     for (const m of messages) {
       for (const p of m.parts) {
-        if (p.type === 'data-savedLemmas') for (const l of p.data) set.add(l.toLowerCase());
+        if (p.type === 'data-savedLemmas') for (const l of p.data) set.add(lowercaseTargetText(l));
       }
     }
     for (const l of locallySaved) set.add(l);
@@ -154,7 +155,7 @@ export default function Chat({
   // Anonymous visitors have no vocab_entries to save into, so their gloss
   // panels stay exactly as they were: words and translations, no buttons.
   const canSave = userEmail !== null;
-  const isSaved = (lemma: string) => savedLemmas.has(lemma.toLowerCase());
+  const isSaved = (lemma: string) => savedLemmas.has(lowercaseTargetText(lemma));
 
   function handleLevelChange(next: CefrLevel) {
     setLevel(next);
@@ -178,7 +179,7 @@ export default function Chat({
    * lemmas already in the Set keeps a double-click off that queue entirely.
    */
   async function saveWord(entry: WordGloss[number], source: VocabSource, sourceText: string) {
-    const key = entry.lemma.toLowerCase();
+    const key = lowercaseTargetText(entry.lemma);
     if (!userEmail || !entry.lemma || savedLemmas.has(key)) return;
 
     setLocallySaved((prev) => new Set(prev).add(key));

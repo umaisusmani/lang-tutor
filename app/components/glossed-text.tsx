@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Pill } from '@/app/components/pill';
 import { WordPopover } from '@/app/components/word-popover';
 import type { WordGloss } from '@/lib/gloss';
+import { lowercaseTargetText } from '@/lib/language-case';
 import { stripPunctuation } from '@/lib/text';
 
 type GlossEntry = WordGloss[number];
@@ -40,7 +41,7 @@ function WordMenu({
   popoverRef: RefObject<HTMLDivElement | null>;
 }) {
   const word = stripPunctuation(entry.word);
-  const showLemma = !!entry.lemma && entry.lemma.toLowerCase() !== word.toLowerCase();
+  const showLemma = !!entry.lemma && lowercaseTargetText(entry.lemma) !== lowercaseTargetText(word);
 
   return (
     <WordPopover
@@ -139,7 +140,7 @@ export function GlossedText({
   }, [openIndex]);
 
   const byExact = new Map((words ?? []).map((g) => [stripPunctuation(g.word), g]));
-  const byLower = new Map((words ?? []).map((g) => [stripPunctuation(g.word).toLowerCase(), g]));
+  const byLower = new Map((words ?? []).map((g) => [lowercaseTargetText(stripPunctuation(g.word)), g]));
 
   const tokens = text.split(/\s+/).filter(Boolean);
 
@@ -147,7 +148,7 @@ export function GlossedText({
     <div ref={rootRef} className={`flex flex-wrap gap-x-[0.3em] ${className ?? ''}`}>
       {tokens.map((token, i) => {
         const key = stripPunctuation(token);
-        const entry = byExact.get(key) ?? byLower.get(key.toLowerCase());
+        const entry = byExact.get(key) ?? byLower.get(lowercaseTargetText(key));
         const body = highlight?.has(i) ? (
           <span className="bg-orange text-on-bright rounded-[4px] px-1 font-bold">{token}</span>
         ) : (

@@ -1,4 +1,6 @@
 import type { VocabEntry } from '@/lib/types/db';
+import { activeLanguage } from '@/lib/languages';
+import { lowercaseTargetText } from '@/lib/language-case';
 
 /**
  * Turning a saved word into something to answer, and checking the answer.
@@ -88,13 +90,13 @@ function findWord(sentence: string, term: string): { start: number; end: number 
  */
 function emphasizeParticle(rest: string, lemma: string, answer: string): ClozeSegment[] {
   if (!rest) return [];
-  const verb = bareLemma(lemma).toLowerCase();
+  const verb = lowercaseTargetText(bareLemma(lemma));
   const tokens = rest.split(/(\s+)/);
   let particleAt = -1;
 
-  if (!verb.startsWith(answer.toLowerCase())) {
+  if (!verb.startsWith(lowercaseTargetText(answer))) {
     tokens.forEach((token, i) => {
-      const core = token.replace(/[^\p{L}]/gu, '').toLowerCase();
+      const core = lowercaseTargetText(token.replace(/[^\p{L}]/gu, ''));
       if (core.length >= 2 && core.length < verb.length && verb.startsWith(core)) particleAt = i;
     });
   }
@@ -141,7 +143,7 @@ export function checkAnswer(given: string, expected: string): AnswerCheck {
   const e = tidy(expected);
   if (!g || fold(g) !== fold(e)) return { correct: false };
 
-  const capitalOf = (s: string) => s[0] !== s[0].toLowerCase();
+  const capitalOf = (s: string) => s[0] !== lowercaseTargetText(s[0]);
   return capitalOf(g) === capitalOf(e) ? { correct: true } : { correct: true, capitalization: true };
 }
 
@@ -157,10 +159,8 @@ function tidy(s: string): string {
 
 /** Case- and umlaut-insensitive comparison key. */
 function fold(s: string): string {
-  return tidy(s)
-    .toLowerCase()
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/ß/g, 'ss');
+  return activeLanguage.foldPairs.reduce(
+    (key, [from, to]) => key.replaceAll(from, to),
+    lowercaseTargetText(tidy(s)),
+  );
 }

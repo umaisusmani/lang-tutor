@@ -1,6 +1,7 @@
 import { getCurrentUserId } from '@/lib/services/profile.service';
 import { consumeTranslation } from '@/lib/services/translation.service';
 import type { WordGloss } from '@/lib/gloss';
+import { lowercaseTargetText } from '@/lib/language-case';
 import { hasTranslatorEnv, parseTranslationInput, translateWithAzure, TranslatorError } from '@/lib/translator';
 
 export async function POST(req: Request) {
@@ -49,8 +50,8 @@ export async function POST(req: Request) {
       const meaning = dictionary.posTag === 'VERB' && !/^to\s+/i.test(english)
         ? `to ${english}` : english;
       entry = {
-        word: german.toLowerCase(),
-        lemma: german.toLowerCase(),
+        word: lowercaseTargetText(german),
+        lemma: lowercaseTargetText(german),
         translation: meaning,
         lemmaTranslation: meaning,
       };

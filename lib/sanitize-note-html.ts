@@ -22,6 +22,7 @@ export function sanitizeTree(nodes: TreeNode[]): TreeNode[] {
       afterBlock = false;
       continue;
     }
+    // HTML tag names are locale-invariant; Turkish casing would break the allow-list.
     const tag = node.tag.toLowerCase();
     if (tag === 'br') {
       output.push({ tag: 'br', children: [] });
@@ -58,6 +59,7 @@ function parse(html: string): TreeNode[] {
     if (node.nodeType === Node.TEXT_NODE) return { text: node.textContent ?? '' };
     if (node.nodeType !== Node.ELEMENT_NODE) return null;
     const element = node as Element;
+    // HTML tag names are locale-invariant; Turkish casing would break the allow-list.
     return { tag: element.tagName.toLowerCase(), children: [...element.childNodes].map(walk).filter((child): child is TreeNode => child !== null) };
   };
   return [...document.body.childNodes].map(walk).filter((child): child is TreeNode => child !== null);

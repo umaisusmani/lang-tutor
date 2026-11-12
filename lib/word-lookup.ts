@@ -3,6 +3,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import { buildWordLookupSystemPrompt } from '@/lib/prompts';
+import { lowercaseTargetText } from '@/lib/language-case';
 import { logUsage, type UsageContext } from '@/lib/services/usage.service';
 
 const MODEL = 'openai/gpt-oss-120b';
@@ -33,7 +34,7 @@ export function normalizeLookedUpWords(words: LookedUpWord[]): LookedUpWord[] {
       example: word.example.trim().slice(0, 200),
       exampleTranslation: word.exampleTranslation.trim().slice(0, 200),
     };
-    const key = entry.lemma.toLowerCase();
+    const key = lowercaseTargetText(entry.lemma);
     if (!key || !entry.meaning || seen.has(key)) continue;
     seen.add(key);
     normalized.push(entry);

@@ -14,6 +14,7 @@ import { TranslateButton, TranslationPanel } from '@/app/components/translation-
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
 import { hasCorrectionCard } from '@/lib/correction-card';
+import { lowercaseTargetText } from '@/lib/language-case';
 import { noteHtmlToPlainText, noteTextToHtml } from '@/lib/sanitize-note-html';
 import type { NoteCategory } from '@/lib/types/db';
 import type { ExplainKind } from '@/lib/explain';
@@ -451,11 +452,11 @@ function CorrectionCard({
             <div className="mt-2 flex flex-col gap-2">
               <RichEditor label="Grammar note" value={noteDraft} onChange={setNoteDraft} />
               <select aria-label="Category (optional)" value={noteCategories.find((category) =>
-                category.name.toLowerCase() === categoryDraft.toLowerCase())?.name ?? categoryDraft}
+                lowercaseTargetText(category.name) === lowercaseTargetText(categoryDraft))?.name ?? categoryDraft}
                 onChange={(event) => setCategoryDraft(event.target.value)}
                 className="border-hair bg-panel text-ink focus:border-line w-full rounded-xl border-2 px-3 py-2 text-sm outline-none">
                 <option value="">No category</option>
-                {categoryDraft && !noteCategories.some((category) => category.name.toLowerCase() === categoryDraft.toLowerCase()) &&
+                {categoryDraft && !noteCategories.some((category) => lowercaseTargetText(category.name) === lowercaseTargetText(categoryDraft)) &&
                   <option value={categoryDraft}>{categoryDraft}</option>}
                 {noteCategories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
               </select>

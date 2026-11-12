@@ -11,6 +11,7 @@ import { useQuota } from '@/app/hooks/use-quota';
 import { useTheme } from '@/app/hooks/use-theme';
 import { saveVocabAction } from '@/app/vocab/actions';
 import type { WordGloss } from '@/lib/gloss';
+import { lowercaseTargetText } from '@/lib/language-case';
 import type { CefrLevel } from '@/lib/prompts';
 import type { QuotaStatus } from '@/lib/quota';
 import { sentenceContaining } from '@/lib/text';
@@ -42,10 +43,10 @@ export function PageHeader({
   const { quota, accept, refresh } = useQuota(initialQuota);
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
-  const savedLemmas = new Set([...initialSavedLemmas, ...locallySaved].map((lemma) => lemma.toLowerCase()));
+  const savedLemmas = new Set([...initialSavedLemmas, ...locallySaved].map((lemma) => lowercaseTargetText(lemma)));
 
   async function saveWord(entry: WordGloss[number], source: VocabSource, sourceText: string) {
-    const key = entry.lemma.toLowerCase();
+    const key = lowercaseTargetText(entry.lemma);
     if (!entry.lemma || savedLemmas.has(key)) return;
     setLocallySaved((previous) => new Set(previous).add(key));
     let ok = false;
@@ -86,7 +87,7 @@ export function PageHeader({
       activePage={activePage}
       dueCount={dueCount}
     />
-    <ToolsLauncher canSave isSaved={(lemma) => savedLemmas.has(lemma.toLowerCase())}
+    <ToolsLauncher canSave isSaved={(lemma) => savedLemmas.has(lowercaseTargetText(lemma))}
       onSaveWord={saveWord} quota={quota} onQuotaChange={accept} onQuotaRefresh={refresh}
       level={level} remaining={quota.remaining} onAuthRequired={() => router.push('/login')} />
   </>;

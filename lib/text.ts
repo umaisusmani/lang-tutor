@@ -5,10 +5,16 @@
  * can't import from.
  */
 
+import { activeLanguage } from '@/lib/languages';
+import { lowercaseTargetText } from '@/lib/language-case';
+
+const extraWordChars = activeLanguage.wordEdgeCharacters.replace(/[\\\]^-]/g, '\\$&');
+const edgePunctuation = new RegExp(`^[^\\w${extraWordChars}]+|[^\\w${extraWordChars}]+$`, 'g');
+
 /** Strips leading/trailing punctuation so a gloss entry still matches a word
  * that carries a comma or full stop in the sentence. */
 export function stripPunctuation(word: string): string {
-  return word.replace(/^[^\wäöüÄÖÜß]+|[^\wäöüÄÖÜß]+$/g, '');
+  return word.replace(edgePunctuation, '');
 }
 
 /**
@@ -25,13 +31,13 @@ export function stripPunctuation(word: string): string {
 export function changedWordIndices(original: string, corrected: string): Set<number> {
   const pool = new Map<string, number>();
   for (const token of original.split(/\s+/)) {
-    const key = stripPunctuation(token).toLowerCase();
+    const key = lowercaseTargetText(stripPunctuation(token));
     if (key) pool.set(key, (pool.get(key) ?? 0) + 1);
   }
 
   const changed = new Set<number>();
   corrected.split(/\s+/).forEach((token, i) => {
-    const key = stripPunctuation(token).toLowerCase();
+    const key = lowercaseTargetText(stripPunctuation(token));
     if (!key) return;
     const left = pool.get(key) ?? 0;
     if (left > 0) pool.set(key, left - 1);
@@ -50,10 +56,10 @@ export function changedWordIndices(original: string, corrected: string): Set<num
  * matches, so an example is never dropped just because the split was imperfect.
  */
 export function sentenceContaining(text: string, word: string): string {
-  const target = stripPunctuation(word).toLowerCase();
+  const target = lowercaseTargetText(stripPunctuation(word));
   const sentences = text.split(/(?<=[.!?])\s+/);
   const match = sentences.find((sentence) =>
-    sentence.split(/\s+/).some((token) => stripPunctuation(token).toLowerCase() === target),
+    sentence.split(/\s+/).some((token) => lowercaseTargetText(stripPunctuation(token)) === target),
   );
   return (match ?? text).trim();
 }

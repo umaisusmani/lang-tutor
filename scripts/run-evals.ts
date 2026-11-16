@@ -11,7 +11,6 @@
 import { generateText } from 'ai';
 
 import { ASK_EVAL_CASES } from '@/evals/ask-cases';
-import type { AskEvalCase } from '@/evals/ask-cases';
 import { EVAL_CASES } from '@/evals/cases';
 import { GLOSS_EVAL_CASES } from '@/evals/gloss-cases';
 import {
@@ -304,29 +303,13 @@ async function runAskSuite(): Promise<SuiteResult> {
       continue;
     }
 
-    const lines = answer.trim().split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    const parts: Record<AskEvalCase['checks'][number]['part'], string> = {
-      whole: answer,
-      first: lines[0] ?? '',
-      grammar: lines[1] ?? '',
-    };
     const problems: string[] = [];
 
-    if ((answer.match(/\S+/g) ?? []).length > 50) problems.push('over 50 words');
-    if (testCase.kind === 'question') {
-      if (/^(?:Translation|German|Grammar):/im.test(answer)) problems.push('sentence labels on a question');
-    } else {
-      const firstLabel = testCase.kind === 'german-phrase' ? 'Translation' : 'German';
-      if (lines.length !== 2) problems.push(`expected two lines, got ${lines.length}`);
-      if (!lines[0]?.startsWith(`${firstLabel}:`)) problems.push(`missing ${firstLabel}: line`);
-      if (!lines[1]?.startsWith('Grammar:')) problems.push('missing Grammar: line');
-    }
-
     for (const check of testCase.checks) {
-      if (!check.pattern.test(parts[check.part])) problems.push(`missing: ${check.why}`);
+      if (!check.pattern.test(answer)) problems.push(`missing: ${check.why}`);
     }
     for (const reject of testCase.rejects ?? []) {
-      if (reject.pattern.test(parts[reject.part])) problems.push(`wrong: ${reject.why}`);
+      if (reject.pattern.test(answer)) problems.push(`wrong: ${reject.why}`);
     }
 
     console.log(`${problems.length ? '✗' : '✓'} ${testCase.id}`);

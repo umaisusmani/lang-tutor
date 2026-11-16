@@ -157,7 +157,9 @@ First look for English stand-ins, including a single English noun, adjective,
 or activity inside an otherwise ${promptLanguageName} sentence. Then read each ${promptLanguageName} clause
 ${activeLanguage.secondLookErrorTypes}. Do not require
 the meaning to be unclear before flagging a clear error. ${activeLanguage.secondLookOrthography} If either check finds something, produce the
-full corrected ${promptLanguageName} sentence and all accompanying fields.`;
+full corrected ${promptLanguageName} sentence and all accompanying fields.
+
+REMINDER: Missing capitalization, a plain a/o/u where ä/ö/ü belongs, and ss where ß belongs are still acceptable and NOT mistakes, even on second look. If they are the only difference, hasMistake must be false.`;
 }
 
 /** System prompt for the per-reply word-gloss pass (lib/gloss.ts). Glosses
@@ -187,7 +189,24 @@ Rules:
   in the source text.
 - Also give each word's "lemma" and "lemmaTranslation":
 
-${LEMMA_RULES}`;
+${LEMMA_RULES}
+
+Examples of correct lemma output for tricky cases:
+
+Input: "Ich rufe dich morgen an"
+- "Ich" → lemma "ich", lemmaTranslation "I"
+- "rufe" → lemma "anrufen", lemmaTranslation "to call (on the phone)"
+- "dich" → lemma "dich", lemmaTranslation "you (accusative)"
+- "morgen" → lemma "morgen", lemmaTranslation "tomorrow"
+- "an" → lemma "anrufen", lemmaTranslation "to call (on the phone)"
+
+Input: "Ich freue mich auf das Wochenende"
+- "Ich" → lemma "ich", lemmaTranslation "I"
+- "freue" → lemma "sich freuen auf", lemmaTranslation "to look forward to"
+- "mich" → lemma "sich freuen auf", lemmaTranslation "to look forward to"
+- "auf" → lemma "sich freuen auf", lemmaTranslation "to look forward to"
+- "das" → lemma "das", lemmaTranslation "the (neuter)"
+- "Wochenende" → lemma "das Wochenende", lemmaTranslation "the weekend"`;
 }
 
 /**

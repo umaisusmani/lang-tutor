@@ -21,6 +21,25 @@ const toolViews: ToolView[] = ['ask', 'translate'];
 const toolViewLabels: Record<ToolView, string> = { ask: 'ask', translate: 'translate' };
 type PanelTurn = { role: 'user' | 'assistant'; content: string };
 
+const PANEL_STORAGE_KEY = 'starvogel-panel-turns';
+const MAX_STORED_TURNS = 10;
+
+function loadStoredTurns(): PanelTurn[] {
+  try {
+    const raw = sessionStorage.getItem(PANEL_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(-MAX_STORED_TURNS);
+  } catch {
+    return [];
+  }
+}
+
+function storeTurns(turns: PanelTurn[]): void {
+  try { sessionStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify(turns.slice(-MAX_STORED_TURNS))); } catch {}
+}
+
 function messageText(message: LangTutorUIMessage): string {
   return message.parts
     .filter((part) => part.type === 'text')
@@ -72,7 +91,14 @@ export function ChatSidePanel({
     if (open && openOnView) setView(openOnView);
   }
   const [draft, setDraft] = useState('');
-  const [turns, setTurns] = useState<PanelTurn[]>([]);
+  const [turns, setTurnsRaw] = useState<PanelTurn[]>(loadStoredTurns);
+  const setTurns: typeof setTurnsRaw = (updater) => {
+    setTurnsRaw((current) => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      storeTurns(next);
+      return next;
+    });
+  };
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [translationDirection, setTranslationDirection] = useState<TranslationDirection>(translatorDirections.englishToTarget);

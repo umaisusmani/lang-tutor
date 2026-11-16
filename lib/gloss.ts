@@ -84,6 +84,35 @@ export function normalizeReplyGloss(
   return { words: words ?? [], translation: translation ?? null };
 }
 
+const SEPARABLE_PREFIXES = new Set([
+  'ab', 'an', 'auf', 'aus', 'bei', 'ein', 'mit',
+  'nach', 'vor', 'zu', 'zurück', 'weg', 'her', 'hin',
+  'fest', 'los', 'statt', 'teil',
+]);
+
+function patchSeparableVerbs(words: WordGloss): WordGloss {
+  if (words.length < 3) return words;
+
+  const last = words[words.length - 1];
+  const particle = last.word.replace(/[.!?,;:"""]/g, '').toLowerCase();
+  if (!SEPARABLE_PREFIXES.has(particle)) return words;
+
+  const verbIndex = words.findIndex((w, i) =>
+    i < 3 && /(?:en|eln|ern)$/i.test(w.lemma) && w.lemma.toLowerCase() !== w.word.toLowerCase(),
+  );
+  if (verbIndex === -1) return words;
+
+  const verb = words[verbIndex];
+  if (verb.lemma.toLowerCase().startsWith(particle)) return words;
+
+  const combined = particle + verb.lemma.toLowerCase();
+  return words.map((w, i) => {
+    if (i === verbIndex) return { ...w, lemma: combined };
+    if (i === words.length - 1) return { ...w, lemma: combined, lemmaTranslation: verb.lemmaTranslation };
+    return w;
+  });
+}
+
 export async function glossText(
   text: string,
   usageContext: UsageContext = {},
@@ -101,5 +130,5 @@ export async function glossText(
 
   await logUsage('gloss', GLOSS_MODEL, usage, usageContext);
 
-  return object;
+  return { ...object, words: patchSeparableVerbs(object.words) };
 }

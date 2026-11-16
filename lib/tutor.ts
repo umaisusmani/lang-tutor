@@ -80,11 +80,13 @@ export class UnusableCorrectionError extends Error {
  * produce a usable correction. */
 export async function checkWithSecondLook(
   check: (secondLook: boolean) => Promise<Correction>,
+  userMessage?: string,
 ): Promise<Correction> {
   const first = await check(false);
   if (hasCorrectionCard(first)) return first;
 
-  const second = await check(true);
+  let second = await check(true);
+  if (userMessage) second = suppressOrthographicOnlyCorrection(userMessage, second);
   if (hasCorrectionCard(second)) return second;
 
   if (first.hasMistake || first.usedEnglish || second.hasMistake || second.usedEnglish) {
@@ -130,5 +132,5 @@ export async function detectCorrection(
       console.info('[correction] second look recovered a missed correction');
     }
     return verdict;
-  });
+  }, userMessage);
 }

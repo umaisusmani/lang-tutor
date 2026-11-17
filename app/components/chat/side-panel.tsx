@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/app/components/button';
 import { Pill } from '@/app/components/pill';
+import { InlineMarkdown } from '@/app/components/chat/inline-markdown';
 import { QuotaBanner } from '@/app/components/quota-banner';
 import { TranslationWords } from '@/app/components/chat/translation-words';
 import { TranslatableResult } from '@/app/components/chat/translatable-result';
@@ -383,7 +384,9 @@ export function ChatSidePanel({
                         : 'border-hair bg-panel text-ink self-start border-2'
                     }`}
                   >
-                    {turn.content || (sending && index === turns.length - 1 ? 'thinking…' : '')}
+                    {turn.role === 'user' || !turn.content
+                      ? turn.content || (sending && index === turns.length - 1 ? 'thinking…' : '')
+                      : <InlineMarkdown text={turn.content} />}
                   </div>
                 ))
               )}

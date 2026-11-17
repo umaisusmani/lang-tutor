@@ -1,13 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
-import { noteHtmlToPlainText } from '@/lib/sanitize-note-html';
+import { NOTE_HTML_MAX, NOTE_PLAIN_MAX, noteHtmlToPlainText } from '@/lib/sanitize-note-html';
+import { sanitizeNoteHtmlServer } from '@/lib/sanitize-note-html.server';
 import { EXAMPLE_SENTENCE_MAX } from '@/lib/services/vocab.service';
 import type { GrammarNote } from '@/lib/types/db';
 
+/** Sanitized HTML ready to store, or null if the note is empty or over the limits. */
 function validNote(note: string): string | null {
   if (typeof note !== 'string') return null;
-  const trimmed = note.trim();
-  const plain = noteHtmlToPlainText(trimmed);
-  return plain.trim() && plain.length <= 500 && trimmed.length <= 5000 ? trimmed : null;
+  const clean = sanitizeNoteHtmlServer(note.trim());
+  const plain = noteHtmlToPlainText(clean);
+  return plain.trim() && plain.length <= NOTE_PLAIN_MAX && clean.length <= NOTE_HTML_MAX ? clean : null;
 }
 
 export async function saveGrammarNote(

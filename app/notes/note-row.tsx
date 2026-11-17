@@ -8,7 +8,7 @@ import { Select } from '@/app/components/select';
 import { notifyError } from '@/app/components/toaster';
 import { RichEditor } from '@/app/notes/rich-editor';
 import { deleteGrammarNoteAction, updateGrammarNoteAction, updateVocabNoteAction } from '@/app/vocab/actions';
-import { noteHtmlToPlainText, renderNoteHtml } from '@/lib/sanitize-note-html';
+import { isNoteWithinLimits, noteHtmlToPlainText, renderNoteHtml } from '@/lib/sanitize-note-html';
 import type { GrammarNote, NoteCategory, VocabEntry } from '@/lib/types/db';
 
 export type NoteItem = { kind: 'grammar'; note: GrammarNote } | { kind: 'word'; note: VocabEntry };
@@ -35,10 +35,11 @@ export function NoteRow({ item, categories, onRemoved, onChanged }: {
   const [error, setError] = useState('');
   const categoryLabelId = useId();
   const confirm = useConfirm();
+  const canSave = item.kind === 'grammar' ? Boolean(noteHtmlToPlainText(draft).trim()) && isNoteWithinLimits(draft) : Boolean(draft.trim());
   const categoryName = item.kind === 'grammar' ? categories.find((entry) => entry.id === category)?.name : undefined;
 
   async function save() {
-    if (pending || !(item.kind === 'grammar' ? noteHtmlToPlainText(draft).trim() : draft.trim())) return;
+    if (pending || !canSave) return;
     setPending(true);
     setError('');
     try {
@@ -116,10 +117,12 @@ export function NoteRow({ item, categories, onRemoved, onChanged }: {
       </div>}
       {error && <p role="alert" className="text-ink-2 text-sm">{error}</p>}
       <div className="flex gap-2">
-        <Pill hitArea disabled={pending || !(item.kind === 'grammar' ? noteHtmlToPlainText(draft).trim() : draft.trim())} onClick={() => void save()}>{pending ? 'saving…' : 'Save'}</Pill>
+        <Pill hitArea disabled={pending || !canSave} onClick={() => void save()}>{pending ? 'saving…' : 'Save'}</Pill>
         <Pill hitArea disabled={pending} onClick={() => { setDraft(text); setCategoryDraft(category); setEditing(false); setError(''); }}>Cancel</Pill>
       </div>
-    </> : <p className="text-ink text-sm whitespace-pre-wrap break-words">{item.kind === 'grammar' ? <SafeNoteDisplay html={text} /> : text}</p>}
+    </> : item.kind === 'grammar'
+      ? <div className="note-content text-ink text-sm break-words"><SafeNoteDisplay html={text} /></div>
+      : <p className="text-ink text-sm whitespace-pre-wrap break-words">{text}</p>}
     {item.kind === 'grammar' && item.note.example_sentence &&
       <p className="text-ink-3 text-[13px] italic break-words">{item.note.example_sentence}</p>}
   </article>;

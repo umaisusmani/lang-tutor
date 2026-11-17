@@ -5,6 +5,7 @@ import { NoteRow } from '@/app/notes/note-row';
 import { updateGrammarNoteAction } from '@/app/vocab/actions';
 import type { GrammarNote, NoteCategory, VocabEntry } from '@/lib/types/db';
 
+vi.mock('@/app/notes/rich-editor', () => import('@/app/notes/rich-editor.mock'));
 vi.mock('@/app/components/confirm-modal', () => ({ useConfirm: () => vi.fn() }));
 vi.mock('@/app/components/toaster', () => ({ notifyError: vi.fn() }));
 vi.mock('@/app/vocab/actions', () => ({
@@ -65,4 +66,42 @@ test('the category dropdown can clear an assigned category', async () => {
   expect(select).toHaveTextContent('No category');
   fireEvent.click(within(row).getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(updateGrammarNoteAction).toHaveBeenCalledWith('grammar-1', grammarNote.note, null));
+});
+
+test('stored tables, headings, lists and links render as real elements with safe links', () => {
+  const note = '<h2>Haben</h2><ul><li>ich habe</li></ul><table><thead><tr><th>Case</th></tr></thead><tbody><tr><td>Nom</td></tr></tbody></table>'
+    + '<p><a href="https://example.com" onclick="x()">more</a> <a href="javascript:alert(1)">bad</a></p>';
+  render(<NoteRow item={{ kind: 'grammar', note: { ...grammarNote, note } }} categories={[]} onRemoved={vi.fn()} onChanged={vi.fn()} />);
+  const row = screen.getByRole('article');
+  expect(within(row).getByRole('heading', { name: 'Haben' })).toBeInTheDocument();
+  expect(within(row).getByRole('list')).toBeInTheDocument();
+  expect(within(row).getByRole('columnheader', { name: 'Case' })).toBeInTheDocument();
+  expect(within(row).getByRole('cell', { name: 'Nom' })).toBeInTheDocument();
+  expect(row.querySelector('.note-table-wrap table')).not.toBeNull();
+  const link = within(row).getByRole('link', { name: 'more' });
+  expect(link).toHaveAttribute('href', 'https://example.com');
+  expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  expect(link).not.toHaveAttribute('onclick');
+  expect(within(row).queryByRole('link', { name: 'bad' })).not.toBeInTheDocument();
+  expect(row).toHaveTextContent('bad');
+});
+
+test('a legacy note with plain newlines still shows both lines', () => {
+  render(<NoteRow item={{ kind: 'grammar', note: { ...grammarNote, note: 'line1\nline2' } }} categories={[]} onRemoved={vi.fn()} onChanged={vi.fn()} />);
+  const row = screen.getByRole('article');
+  expect(row.querySelector('br')).not.toBeNull();
+  expect(row).toHaveTextContent('line1line2');
+});
+
+test('Save is disabled while the edited note is over the length limit', () => {
+  render(<NoteRow item={{ kind: 'grammar', note: grammarNote }} categories={[]} onRemoved={vi.fn()} onChanged={vi.fn()} />);
+  const row = screen.getByRole('article');
+  fireEvent.click(within(row).getByRole('button', { name: 'Edit note' }));
+  const editor = within(row).getByRole('textbox', { name: 'Edit note' });
+  editor.innerHTML = `<p>${'x'.repeat(5001)}</p>`;
+  fireEvent.input(editor);
+  expect(within(row).getByRole('button', { name: 'Save' })).toBeDisabled();
+  editor.innerHTML = '<p>fine</p>';
+  fireEvent.input(editor);
+  expect(within(row).getByRole('button', { name: 'Save' })).toBeEnabled();
 });

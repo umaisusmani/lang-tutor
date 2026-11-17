@@ -12,7 +12,7 @@ import { Select } from '@/app/components/select';
 import { NoteRow, type NoteItem } from '@/app/notes/note-row';
 import { RichEditor } from '@/app/notes/rich-editor';
 import { createNoteCategoryAction, listNoteCategoriesAction, saveGrammarNoteAction, searchSavedWordsAction, updateVocabNoteAction } from '@/app/vocab/actions';
-import { noteHtmlToPlainText, noteTextToHtml } from '@/lib/sanitize-note-html';
+import { isNoteWithinLimits, noteHtmlToPlainText, noteTextToHtml } from '@/lib/sanitize-note-html';
 import type { GrammarNote, NoteCategory, VocabEntry } from '@/lib/types/db';
 
 type SavedWord = { id: string; lemma: string };
@@ -136,8 +136,10 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
     setCategoryError('');
   }
 
+  const canAdd = selectedWord ? Boolean(text.trim()) : Boolean(noteHtmlToPlainText(text).trim()) && isNoteWithinLimits(text);
+
   async function add() {
-    if (!noteHtmlToPlainText(text).trim() || saving) return;
+    if (!canAdd || saving) return;
     setSaving(true);
     setError('');
     try {
@@ -227,8 +229,8 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
             {matches.length > 0 && <div className="flex flex-wrap gap-2" aria-label="Saved word matches">
               {matches.map((word) => <Pill key={word.id} onClick={() => {
                 searchRef.current++;
-                const plain = new DOMParser().parseFromString(text, 'text/html').body.textContent ?? '';
-                setText(plain);
+                // Word notes are plain text with their own 500-character limit.
+                setText(noteHtmlToPlainText(text).trim().slice(0, 500));
                 setSelectedWord(word);
                 setMatches([]);
                 setSearching(false);
@@ -237,7 +239,7 @@ export function NotesBrowser({ grammarNotes, wordNotes, count }: {
           </div>}
         </>}
         {error && <p role="alert" className="text-ink-2 text-sm">{error}</p>}
-        <Button variant="primary" size="sm" type="button" disabled={saving || !noteHtmlToPlainText(text).trim()} onClick={() => void add()}
+        <Button variant="primary" size="sm" type="button" disabled={saving || !canAdd} onClick={() => void add()}
           className="self-start">{saving ? 'Adding…' : 'Add note'}</Button>
       </>}
     </Modal>

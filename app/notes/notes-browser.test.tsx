@@ -10,6 +10,7 @@ import type { GrammarNote, NoteCategory, VocabEntry } from '@/lib/types/db';
 
 const refresh = vi.fn();
 const confirm = vi.fn();
+vi.mock('@/app/notes/rich-editor', () => import('@/app/notes/rich-editor.mock'));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
 vi.mock('@/app/components/confirm-modal', () => ({ useConfirm: () => confirm }));
 vi.mock('@/app/components/toaster', () => ({ notifyError: vi.fn() }));

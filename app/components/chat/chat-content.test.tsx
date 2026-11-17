@@ -5,6 +5,8 @@ import { ChatThread } from '@/app/components/chat/chat-content';
 import type { LangTutorUIMessage } from '@/lib/chat-types';
 import { FALLBACK_PERSONA } from '@/lib/personas';
 
+vi.mock('@/app/notes/rich-editor', () => import('@/app/notes/rich-editor.mock'));
+
 afterEach(cleanup);
 
 test('collapses a correction to its changed-word summary and expands it again', () => {
@@ -79,7 +81,6 @@ test('edits a correction explanation before saving it as a note', async () => {
   fireEvent.click(screen.getByRole('button', { name: '+ save as note' }));
   const editor = screen.getByRole('textbox', { name: 'Grammar note' });
   expect(editor).toHaveTextContent('Use habe with ich.');
-  expect(screen.getByRole('button', { name: 'Underline' })).toBeInTheDocument();
   const category = screen.getByRole('combobox', { name: 'Category (optional)' });
   expect(category).toHaveValue('verb conjugation');
   editor.innerHTML = 'Use <strong>habe</strong> for ich.';

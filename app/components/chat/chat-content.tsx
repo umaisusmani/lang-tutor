@@ -17,7 +17,7 @@ import type { LangTutorUIMessage } from '@/lib/chat-types';
 import type { Starter } from '@/lib/constants';
 import { hasCorrectionCard } from '@/lib/correction-card';
 import { lowercaseTargetText } from '@/lib/language-case';
-import { noteHtmlToPlainText, noteTextToHtml } from '@/lib/sanitize-note-html';
+import { isNoteWithinLimits, noteHtmlToPlainText, noteTextToHtml } from '@/lib/sanitize-note-html';
 import type { NoteCategory } from '@/lib/types/db';
 import type { ExplainKind } from '@/lib/explain';
 import type { WordGloss } from '@/lib/gloss';
@@ -367,8 +367,9 @@ function CorrectionCard({
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
   const [noteError, setNoteError] = useState(false);
+  const canSaveNote = Boolean(noteHtmlToPlainText(noteDraft).trim()) && isNoteWithinLimits(noteDraft);
   async function saveNote() {
-    if (savingNote || !noteHtmlToPlainText(noteDraft).trim()) return;
+    if (savingNote || !canSaveNote) return;
     setSavingNote(true);
     let ok = false;
     try {
@@ -470,7 +471,7 @@ function CorrectionCard({
               </select>
               {noteError && <span role="alert" className="text-ink-2 text-sm">Couldn&apos;t save this note. Please try again.</span>}
               <div className="flex gap-2">
-                <Pill hitArea disabled={savingNote || !noteHtmlToPlainText(noteDraft).trim()} onClick={() => void saveNote()}>{savingNote ? 'saving…' : 'Save'}</Pill>
+                <Pill hitArea disabled={savingNote || !canSaveNote} onClick={() => void saveNote()}>{savingNote ? 'saving…' : 'Save'}</Pill>
                 <Pill hitArea disabled={savingNote} onClick={() => { setEditingNote(false); setNoteError(false); }}>Cancel</Pill>
               </div>
             </div>

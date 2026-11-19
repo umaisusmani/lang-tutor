@@ -1,6 +1,7 @@
 import type { PersonaProfile } from '@/lib/personas';
 import type { LanguagePack } from '@/lib/languages/types';
 import type { Starter } from '@/lib/constants';
+import { DE_TOPIC_SEEDS } from '@/lib/languages/de-topics';
 
 /**
  * The mistake-type taxonomy. Single source of truth — referenced by the
@@ -104,7 +105,7 @@ const FALLBACK_PERSONA: PersonaProfile = {
   city: 'Düsseldorf',
   bio:
     'Kind, warm and talkative. Studies media design and works weekend shifts in ' +
-    'a café in Flingern. Loves walking along the Rhine, trying new recipes, ' +
+    'a café in Flingern. Loves trying new recipes, ' +
     'indie music and cycling around the city. Has a younger brother and a ' +
     'slightly chaotic flatmate. Curious about other people and happy to ' +
     'share little stories from her own week. Also very much into jewellery crafting and has a small Etsy shop for it.',
@@ -133,7 +134,7 @@ const LEVEL_GUIDANCE: LanguagePack['levelGuidance'] = {
 - Speak to the learner as "du".`,
   A2: `The learner is an elementary learner (CEFR A2). Limits for every reply:
 - At most 3 sentences, each at most 12 words.
-- Present tense and Perfekt only.
+- Present tense and Perfekt only. "war", "hatte" and the Präteritum of modal verbs (konnte, wollte, musste) are fine.
 - At most one simple subordinate clause per reply (weil, dass, wenn), and no relative clauses.
 - Everyday vocabulary. Speak to the learner as "du".`,
   B1: 'The learner is an intermediate learner (CEFR B1). Use natural everyday German, including some subordinate clauses (weil, dass, wenn) and the Präteritum of common verbs. Avoid rare idioms.',
@@ -227,7 +228,7 @@ For a unit it's the unit's meaning ("anrufen" -> "to call (on the phone)",
 that share a lemma share its lemmaTranslation.`;
 
 // Persona-specific conversation detail used after the generic character guidance.
-const PERSONA_WORDING = 'Walks by the Rhine are an occasional detail, not a default topic. If you mention one, it is along the riverside promenade.';
+const PERSONA_WORDING = 'Your city and your café job are background, not default topics.';
 
 const STARTERS: readonly Starter[] = [
   // Everyday small talk
@@ -320,7 +321,6 @@ export const de: LanguagePack<typeof MISTAKE_TYPES> = {
   },
   secondLookErrorTypes: 'for a clear verb, word-order, case, article, or word-choice error',
   secondLookOrthography: 'Ignore capitalization,\nmissing umlauts, and ss for ß here too; "uber" in a German sentence can mean\n"über", not an English stand-in.',
-  correctionGlossFunctionWords: '(articles,\n  auxiliaries, pronouns)',
   glossFunctionWords: '(articles, auxiliaries, pronouns, conjunctions)',
   wordLookupNounMeaning: 'no article for nouns',
   explanationNounArticle: '(with its article\nfor nouns)',
@@ -344,6 +344,7 @@ export const de: LanguagePack<typeof MISTAKE_TYPES> = {
   conversationStyle: CONVERSATION_STYLE,
   lemmaRules: LEMMA_RULES,
   personaWording: PERSONA_WORDING,
+  topicSeeds: DE_TOPIC_SEEDS,
   translatorDirections: {
     targetToEnglish: 'de-en',
     englishToTarget: 'en-de',

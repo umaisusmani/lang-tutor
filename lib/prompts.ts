@@ -56,19 +56,32 @@ export function buildTurnGuidance(
   return 'Your last two replies ended with questions. This time, respond with a statement, opinion, or small detail about yourself instead of asking another question.';
 }
 
+/**
+ * Optional things from her own life to bring up this turn (see lib/topics.ts).
+ * The model decides whether to use one: they are offered, never required.
+ */
+export function buildTopicGuidance(topics: readonly string[]): string {
+  if (!topics.length) return '';
+  return `Optional ideas from your own life that you could bring up. React to what the learner said first, then use one only if it fits naturally. Ignore them if the learner's topic is more interesting. Never say that you were given ideas.
+${topics.map((topic) => `- ${topic}`).join('\n')}`;
+}
+
 /** Builds the full system prompt for a given proficiency level and persona.
  * Both default so callers that don't care (e.g. quick local tests) still get
- * a sensible prompt. The level section comes last: its limits are the
- * constraint the persona's chattiness most wants to break, and the last
- * instruction in a system prompt tends to win that tug-of-war. */
+ * a sensible prompt. `turnNotes` are per-turn additions (see
+ * buildTurnGuidance and buildTopicGuidance). The level section comes last:
+ * its limits are the constraint the persona's chattiness most wants to
+ * break, and the last instruction in a system prompt tends to win that
+ * tug-of-war. */
 export function buildConversationSystemPrompt(
   level: CefrLevel = DEFAULT_CEFR_LEVEL,
   persona: PersonaProfile = FALLBACK_PERSONA,
+  turnNotes = '',
 ): string {
   return `${personaSection(persona)}
 
 ${CONVERSATION_STYLE}
-
+${turnNotes ? `\nThis turn:\n${turnNotes}\n` : ''}
 Learner's level (these limits override everything above -- being chatty never means longer or harder sentences):
 ${LEVEL_GUIDANCE[level]}`;
 }
@@ -112,18 +125,8 @@ Also:
 - "explanation" is one or two plain-language sentences in English, understandable to someone who doesn't know grammar terminology.
 - "correctionTranslation" is a natural English translation of "correction"
   as a whole sentence (idiomatic, not word by word).
-- "correctionGloss" is a word-by-word English translation of EVERY word in
-  "correction", in order, including small function words ${activeLanguage.correctionGlossFunctionWords} -- not just the content words. Each entry is
-  {word, lemma, lemmaTranslation, translation} where "word" is copied exactly
-  as it appears in "correction" (same capitalization), WITHOUT any leading or
-  trailing punctuation -- no sentence-final periods, commas, or question
-  marks. The one exception is punctuation that is part of the word's own
-  spelling, like an apostrophe in a contraction. "translation" is the word's
-  meaning in this sentence. "lemma" and "lemmaTranslation" follow these rules:
 
-${LEMMA_RULES}
-
-If there is no mistake worth flagging at this level, hasMistake must be false and mistakeType/correction/correctionTranslation/explanation/correctionGloss must all be null.
+If there is no mistake worth flagging at this level, hasMistake must be false and mistakeType/correction/correctionTranslation/explanation must all be null.
 
 Before deciding the sentence is clean, check each verb form and the order of
 the verb in its clause, then check for missing or wrong words and endings.
@@ -144,7 +147,7 @@ in context is ${promptLanguageName} even if it is also English ${activeLanguage.
 - The one exception to the null rule above: when usedEnglish is true,
   "correction" is still filled in -- the whole sentence in ${promptLanguageName}, with the
   English words replaced (plus the fix, if hasMistake) -- along with its
-  correctionTranslation, correctionGloss, and an explanation naming the
+  correctionTranslation and an explanation naming the
   ${promptLanguageName} word(s)${activeLanguage.correctionEnglishExamples.nounArticle}.`;
 }
 
@@ -157,9 +160,7 @@ First look for English stand-ins, including a single English noun, adjective,
 or activity inside an otherwise ${promptLanguageName} sentence. Then read each ${promptLanguageName} clause
 ${activeLanguage.secondLookErrorTypes}. Do not require
 the meaning to be unclear before flagging a clear error. ${activeLanguage.secondLookOrthography} If either check finds something, produce the
-full corrected ${promptLanguageName} sentence and all accompanying fields.
-
-REMINDER: Missing capitalization, a plain a/o/u where ä/ö/ü belongs, and ss where ß belongs are still acceptable and NOT mistakes, even on second look. If they are the only difference, hasMistake must be false.`;
+full corrected ${promptLanguageName} sentence and all accompanying fields.`;
 }
 
 /** System prompt for the per-reply word-gloss pass (lib/gloss.ts). Glosses

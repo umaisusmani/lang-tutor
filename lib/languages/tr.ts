@@ -150,7 +150,6 @@ export const tr: LanguagePack<typeof MISTAKE_TYPES, 'tr'> = {
   },
   secondLookErrorTypes: "for a clear verb-ending, case-suffix, possessive, vowel-harmony, or word-choice error",
   secondLookOrthography: "Ignore capitalization and missing Turkish characters here too (c for ç, g for ğ, i for ı, o for ö, s for ş, u for ü); \"cok\" in a Turkish sentence means \"çok\", not an English stand-in.",
-  correctionGlossFunctionWords: "(pronouns,\n  postpositions, question particles)",
   glossFunctionWords: "(pronouns, postpositions, conjunctions, question particles)",
   wordLookupNounMeaning: "the bare noun with no suffixes",
   explanationNounArticle: "(in its dictionary\nform)",

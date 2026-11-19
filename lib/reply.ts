@@ -1,7 +1,12 @@
 import { groq } from '@ai-sdk/groq';
 
 import type { PersonaProfile } from '@/lib/personas';
-import { buildConversationSystemPrompt, buildTurnGuidance, type CefrLevel } from '@/lib/prompts';
+import {
+  buildConversationSystemPrompt,
+  buildTopicGuidance,
+  buildTurnGuidance,
+  type CefrLevel,
+} from '@/lib/prompts';
 
 export const CHAT_MODEL = 'openai/gpt-oss-120b';
 
@@ -18,13 +23,15 @@ export function replySettings(
   /** Her last two replies in this chat, newest first -- see buildTurnGuidance(). */
   previousReply?: string,
   replyBeforePrevious?: string,
+  /** Ideas she may bring up this turn -- see pickTopics() in lib/topics.ts. */
+  topics: readonly string[] = [],
 ) {
-  const turnGuidance = buildTurnGuidance(previousReply, replyBeforePrevious);
+  const turnNotes = [buildTurnGuidance(previousReply, replyBeforePrevious), buildTopicGuidance(topics)]
+    .filter(Boolean)
+    .join('\n\n');
   return {
     model: groq(CHAT_MODEL),
-    system: turnGuidance
-      ? `${buildConversationSystemPrompt(level, persona)}\n\nThis turn:\n${turnGuidance}`
-      : buildConversationSystemPrompt(level, persona),
+    system: buildConversationSystemPrompt(level, persona, turnNotes),
     providerOptions: {
       // Groq defaults to raw reasoning, which can put the model's planning
       // into the same text stream as the target-language reply.

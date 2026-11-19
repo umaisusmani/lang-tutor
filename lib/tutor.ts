@@ -2,7 +2,7 @@ import { groq } from '@ai-sdk/groq';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
-import { WordGlossSchema } from '@/lib/gloss';
+import { glossText, type WordGloss } from '@/lib/gloss';
 import { hasCorrectionCard } from '@/lib/correction-card';
 import { MISTAKE_TYPES } from '@/lib/mistake-types';
 import { lowercaseTargetText } from '@/lib/language-case';
@@ -16,7 +16,11 @@ import { logUsage, type UsageContext } from '@/lib/services/usage.service';
 
 const CORRECTION_MODEL = 'openai/gpt-oss-120b';
 
-const CorrectionSchema = z.object({
+// What the model fills in. The word-by-word gloss is deliberately not part of
+// it: most messages have no mistake, so asking for a gloss (and sending the
+// lemma rules that go with it) on every check was wasted tokens. detectCorrection()
+// glosses the corrected sentence afterwards, only when there is one.
+const ModelCorrectionSchema = z.object({
   hasMistake: z.boolean(),
   // The learner used English for words they didn't know -- invited by the UI,
   // so it's not a mistake: it doesn't set hasMistake and isn't recorded in
@@ -29,13 +33,14 @@ const CorrectionSchema = z.object({
   // Whole-sentence English translation of `correction`, same call.
   correctionTranslation: z.string().nullable(),
   explanation: z.string().nullable(),
-  // Word-by-word gloss of `correction`, not `userMessage` -- rides on this
-  // same call for free (no extra request), unlike the reply gloss in
-  // lib/gloss.ts, which needs its own call since it glosses different text.
-  correctionGloss: WordGlossSchema.nullable(),
 });
 
-export type Correction = z.infer<typeof CorrectionSchema>;
+export type Correction = z.infer<typeof ModelCorrectionSchema> & {
+  // Word-by-word gloss of `correction`, not `userMessage`. Added by
+  // detectCorrection() from a separate glossText() call; null when there is no
+  // corrected sentence, or when that call failed.
+  correctionGloss: WordGloss | null;
+};
 
 /** A model can still flag keyboard spelling after being asked to ignore it.
  * If its full correction changes no words beyond case, diacritics, ß, or
@@ -110,10 +115,10 @@ export async function detectCorrection(
   level: CefrLevel = DEFAULT_CEFR_LEVEL,
   usageContext: UsageContext = {},
 ): Promise<Correction> {
-  return checkWithSecondLook(async (secondLook) => {
+  const checked = await checkWithSecondLook(async (secondLook) => {
     const { object, usage } = await generateObject({
       model: groq(CORRECTION_MODEL),
-      schema: CorrectionSchema,
+      schema: ModelCorrectionSchema,
       system: secondLook
         ? buildCorrectionSecondLookPrompt(level)
         : buildCorrectionSystemPrompt(level),
@@ -127,10 +132,21 @@ export async function detectCorrection(
     });
 
     await logUsage('correction', CORRECTION_MODEL, usage, usageContext);
-    const verdict = suppressOrthographicOnlyCorrection(userMessage, object);
+    const verdict = suppressOrthographicOnlyCorrection(userMessage, { ...object, correctionGloss: null });
     if (secondLook && hasCorrectionCard(verdict)) {
       console.info('[correction] second look recovered a missed correction');
     }
     return verdict;
   }, userMessage);
+
+  if (!hasCorrectionCard(checked) || !checked.correction) return checked;
+
+  // A failed gloss costs the word-by-word breakdown, not the correction card.
+  try {
+    const { words } = await glossText(checked.correction, usageContext);
+    return { ...checked, correctionGloss: words };
+  } catch (err) {
+    console.error('[correction] gloss failed:', err);
+    return checked;
+  }
 }

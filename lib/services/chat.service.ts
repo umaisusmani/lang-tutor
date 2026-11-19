@@ -17,6 +17,7 @@ import { recordMistake } from '@/lib/services/mistake.service';
 import { resolvePersona } from '@/lib/services/persona.service';
 import { logUsage } from '@/lib/services/usage.service';
 import { getSavedLemmas } from '@/lib/services/vocab.service';
+import { pickTopics } from '@/lib/topics';
 import { detectCorrection, UnusableCorrectionError } from '@/lib/tutor';
 import type { Conversation } from '@/lib/types/db';
 
@@ -234,8 +235,16 @@ export async function runChatTurn(
     .slice(-2)
     .reverse()
     .map((message) => message.parts.filter((part) => part.type === 'text').map((part) => part.text).join('\n'));
+  const topics = pickTopics({
+    key: conversation?.id ?? messages[0]?.id ?? '',
+    turn: messages.filter((message) => message.role === 'assistant').length,
+    level,
+    learnerMessage: userText,
+    previousReply: previousReplies[0],
+    replyBeforePrevious: previousReplies[1],
+  });
   const result = streamText({
-    ...replySettings(level, persona, previousReplies[0], previousReplies[1]),
+    ...replySettings(level, persona, previousReplies[0], previousReplies[1], topics),
     messages: await convertToModelMessages(messages),
     onFinish: ({ totalUsage }) => logUsage('chat', CHAT_MODEL, totalUsage, { userId }),
   });

@@ -54,8 +54,8 @@ export type WordGloss = z.infer<typeof WordGlossSchema>;
  * it.
  */
 // Groq's structured-output mode rejects a bare array as the top-level schema
-// ("schema must have type 'object' ... at the top level") -- it's fine nested
-// inside CorrectionSchema's `correctionGloss` field, but glossText() calls
+// ("schema must have type 'object' ... at the top level") -- it's fine as the
+// stored `correctionGloss` field on a Correction, but glossText() calls
 // generateObject with this schema directly as the top level, so it has to be
 // wrapped in an object here and unwrapped after.
 //

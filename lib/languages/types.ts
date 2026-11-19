@@ -6,6 +6,17 @@ import type { PersonaProfile } from '@/lib/personas';
 import type { CefrLevel } from '@/lib/prompts';
 import type { Starter } from '@/lib/constants';
 
+export type TopicKind = 'story' | 'opinion' | 'plan' | 'person' | 'ask';
+
+/** One thing the persona could bring up. `text` is an instruction-style hook in
+ * English; the model writes the target-language reply. `basic` marks topics
+ * simple enough for A1 learners. */
+export interface TopicSeed {
+  kind: TopicKind;
+  text: string;
+  basic?: true;
+}
+
 export interface LanguagePack<
   Mistakes extends readonly [string, ...string[]] = readonly [string, ...string[]],
   Code extends string = 'de' | 'tr',
@@ -34,7 +45,6 @@ export interface LanguagePack<
   };
   secondLookErrorTypes: string;
   secondLookOrthography: string;
-  correctionGlossFunctionWords: string;
   glossFunctionWords: string;
   wordLookupNounMeaning: string;
   explanationNounArticle: string;
@@ -55,6 +65,8 @@ export interface LanguagePack<
   conversationStyle: string;
   lemmaRules: string;
   personaWording: string;
+  /** Pool the persona draws per-turn conversation ideas from (lib/topics.ts). */
+  topicSeeds?: readonly TopicSeed[];
   translatorDirections: {
     targetToEnglish: `${Code}-en`;
     englishToTarget: `en-${Code}`;
